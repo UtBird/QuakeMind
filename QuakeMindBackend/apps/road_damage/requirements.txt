@@ -1,0 +1,15 @@
+datasets
+huggingface_hub
+opencv-python
+numpy
+tqdm
+scikit-learn
+torch
+torchvision
+segmentation-models-pytorch
+albumentations
+osmnx
+geopandas
+shapely
+rasterio
+matplotlib

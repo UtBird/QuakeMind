@@ -1,0 +1,21 @@
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+.codex
+
+# Project specific
+output/
+temp_map_inference/
+cache/
+
+# Large Model Files (>100MB)
+models/
+*.ckpt
+*.pth
+
+# IDE
+.vscode/
+.idea/

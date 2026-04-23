@@ -1,0 +1,9 @@
+streamlit
+folium
+streamlit-folium
+transformers
+torch
+nltk
+zeyrek
+geopy
+huggingface_hub

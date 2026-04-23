@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.png
+models/help_berturk/
+data/processed/
+/models

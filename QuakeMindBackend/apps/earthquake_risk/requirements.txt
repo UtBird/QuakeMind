@@ -1,0 +1,11 @@
+# Linux GUI dependency: install with `sudo apt install python3-tk`
+opencv-python
+ultralytics
+requests
+folium
+numpy
+pandas
+scikit-learn
+catboost
+geopy
+customtkinter

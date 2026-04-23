@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+venv/
+**/venv/
+**/.venv/
+
+.vscode/
+.codex/
+.codex
+
+runtime/
+cache/
+catboost_info/
+**/cache/
+**/catboost_info/
+
+# Models hosted outside GitHub
+apps/disaster_nlp/models/2kveri/model.safetensors
+apps/road_damage/models/optimized_mitb4_focal_dice30.pth
+apps/road_damage/models/210926_deneme_18epoch_mitb4_imagenet_focalanddiceloss.pth
