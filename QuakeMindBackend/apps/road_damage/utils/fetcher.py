@@ -5,18 +5,22 @@ import cv2
 from PIL import Image
 import datetime
 import logging
+import time
 
 try:
     import streamlit as st
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
     _has_st = True
 except ImportError:
     _has_st = False
+    get_script_run_ctx = None
 
 _logger = logging.getLogger(__name__)
+_roads_cache = {}
 
 
 def _warn(msg):
-    if _has_st:
+    if _has_st and get_script_run_ctx is not None and get_script_run_ctx() is not None:
         try:
             st.warning(msg)
         except Exception:
@@ -25,7 +29,7 @@ def _warn(msg):
 
 
 def _error(msg):
-    if _has_st:
+    if _has_st and get_script_run_ctx is not None and get_script_run_ctx() is not None:
         try:
             st.error(msg)
         except Exception:
@@ -99,35 +103,62 @@ def fetch_satellite_area(lat, lon, bbox=None, zoom_level=18, wayback_id=None, pr
 def get_osm_roads_overpass(bounds, w, h, thickness=4):
     """Fetches OSM roads via Overpass and draws perfectly aligned array."""
     west, south, east, north = bounds
-    
+
+    cache_key = (
+        round(float(west), 5),
+        round(float(south), 5),
+        round(float(east), 5),
+        round(float(north), 5),
+        int(w),
+        int(h),
+        int(thickness),
+    )
+
+    if cache_key in _roads_cache:
+        return _roads_cache[cache_key].copy()
+
     servers = [
-        "http://overpass-api.de/api/interpreter",
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass-api.de/api/interpreter?data=",
         "https://overpass.kumi.systems/api/interpreter",
-        "https://lz4.overpass-api.de/api/interpreter"
+        "https://lz4.overpass-api.de/api/interpreter",
+        "https://overpass.private.coffee/api/interpreter",
     ]
-    
+
     query = f'''
     [out:json][timeout:30];
     way["highway"]({south},{west},{north},{east});
     out geom;
     '''
-    
+
     road_img = np.zeros((h, w), dtype=np.uint8)
     data = None
-    
+
+    session = requests.Session()
+    headers = {"User-Agent": "QuakeMindRoadDamage/1.0"}
+
     for url in servers:
-        try:
-            resp = requests.post(url, data=query, timeout=30)
-            if resp.status_code == 200:
-                data = resp.json()
-                break # Success
-        except Exception:
-            continue
-            
+        for attempt in range(2):
+            try:
+                if url.endswith("?data="):
+                    resp = session.get(url + requests.utils.quote(query), headers=headers, timeout=35)
+                else:
+                    resp = session.post(url, data=query, headers=headers, timeout=35)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    break  # Success
+            except Exception:
+                pass
+
+            # brief backoff between attempts/servers
+            time.sleep(0.35 + (attempt * 0.25))
+        if data is not None:
+            break
+
     if not data:
         _warn("All Overpass servers failed. Roads could not be fetched.")
         return road_img
-        
+
     try:
         for element in data.get('elements', []):
             if 'geometry' in element:
@@ -141,7 +172,12 @@ def get_osm_roads_overpass(bounds, w, h, thickness=4):
                     cv2.polylines(road_img, [pts], False, 1, thickness=thickness)
     except Exception as e:
         _warn(f"OSM parse error: {e}")
-        
+
+    # Keep a small in-memory cache to survive transient Overpass outages.
+    if len(_roads_cache) >= 24:
+        _roads_cache.pop(next(iter(_roads_cache)))
+    _roads_cache[cache_key] = road_img.copy()
+
     return road_img
 
 def get_wayback_versions():
