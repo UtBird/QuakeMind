@@ -14,6 +14,10 @@ class RoadDamageResult {
     required this.threshold,
     required this.safeRoadSegments,
     required this.blockedRoadSegments,
+    required this.satelliteSource,
+    required this.satelliteTileUrl,
+    required this.satelliteAttribution,
+    required this.timingsMs,
   });
 
   factory RoadDamageResult.fromJson(Map<String, dynamic> json) {
@@ -34,6 +38,10 @@ class RoadDamageResult {
       threshold: (json['threshold'] as num?)?.toDouble() ?? 0.4,
       safeRoadSegments: _parseSegments(json['safeRoadSegments']),
       blockedRoadSegments: _parseSegments(json['blockedRoadSegments']),
+      satelliteSource: json['satelliteSource'] as String? ?? '',
+      satelliteTileUrl: json['satelliteTileUrl'] as String? ?? '',
+      satelliteAttribution: json['satelliteAttribution'] as String? ?? '',
+      timingsMs: _parseTimings(json['timingsMs']),
     );
   }
 
@@ -58,6 +66,17 @@ class RoadDamageResult {
         .toList();
   }
 
+  static Map<String, double> _parseTimings(dynamic raw) {
+    if (raw is! Map) return const {};
+    final out = <String, double>{};
+    for (final entry in raw.entries) {
+      final key = entry.key.toString();
+      final value = (entry.value as num?)?.toDouble();
+      if (value != null) out[key] = value;
+    }
+    return out;
+  }
+
   final String city;
   final double damageRate;
   final int openRoads;
@@ -72,6 +91,10 @@ class RoadDamageResult {
   final double threshold;
   final List<List<RoadPoint>> safeRoadSegments;
   final List<List<RoadPoint>> blockedRoadSegments;
+  final String satelliteSource;
+  final String satelliteTileUrl;
+  final String satelliteAttribution;
+  final Map<String, double> timingsMs;
 }
 
 class RoadPoint {

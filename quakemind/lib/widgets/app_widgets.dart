@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -8,6 +9,33 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../models/road_damage_result.dart';
 import '../models/risk_module_result.dart';
 import '../theme/app_theme.dart';
+
+BoxDecoration _glassBoxDecoration({
+  double radius = 26,
+  Color? tint,
+  Color? stroke,
+}) {
+  final base = tint ?? AppTheme.panelHigh;
+  return BoxDecoration(
+    gradient: LinearGradient(
+      colors: [
+        base.withValues(alpha: 0.42),
+        AppTheme.panel.withValues(alpha: 0.30),
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: stroke ?? AppTheme.glassStroke),
+    boxShadow: const [
+      BoxShadow(
+        color: Color(0x66000000),
+        blurRadius: 22,
+        offset: Offset(0, 12),
+      ),
+    ],
+  );
+}
 
 class SectionCard extends StatelessWidget {
   const SectionCard({
@@ -23,20 +51,19 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color ?? Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFF0E7D8)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x140D1B2A),
-            blurRadius: 24,
-            offset: Offset(0, 14),
+    final scheme = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: _glassBoxDecoration(
+            radius: 28,
+            tint: color ?? scheme.surfaceContainerHigh,
           ),
-        ],
+          child: Padding(padding: padding, child: child),
+        ),
       ),
-      child: Padding(padding: padding, child: child),
     );
   }
 }
@@ -74,24 +101,34 @@ class MetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.bodyMedium),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: color),
+    final scheme = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: _glassBoxDecoration(
+            radius: 22,
+            tint: scheme.surfaceContainerHigh,
+            stroke: color.withValues(alpha: 0.44),
           ),
-        ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 10),
+              Text(
+                value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(color: color),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -108,7 +145,8 @@ class StatusPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: color.withValues(alpha: 0.14),
+        border: Border.all(color: color.withValues(alpha: 0.42)),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -289,146 +327,148 @@ class _RiskMapPanelState extends State<RiskMapPanel> {
 
     return Container(
       height: widget.height,
-      decoration: BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(26)),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: const Color(0xFFF0E7D8)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x140D1B2A),
-            blurRadius: 24,
-            offset: Offset(0, 14),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: _glassBoxDecoration(radius: 26),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.title,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${widget.city} merkezli canli harita katmanlari',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${widget.city} merkezli canli harita katmanlari',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.ink,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          '${widget.result.totalFaultFeatures} segment / ${widget.result.nearbyQuakeCount} deprem',
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.ink,
-                    borderRadius: BorderRadius.circular(14),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SegmentedButton<_RiskMapMode>(
+                      segments: segments,
+                      selected: {_mode},
+                      onSelectionChanged: (value) {
+                        setState(() {
+                          _mode = value.first;
+                        });
+                      },
+                    ),
                   ),
-                  child: Text(
-                    '${widget.result.totalFaultFeatures} segment / ${widget.result.nearbyQuakeCount} deprem',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: _mode == _RiskMapMode.technical
+                        ? _RiskTechnicalPanel(result: widget.result)
+                        : Stack(
+                            children: [
+                              WebViewWidget(controller: _webViewController),
+                              Positioned(
+                                left: 14,
+                                top: 14,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xDD0D1B2A),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const _MapLegendRow(
+                                        color: Color(0xFFCC5A31),
+                                        label: 'Ana faylar',
+                                      ),
+                                      const SizedBox(height: 6),
+                                      const _MapLegendRow(
+                                        color: Color(0xFFF7C548),
+                                        label: 'Deprem odaklari',
+                                      ),
+                                      const SizedBox(height: 6),
+                                      const _MapLegendRow(
+                                        color: Color(0xFFE63946),
+                                        label: 'Secili sehir',
+                                      ),
+                                      if (widget.showHeatmapMode &&
+                                          _mode == _RiskMapMode.heatmap) ...[
+                                        const SizedBox(height: 6),
+                                        const _MapLegendRow(
+                                          color: Color(0xFF4CC9F0),
+                                          label: 'Isi katmani acik',
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.sand,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                      _mode == _RiskMapMode.technical
+                          ? 'Teknik katmanda backend tarafindaki detayli fay GeoJSON sayilari ve en guclu 20 deprem listeleniyor.'
+                          : widget.showHeatmapMode
+                          ? 'Bu harita backendde uretilen gercek Folium icerigini gosterir. Harita uzerinde gezinebilir, yakinlasabilir ve layer control ile isi haritasi ile fay katmanlarini acip kapatabilirsin.'
+                          : 'Bu harita backendde uretilen gercek Folium icerigini gosterir. Harita uzerinde gezinebilir, yakinlasabilir ve katmanlari inceleyebilirsin.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SegmentedButton<_RiskMapMode>(
-                segments: segments,
-                selected: {_mode},
-                onSelectionChanged: (value) {
-                  setState(() {
-                    _mode = value.first;
-                  });
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: _mode == _RiskMapMode.technical
-                  ? _RiskTechnicalPanel(result: widget.result)
-                  : Stack(
-                      children: [
-                        WebViewWidget(controller: _webViewController),
-                        Positioned(
-                          left: 14,
-                          top: 14,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xDD0D1B2A),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const _MapLegendRow(
-                                  color: Color(0xFFCC5A31),
-                                  label: 'Ana faylar',
-                                ),
-                                const SizedBox(height: 6),
-                                const _MapLegendRow(
-                                  color: Color(0xFFF7C548),
-                                  label: 'Deprem odaklari',
-                                ),
-                                const SizedBox(height: 6),
-                                const _MapLegendRow(
-                                  color: Color(0xFFE63946),
-                                  label: 'Secili sehir',
-                                ),
-                                if (widget.showHeatmapMode &&
-                                    _mode == _RiskMapMode.heatmap) ...[
-                                  const SizedBox(height: 6),
-                                  const _MapLegendRow(
-                                    color: Color(0xFF4CC9F0),
-                                    label: 'Isi katmani acik',
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppTheme.sand,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Text(
-                _mode == _RiskMapMode.technical
-                    ? 'Teknik katmanda backend tarafindaki detayli fay GeoJSON sayilari ve en guclu 20 deprem listeleniyor.'
-                    : widget.showHeatmapMode
-                    ? 'Bu harita backendde uretilen gercek Folium icerigini gosterir. Harita uzerinde gezinebilir, yakinlasabilir ve layer control ile isi haritasi ile fay katmanlarini acip kapatabilirsin.'
-                    : 'Bu harita backendde uretilen gercek Folium icerigini gosterir. Harita uzerinde gezinebilir, yakinlasabilir ve katmanlari inceleyebilirsin.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -508,7 +548,7 @@ class _RiskTechnicalPanel extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8F3E7),
+              color: AppTheme.panelHigh,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
@@ -561,113 +601,119 @@ class GeoPointsMapPanel extends StatelessWidget {
         ? LatLng(markers.last.latitude, markers.last.longitude)
         : const LatLng(39.0, 35.0);
 
-    return Container(
+    return SizedBox(
       height: height,
-      decoration: BoxDecoration(
-        color: Colors.white,
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: const Color(0xFFF0E7D8)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x140D1B2A),
-            blurRadius: 24,
-            offset: Offset(0, 14),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: _glassBoxDecoration(radius: 26),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 4),
-                Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.ink,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          '${markers.length} konum',
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.ink,
-                    borderRadius: BorderRadius.circular(14),
+                ),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: FlutterMap(
+                      options: MapOptions(
+                        initialCenter: center,
+                        initialZoom: markers.isNotEmpty ? 11 : 5.5,
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.example.quakemind',
+                        ),
+                        MarkerLayer(
+                          markers: markers
+                              .map(
+                                (item) => Marker(
+                                  point: LatLng(item.latitude, item.longitude),
+                                  width: 32,
+                                  height: 32,
+                                  child: Tooltip(
+                                    message: item.label,
+                                    child: Icon(
+                                      item.highlight
+                                          ? Icons.location_on
+                                          : Icons.location_pin,
+                                      color: item.highlight
+                                          ? const Color(0xFFE15B64)
+                                          : const Color(0xFF15616D),
+                                      size: item.highlight ? 30 : 24,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Text(
-                    '${markers.length} konum',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.sand,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                      markers.isEmpty
+                          ? 'Metinden cikarilan koordinat bulunamadiginda bu panel bos kalir.'
+                          : 'Harita, NLP analizinde cikarilan konumlari oturum bazli biriktirerek gosterir.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: FlutterMap(
-                options: MapOptions(
-                  initialCenter: center,
-                  initialZoom: markers.isNotEmpty ? 11 : 5.5,
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.quakemind',
-                  ),
-                  MarkerLayer(
-                    markers: markers
-                        .map(
-                          (item) => Marker(
-                            point: LatLng(item.latitude, item.longitude),
-                            width: 32,
-                            height: 32,
-                            child: Tooltip(
-                              message: item.label,
-                              child: Icon(
-                                item.highlight
-                                    ? Icons.location_on
-                                    : Icons.location_pin,
-                                color: item.highlight
-                                    ? const Color(0xFFE15B64)
-                                    : const Color(0xFF15616D),
-                                size: item.highlight ? 30 : 24,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppTheme.sand,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Text(
-                markers.isEmpty
-                    ? 'Metinden cikarilan koordinat bulunamadiginda bu panel bos kalir.'
-                    : 'Harita, NLP analizinde cikarilan konumlari oturum bazli biriktirerek gosterir.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -707,6 +753,13 @@ class RoadLogisticsMapPanel extends StatelessWidget {
         )
         .toList(growable: false);
 
+    final tileTemplate = result.satelliteTileUrl.trim().isNotEmpty
+        ? result.satelliteTileUrl.trim()
+        : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    final tileAttribution = result.satelliteAttribution.trim().isNotEmpty
+        ? result.satelliteAttribution.trim()
+        : 'OpenStreetMap';
+
     final safePolylines = result.safeRoadSegments
         .map(
           (segment) => Polyline(
@@ -719,90 +772,111 @@ class RoadLogisticsMapPanel extends StatelessWidget {
         )
         .toList(growable: false);
 
-    return Container(
+    return SizedBox(
       height: height,
-      decoration: BoxDecoration(
-        color: Colors.white,
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: const Color(0xFFF0E7D8)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x140D1B2A),
-            blurRadius: 24,
-            offset: Offset(0, 14),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: _glassBoxDecoration(radius: 26),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 4),
-                Text(
-                  '${result.city} - acik/kapali yol cizimleri',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${result.city} - acik/kapali yol cizimleri',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          StatusPill(
+                            label:
+                                'Kapali segment: ${result.blockedRoadSegments.length}',
+                            color: const Color(0xFFE15B64),
+                          ),
+                          StatusPill(
+                            label:
+                                'Acik segment: ${result.safeRoadSegments.length}',
+                            color: AppTheme.teal,
+                          ),
+                          StatusPill(
+                            label: result.satelliteSource.isNotEmpty
+                                ? result.satelliteSource
+                                : 'OpenStreetMap',
+                            color: const Color(0xFF3276E8),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    StatusPill(
-                      label: 'Kapali segment: ${result.blockedRoadSegments.length}',
-                      color: const Color(0xFFE15B64),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: FlutterMap(
+                      options: MapOptions(
+                        initialCenter: LatLng(
+                          centerPoint.latitude,
+                          centerPoint.longitude,
+                        ),
+                        initialZoom: 14,
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: tileTemplate,
+                          userAgentPackageName: 'com.example.quakemind',
+                          maxZoom: 20,
+                        ),
+                        PolylineLayer(polylines: safePolylines),
+                        PolylineLayer(polylines: blockedPolylines),
+                      ],
                     ),
-                    StatusPill(
-                      label: 'Acik segment: ${result.safeRoadSegments.length}',
-                      color: AppTheme.teal,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
                     ),
-                  ],
+                    decoration: BoxDecoration(
+                      color: AppTheme.sand,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Text(
+                      'Yesil cizgiler acik yollari, kirmizi cizgiler engelli/kapali yol segmentlerini gosterir.',
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      'Harita kaynagi: $tileAttribution',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: FlutterMap(
-                options: MapOptions(
-                  initialCenter: LatLng(
-                    centerPoint.latitude,
-                    centerPoint.longitude,
-                  ),
-                  initialZoom: 14,
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.quakemind',
-                  ),
-                  PolylineLayer(polylines: safePolylines),
-                  PolylineLayer(polylines: blockedPolylines),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppTheme.sand,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const Text(
-                'Yesil cizgiler acik yollari, kirmizi cizgiler engelli/kapali yol segmentlerini gosterir.',
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

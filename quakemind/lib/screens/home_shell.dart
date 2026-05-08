@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -25,7 +27,7 @@ class _HomeShellState extends State<HomeShell> {
   int _index = 0;
   String _selectedCity = turkeyCities.first;
   String _selectedRoadCity = roadCities.first;
-  String _selectedSource = 'Google Maps';
+  String _selectedSource = 'OpenAerialMap';
   String _selectedSample = nlpSamples.first;
   double _damageBooster = 3.5;
   double _threshold = 0.40;
@@ -65,49 +67,111 @@ class _HomeShellState extends State<HomeShell> {
     ];
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFF3EFE4), Color(0xFFE9E2D0)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      body: Stack(
+        children: [
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppTheme.bg, Color(0xFF0D1526), Color(0xFF0A1220)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: KeyedSubtree(key: ValueKey(_index), child: pages[_index]),
+          Positioned(
+            right: -60,
+            top: -80,
+            child: IgnorePointer(
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.teal.withValues(alpha: 0.12),
+                ),
+              ),
+            ),
           ),
-        ),
+          Positioned(
+            left: -40,
+            bottom: 110,
+            child: IgnorePointer(
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.accent.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: KeyedSubtree(key: ValueKey(_index), child: pages[_index]),
+            ),
+          ),
+        ],
       ),
-      bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFF0E7D8))),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x140D1B2A),
-              blurRadius: 20,
-              offset: Offset(0, -6),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.panelHigh.withValues(alpha: 0.48),
+                    AppTheme.panel.withValues(alpha: 0.34),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppTheme.glassStroke),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x66000000),
+                    blurRadius: 24,
+                    offset: Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: NavigationBar(
+                selectedIndex: _index,
+                onDestinationSelected: (value) =>
+                    setState(() => _index = value),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.dashboard_customize),
+                    label: 'Panel',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.public),
+                    label: 'Risk',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.satellite_alt),
+                    label: 'Uydu',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.crisis_alert),
+                    label: 'NLP',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.videocam),
+                    label: 'Kamera',
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-        child: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (value) => setState(() => _index = value),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.dashboard_customize),
-              label: 'Panel',
-            ),
-            NavigationDestination(icon: Icon(Icons.public), label: 'Risk'),
-            NavigationDestination(
-              icon: Icon(Icons.satellite_alt),
-              label: 'Uydu',
-            ),
-            NavigationDestination(icon: Icon(Icons.crisis_alert), label: 'NLP'),
-            NavigationDestination(icon: Icon(Icons.videocam), label: 'Kamera'),
-          ],
+          ),
         ),
       ),
     );
@@ -218,7 +282,7 @@ class _DashboardPageState extends State<_DashboardPage> {
                         .map(
                           (item) => Chip(
                             label: Text(item),
-                            backgroundColor: const Color(0xFFF8F3E7),
+                            backgroundColor: AppTheme.sand,
                           ),
                         )
                         .toList(),
@@ -228,9 +292,6 @@ class _DashboardPageState extends State<_DashboardPage> {
                     alignment: Alignment.centerRight,
                     child: FilledButton(
                       onPressed: () => widget.onOpenModule(index + 1),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: module.color,
-                      ),
                       child: const Text('Modulu Ac'),
                     ),
                   ),
@@ -361,10 +422,6 @@ class _DashboardPageState extends State<_DashboardPage> {
                 },
                 icon: const Icon(Icons.settings_ethernet),
                 label: const Text('Sunucu Ayari'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.white54),
-                ),
               ),
               OutlinedButton.icon(
                 onPressed: _checking ? null : _checkConnection,
@@ -379,10 +436,6 @@ class _DashboardPageState extends State<_DashboardPage> {
                       )
                     : const Icon(Icons.refresh),
                 label: const Text('Baglantiyi Test Et'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.white54),
-                ),
               ),
             ],
           ),
@@ -596,30 +649,45 @@ class _RiskPageState extends State<_RiskPage> {
               ),
               if (_useManualCoordinates) ...[
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _manualLatitudeController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = (constraints.maxWidth - 12) / 2;
+                    final fieldWidth = width > 170
+                        ? width
+                        : constraints.maxWidth;
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: fieldWidth,
+                          child: TextField(
+                            controller: _manualLatitudeController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Enlem',
+                            ),
+                          ),
                         ),
-                        decoration: const InputDecoration(labelText: 'Enlem'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _manualLongitudeController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                          signed: true,
+                        SizedBox(
+                          width: fieldWidth,
+                          child: TextField(
+                            controller: _manualLongitudeController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Boylam',
+                            ),
+                          ),
                         ),
-                        decoration: const InputDecoration(labelText: 'Boylam'),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 14),
               ],
@@ -663,52 +731,74 @@ class _RiskPageState extends State<_RiskPage> {
             final result = snapshot.data!;
             return Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: MetricTile(
-                        label: 'Risk skoru',
-                        value: result.riskScore.toStringAsFixed(1),
-                        color: const Color(0xFFE15B64),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: MetricTile(
-                        label: 'Risk seviyesi',
-                        value: result.riskLevel,
-                        color: const Color(0xFFB24C63),
-                      ),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = (constraints.maxWidth - 12) / 2;
+                    final tileWidth = width > 170
+                        ? width
+                        : constraints.maxWidth;
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: tileWidth,
+                          child: MetricTile(
+                            label: 'Risk skoru',
+                            value: result.riskScore.toStringAsFixed(1),
+                            color: const Color(0xFFE15B64),
+                          ),
+                        ),
+                        SizedBox(
+                          width: tileWidth,
+                          child: MetricTile(
+                            label: 'Risk seviyesi',
+                            value: result.riskLevel,
+                            color: const Color(0xFFB24C63),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: MetricTile(
-                        label: 'Son guncelleme',
-                        value: result.lastUpdate,
-                        color: const Color(0xFF15616D),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: MetricTile(
-                        label: result.usedManualCoordinates
-                            ? 'Manuel koordinat'
-                            : 'Koordinat',
-                        value:
-                            '${result.latitude.toStringAsFixed(2)} / ${result.longitude.toStringAsFixed(2)}',
-                        color: const Color(0xFF5A6C7D),
-                      ),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = (constraints.maxWidth - 12) / 2;
+                    final tileWidth = width > 170
+                        ? width
+                        : constraints.maxWidth;
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: tileWidth,
+                          child: MetricTile(
+                            label: 'Son guncelleme',
+                            value: result.lastUpdate,
+                            color: const Color(0xFF15616D),
+                          ),
+                        ),
+                        SizedBox(
+                          width: tileWidth,
+                          child: MetricTile(
+                            label: result.usedManualCoordinates
+                                ? 'Manuel koordinat'
+                                : 'Koordinat',
+                            value:
+                                '${result.latitude.toStringAsFixed(2)} / ${result.longitude.toStringAsFixed(2)}',
+                            color: const Color(0xFF5A6C7D),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 18),
                 if (result.refreshMessage.isNotEmpty) ...[
                   SectionCard(
-                    color: const Color(0xFFF7FBF7),
+                    color: AppTheme.panelHigh,
                     child: Text(result.refreshMessage),
                   ),
                   const SizedBox(height: 18),
@@ -776,10 +866,15 @@ class _RiskPageState extends State<_RiskPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(entry.key),
+                                  Expanded(
+                                    child: Text(
+                                      entry.key,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
                                   Text('%${(entry.value * 100).round()}'),
                                 ],
                               ),
@@ -789,7 +884,7 @@ class _RiskPageState extends State<_RiskPage> {
                                 child: LinearProgressIndicator(
                                   minHeight: 10,
                                   value: entry.value,
-                                  backgroundColor: const Color(0xFFECE5D8),
+                                  backgroundColor: AppTheme.mist,
                                   color: entry.value > 0.75
                                       ? const Color(0xFFE15B64)
                                       : AppTheme.teal,
@@ -932,7 +1027,7 @@ class _RoadDamagePageState extends State<_RoadDamagePage> {
   static const _oamSampleTitle = '2023-02-09T17:00:00.000Z - Help.NGO';
 
   Future<RoadDamageResult>? _future;
-  _RoadLocationMode _locationMode = _RoadLocationMode.current;
+  _RoadLocationMode _locationMode = _RoadLocationMode.sample;
   double? _currentLatitude;
   double? _currentLongitude;
   String? _locationError;
@@ -1047,25 +1142,28 @@ class _RoadDamagePageState extends State<_RoadDamagePage> {
                     'Analiz edilecek sehri ve uydu goruntu kaynagini secin.',
               ),
               const SizedBox(height: 18),
-              SegmentedButton<_RoadLocationMode>(
-                segments: const [
-                  ButtonSegment(
-                    value: _RoadLocationMode.current,
-                    label: Text('Bulundugum Konum'),
-                    icon: Icon(Icons.my_location),
-                  ),
-                  ButtonSegment(
-                    value: _RoadLocationMode.sample,
-                    label: Text('Ornek Uydu Seti'),
-                    icon: Icon(Icons.layers),
-                  ),
-                ],
-                selected: {_locationMode},
-                onSelectionChanged: (value) {
-                  setState(() {
-                    _locationMode = value.first;
-                  });
-                },
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SegmentedButton<_RoadLocationMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: _RoadLocationMode.current,
+                      label: Text('Bulundugum Konum'),
+                      icon: Icon(Icons.my_location),
+                    ),
+                    ButtonSegment(
+                      value: _RoadLocationMode.sample,
+                      label: Text('Ornek Uydu Seti'),
+                      icon: Icon(Icons.layers),
+                    ),
+                  ],
+                  selected: {_locationMode},
+                  onSelectionChanged: (value) {
+                    setState(() {
+                      _locationMode = value.first;
+                    });
+                  },
+                ),
               ),
               const SizedBox(height: 12),
               if (_locationMode == _RoadLocationMode.current) ...[
@@ -1160,15 +1258,18 @@ class _RoadDamagePageState extends State<_RoadDamagePage> {
                 ),
               ),
               const SizedBox(height: 12),
-              SegmentedButton<int>(
-                segments: const [
-                  ButtonSegment(value: 0, label: Text('Kapali')),
-                  ButtonSegment(value: 1, label: Text('Hafif')),
-                  ButtonSegment(value: 2, label: Text('Guclu')),
-                ],
-                selected: {widget.postProcessLevel},
-                onSelectionChanged: (value) =>
-                    widget.onPostProcessChanged(value.first),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SegmentedButton<int>(
+                  segments: const [
+                    ButtonSegment(value: 0, label: Text('Kapali')),
+                    ButtonSegment(value: 1, label: Text('Hafif')),
+                    ButtonSegment(value: 2, label: Text('Guclu')),
+                  ],
+                  selected: {widget.postProcessLevel},
+                  onSelectionChanged: (value) =>
+                      widget.onPostProcessChanged(value.first),
+                ),
               ),
               const SizedBox(height: 18),
               SizedBox(
@@ -1238,6 +1339,49 @@ class _RoadDamageResultView extends StatelessWidget {
 
   final RoadDamageResult result;
 
+  void _showAnalysisSteps(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Analiz Adimlari',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      ...result.logLines.map(
+                        (line) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(
+                            Icons.task_alt,
+                            color: AppTheme.teal,
+                          ),
+                          title: Text(line),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -1282,12 +1426,8 @@ class _RoadDamageResultView extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 12),
-              ...result.logLines.map(
-                (line) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.task_alt, color: AppTheme.teal),
-                  title: Text(line),
-                ),
+              const Text(
+                'Adim detaylari ve teknik sureler "Adimlari Goster" butonunda acilir.',
               ),
               const Divider(height: 32),
               Text(
@@ -1299,13 +1439,31 @@ class _RoadDamageResultView extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8F3E7),
+                  color: AppTheme.panelHigh,
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Text(
                   result.recommendedAction,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _showAnalysisSteps(context),
+                    icon: const Icon(Icons.format_list_numbered),
+                    label: const Text('Adimlari Goster'),
+                  ),
+                  if (result.timingsMs['total'] != null)
+                    StatusPill(
+                      label:
+                          'Toplam sure: ${(result.timingsMs['total']! / 1000).toStringAsFixed(1)} sn',
+                      color: const Color(0xFF3276E8),
+                    ),
+                ],
               ),
             ],
           ),
@@ -1314,7 +1472,7 @@ class _RoadDamageResultView extends StatelessWidget {
         RoadLogisticsMapPanel(
           title: 'Lojistik Cizim Katmani',
           result: result,
-          height: 360,
+          height: 500,
         ),
       ],
     );
@@ -1450,24 +1608,35 @@ class _NlpPageState extends State<_NlpPage> {
               final result = snapshot.data!;
               return Column(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: MetricTile(
-                          label: 'Kategori',
-                          value: result.category,
-                          color: const Color(0xFF0F9D7A),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: MetricTile(
-                          label: 'Guven',
-                          value: '%${(result.confidence * 100).round()}',
-                          color: const Color(0xFF3276E8),
-                        ),
-                      ),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width = (constraints.maxWidth - 12) / 2;
+                      final tileWidth = width > 170
+                          ? width
+                          : constraints.maxWidth;
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          SizedBox(
+                            width: tileWidth,
+                            child: MetricTile(
+                              label: 'Kategori',
+                              value: result.category,
+                              color: const Color(0xFF0F9D7A),
+                            ),
+                          ),
+                          SizedBox(
+                            width: tileWidth,
+                            child: MetricTile(
+                              label: 'Guven',
+                              value: '%${(result.confidence * 100).round()}',
+                              color: const Color(0xFF3276E8),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   MetricTile(
@@ -1706,23 +1875,26 @@ class _CameraPageState extends State<_CameraPage> {
                 decoration: const InputDecoration(labelText: 'Goruntu kaynagi'),
               ),
               const SizedBox(height: 12),
-              SegmentedButton<CameraDetectionMode>(
-                segments: const [
-                  ButtonSegment(
-                    value: CameraDetectionMode.debris,
-                    label: Text('Enkaz Tespiti'),
-                    icon: Icon(Icons.apartment),
-                  ),
-                  ButtonSegment(
-                    value: CameraDetectionMode.crack,
-                    label: Text('Catlak Tespiti'),
-                    icon: Icon(Icons.crisis_alert),
-                  ),
-                ],
-                selected: {_mode},
-                onSelectionChanged: (value) {
-                  setState(() => _mode = value.first);
-                },
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SegmentedButton<CameraDetectionMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: CameraDetectionMode.debris,
+                      label: Text('Enkaz Tespiti'),
+                      icon: Icon(Icons.apartment),
+                    ),
+                    ButtonSegment(
+                      value: CameraDetectionMode.crack,
+                      label: Text('Catlak Tespiti'),
+                      icon: Icon(Icons.crisis_alert),
+                    ),
+                  ],
+                  selected: {_mode},
+                  onSelectionChanged: (value) {
+                    setState(() => _mode = value.first);
+                  },
+                ),
               ),
               const SizedBox(height: 14),
               const Wrap(
@@ -1802,26 +1974,35 @@ class _CameraPageState extends State<_CameraPage> {
           ),
         ),
         const SizedBox(height: 18),
-        Row(
-          children: [
-            Expanded(
-              child: MetricTile(
-                label: 'Son guven skoru',
-                value: latest == null
-                    ? '-'
-                    : '%${(latest.confidence * 100).round()}',
-                color: const Color(0xFF7CC6FE),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: MetricTile(
-                label: 'Toplam tespit sinyali',
-                value: '${_ticks.length}',
-                color: const Color(0xFFF59F00),
-              ),
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final width = (constraints.maxWidth - 12) / 2;
+            final tileWidth = width > 170 ? width : constraints.maxWidth;
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                SizedBox(
+                  width: tileWidth,
+                  child: MetricTile(
+                    label: 'Son guven skoru',
+                    value: latest == null
+                        ? '-'
+                        : '%${(latest.confidence * 100).round()}',
+                    color: const Color(0xFF7CC6FE),
+                  ),
+                ),
+                SizedBox(
+                  width: tileWidth,
+                  child: MetricTile(
+                    label: 'Toplam tespit sinyali',
+                    value: '${_ticks.length}',
+                    color: const Color(0xFFF59F00),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 18),
         SectionCard(
@@ -1972,7 +2153,7 @@ class _ErrorState extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8F3E7),
+                color: AppTheme.panelHigh,
                 borderRadius: BorderRadius.circular(18),
               ),
               child: const Column(

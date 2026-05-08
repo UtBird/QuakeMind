@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
@@ -25,6 +26,8 @@ class BridgeHttpClient {
     required this.defaultPort,
   });
 
+  static final http.Client _sharedClient = http.Client();
+
   final String configuredBaseUrl;
   final int defaultPort;
 
@@ -38,16 +41,29 @@ class BridgeHttpClient {
     Object? lastError;
     try {
       final uri = Uri.parse('$baseUrl$endpoint');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(payload),
-      ).timeout(Duration(seconds: timeoutSeconds));
+      final response = await _sharedClient
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Connection': 'keep-alive',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(Duration(seconds: timeoutSeconds));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return decodeBridgeJson(response.body);
       }
-      lastError = Exception('[$baseUrl] ${response.statusCode}: ${response.body}');
+      throw _BridgeHttpException(
+        _extractServerError(
+          baseUrl: baseUrl,
+          statusCode: response.statusCode,
+          rawBody: response.body,
+        ),
+      );
+    } on _BridgeHttpException {
+      rethrow;
     } catch (error) {
       lastError = error;
     }
@@ -67,7 +83,9 @@ class BridgeHttpClient {
     final baseUrl = await ApiConfig.getBackendUrl();
     try {
       final uri = Uri.parse('$baseUrl$endpoint');
-      final response = await http.get(uri).timeout(Duration(seconds: timeoutSeconds));
+      final response = await _sharedClient
+          .get(uri, headers: const {'Connection': 'keep-alive'})
+          .timeout(Duration(seconds: timeoutSeconds));
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return decodeBridgeJson(response.body);
       }
@@ -76,11 +94,45 @@ class BridgeHttpClient {
   }
 }
 
+class _BridgeHttpException implements Exception {
+  const _BridgeHttpException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+String _extractServerError({
+  required String baseUrl,
+  required int statusCode,
+  required String rawBody,
+}) {
+  if (rawBody.trim().isEmpty) {
+    return '[$baseUrl] Sunucu hatasi: HTTP $statusCode';
+  }
+  try {
+    final decoded = jsonDecode(rawBody);
+    if (decoded is Map<String, dynamic>) {
+      final detail = decoded['detail'];
+      if (detail != null) {
+        return '[$baseUrl] Sunucu hatasi ($statusCode): $detail';
+      }
+      final error = decoded['error'];
+      if (error != null) {
+        return '[$baseUrl] Sunucu hatasi ($statusCode): $error';
+      }
+    }
+  } catch (_) {}
+  return '[$baseUrl] Sunucu hatasi ($statusCode): $rawBody';
+}
+
 Future<Map<String, dynamic>> runBridgeProcess({
   required String scriptPath,
   required List<String> args,
 }) async {
-  throw Exception("Native execution is deprecated. Please use the HTTP API configured in Settings.");
+  throw Exception(
+    "Native execution is deprecated. Please use the HTTP API configured in Settings.",
+  );
 }
 
 Map<String, dynamic> decodeBridgeJson(String raw) {

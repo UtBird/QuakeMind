@@ -49,7 +49,7 @@ class RoadDamageService {
           'Ayarlardan API adresini (IP:Port) dogru girdiginizden emin olun.',
         ],
       ),
-      timeoutSeconds: 120,
+      timeoutSeconds: 300,
     );
 
     return RoadDamageResult.fromJson(jsonMap);
