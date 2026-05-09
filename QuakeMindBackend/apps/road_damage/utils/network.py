@@ -52,7 +52,8 @@ def analyze_road_network_graph(bounds, w, h, blockage_mask):
     """Fetches OSM graph, evaluates blockages, and returns safe/blocked lists."""
     west, south, east, north = bounds
     try:
-        G = ox.graph_from_bbox(bbox=bounds, network_type='all', simplify=True)
+        # 'drive' kullanarak sadece araç yollarını çekiyoruz, graph boyutu küçülüyor ve hızlanıyor
+        G = ox.graph_from_bbox(bbox=bounds, network_type='drive', simplify=True)
     except Exception as e:
         print("OSMnx error:", e)
         return None, None, None, None
@@ -70,8 +71,8 @@ def analyze_road_network_graph(bounds, w, h, blockage_mask):
             line = LineString([(u_node['x'], u_node['y']), (v_node['x'], v_node['y'])])
             
         length = line.length
-        # Sample every ~2 meters to accurately capture small blockages
-        num_samples = max(int(length / 0.00002), 5)
+        # Örnekleme sıklığını ~5 metreye düşürüyoruz (eskiden ~2 metreydi)
+        num_samples = max(int(length / 0.00005), 3)
         
         current_type = None
         current_segment = []
