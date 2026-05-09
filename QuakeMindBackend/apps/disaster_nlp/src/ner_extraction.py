@@ -5,6 +5,8 @@ from transformers import pipeline
 import torch
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
+from pathlib import Path
+from huggingface_hub import snapshot_download
 
 from src.tr_locations import PROVINCES, PROVINCE_TO_DISTRICTS
 
@@ -31,8 +33,35 @@ STOP_FALLBACK_TOKENS = ADDRESS_HINTS | NOISE_WORDS
 class LocationExtractor:
     def __init__(self, model_name="yhaslan/turkish-earthquake-tweets-ner"):
         device = 0 if torch.cuda.is_available() else -1
-        # Aggregation strategy groups tokens into full entities (e.g., 'Avcılar' 'Merkez' -> 'Avcılar Merkez')
-        self.ner = pipeline("token-classification", model=model_name, aggregation_strategy="simple", device=device)
+        
+        import os
+        os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+        
+        try:
+            # Önce modelin lokal cache'de (daha önce indirilmiş) olup olmadığını kontrol et
+            model_path = snapshot_download(repo_id=model_name, local_files_only=True)
+        except Exception:
+            try:
+                # Eğer lokalde yoksa, o zaman internetten indirmeyi dene
+                local_dir = Path(__file__).resolve().parents[2] / "models" / "ner"
+                local_dir.mkdir(parents=True, exist_ok=True)
+                snapshot_download(
+                    repo_id=model_name,
+                    local_dir=str(local_dir),
+                    allow_patterns=["config.json", "pytorch_model.bin", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json", "vocab.txt"],
+                    local_files_only=False
+                )
+                model_path = str(local_dir)
+            except Exception as e:
+                print(f"Warning: Failed to snapshot_download NER model from network: {e}")
+                model_path = model_name
+
+        # Pipeline'ı her zaman lokal modda (internete çıkmadan) başlat ki timeoutlara takılmasın
+        try:
+            self.ner = pipeline("token-classification", model=model_path, aggregation_strategy="simple", device=device, model_kwargs={"use_safetensors": False, "local_files_only": True})
+        except Exception:
+            # En kötü senaryo, normal başlat
+            self.ner = pipeline("token-classification", model=model_path, aggregation_strategy="simple", device=device, model_kwargs={"use_safetensors": False})
         
         # Geopy setup with OpenStreetMap
         self.geolocator = Nominatim(user_agent="disaster_nlp_app", timeout=5)

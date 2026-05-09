@@ -278,9 +278,9 @@ def load_nlp_pipeline():
 def load_road_runtime():
     clear_module_cache(["utils"])
     with temporary_sys_path(ROAD_ROOT), temporary_cwd(ROAD_ROOT):
-        from utils.fetcher import fetch_satellite_area, get_osm_roads_overpass, get_wayback_versions, search_oam_images
-        from utils.inference import load_simple_model, run_inference
-        from utils.network import analyze_road_network_graph
+        from apps.road_damage.utils.fetcher import fetch_satellite_area, get_osm_roads_overpass, get_wayback_versions, search_oam_images
+        from apps.road_damage.utils.inference import load_simple_model, run_inference
+        from apps.road_damage.utils.network import analyze_road_network_graph
 
         return {
             "fetch_satellite_area": fetch_satellite_area,
@@ -808,11 +808,12 @@ def render_road_screen():
         if st.button("🗺️ Lojistik Ağı Hesapla", key="road_logistics_btn"):
             with st.spinner("Graph matrisi çıkarılıyor ve kapanan yollar siliniyor..."):
                 w, h = res["original_img"].shape[1], res["original_img"].shape[0]
-                G, safe_edges, blocked_edges = analyze_road_network_graph(res["bounds"], w, h, current_intersection)
+                G, safe_G, safe_edges, blocked_edges = analyze_road_network_graph(res["bounds"], w, h, current_intersection)
                 if G is None:
                     st.error("Bu bölge için OSM yol ağı bulunamadı.")
                 else:
                     st.session_state.road_logistic_data = {
+                        "safe_G": safe_G,
                         "safe_edges": safe_edges,
                         "blocked_edges": blocked_edges,
                         "bounds": res["bounds"],

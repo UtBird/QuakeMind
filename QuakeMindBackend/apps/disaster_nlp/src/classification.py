@@ -1,4 +1,6 @@
 import os
+os.environ["HF_HUB_DISABLE_HTTP2"] = "1"
+
 from pathlib import Path
 
 import torch

@@ -46,58 +46,72 @@ def num2deg(xtile, ytile, zoom):
 
 def fetch_satellite_area(lat, lon, bbox=None, zoom_level=18, wayback_id=None, provider='google', custom_url=None):
     """Downloads tiles covering a bounding box or a single coordinate."""
-    if not bbox:
-        n = 2.0 ** zoom_level
-        xtile = int((lon + 180.0) / 360.0 * n)
-        ytile = int((1.0 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2.0 * n)
-        lat_n, lon_w = num2deg(xtile, ytile, zoom_level)
-        lat_s, lon_e = num2deg(xtile + 2, ytile + 2, zoom_level)
-        bbox = (lon_w, lat_s, lon_e, lat_n)
+    def _try_fetch(z):
+        n = 2.0 ** z
+        if not bbox:
+            xt = int((lon + 180.0) / 360.0 * n)
+            yt = int((1.0 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2.0 * n)
+            lat_n, lon_w = num2deg(xt, yt, z)
+            lat_s, lon_e = num2deg(xt + 2, yt + 2, z)
+            b = (lon_w, lat_s, lon_e, lat_n)
+        else:
+            b = bbox
+            
+        lon_min, lat_min, lon_max, lat_max = b
+        xtile_min = int((lon_min + 180.0) / 360.0 * n)
+        xtile_max = int((lon_max + 180.0) / 360.0 * n)
+        ytile_max = int((1.0 - math.asinh(math.tan(math.radians(lat_min))) / math.pi) / 2.0 * n)
+        ytile_min = int((1.0 - math.asinh(math.tan(math.radians(lat_max))) / math.pi) / 2.0 * n)
         
-    lon_min, lat_min, lon_max, lat_max = bbox
-    n = 2.0 ** zoom_level
-    xtile_min = int((lon_min + 180.0) / 360.0 * n)
-    xtile_max = int((lon_max + 180.0) / 360.0 * n)
-    ytile_max = int((1.0 - math.asinh(math.tan(math.radians(lat_min))) / math.pi) / 2.0 * n)
-    ytile_min = int((1.0 - math.asinh(math.tan(math.radians(lat_max))) / math.pi) / 2.0 * n)
-    
-    if (xtile_max - xtile_min + 1) * (ytile_max - ytile_min + 1) > 36:
-        _warn("Seçilen alan çok büyük. Harita boyutu 6x6 tile ile sınırlandırıldı.")
-        xt_c = (xtile_min + xtile_max) // 2
-        yt_c = (ytile_min + ytile_max) // 2
-        xtile_min = max(xtile_min, xt_c - 2); xtile_max = min(xtile_max, xt_c + 3)
-        ytile_min = max(ytile_min, yt_c - 2); ytile_max = min(ytile_max, yt_c + 3)
+        if (xtile_max - xtile_min + 1) * (ytile_max - ytile_min + 1) > 36:
+            xt_c = (xtile_min + xtile_max) // 2
+            yt_c = (ytile_min + ytile_max) // 2
+            xtile_min = max(xtile_min, xt_c - 2); xtile_max = min(xtile_max, xt_c + 3)
+            ytile_min = max(ytile_min, yt_c - 2); ytile_max = min(ytile_max, yt_c + 3)
 
-    nx_tiles = xtile_max - xtile_min + 1
-    ny_tiles = ytile_max - ytile_min + 1
-    stitched_img = Image.new('RGB', (nx_tiles * 256, ny_tiles * 256))
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    
-    for x in range(xtile_min, xtile_max + 1):
-        for y in range(ytile_min, ytile_max + 1):
-            if provider == 'esri' and wayback_id:
-                url = f"https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{wayback_id}/{zoom_level}/{y}/{x}"
-            elif provider == 'google':
-                url = f"https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={zoom_level}"
-            elif provider == 'custom' and custom_url:
-                url = custom_url.replace('{x}', str(x)).replace('{y}', str(y)).replace('{z}', str(zoom_level))
-            else:
-                return None, None
-                
-            px = (x - xtile_min) * 256
-            py = (y - ytile_min) * 256
-            try:
-                r = requests.get(url, headers=headers, timeout=15)
-                if r.status_code == 200:
-                    from io import BytesIO
-                    tile_img = Image.open(BytesIO(r.content)).convert('RGB')
-                    stitched_img.paste(tile_img, (px, py))
-            except Exception:
-                pass
+        nx_tiles = xtile_max - xtile_min + 1
+        ny_tiles = ytile_max - ytile_min + 1
+        stitched_img = Image.new('RGB', (nx_tiles * 256, ny_tiles * 256))
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        any_success = False
+        
+        for x in range(xtile_min, xtile_max + 1):
+            for y in range(ytile_min, ytile_max + 1):
+                if provider == 'esri' and wayback_id:
+                    url = f"https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{wayback_id}/{z}/{y}/{x}"
+                elif provider == 'google':
+                    url = f"https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+                elif provider == 'custom' and custom_url:
+                    url = custom_url.replace('{x}', str(x)).replace('{y}', str(y)).replace('{z}', str(z))
+                else:
+                    return None, None
+                    
+                px = (x - xtile_min) * 256
+                py = (y - ytile_min) * 256
+                try:
+                    r = requests.get(url, headers=headers, timeout=8)
+                    if r.status_code == 200:
+                        from io import BytesIO
+                        tile_img = Image.open(BytesIO(r.content)).convert('RGB')
+                        stitched_img.paste(tile_img, (px, py))
+                        any_success = True
+                except Exception:
+                    pass
 
-    real_lat_n, real_lon_w = num2deg(xtile_min, ytile_min, zoom_level)
-    real_lat_s, real_lon_e = num2deg(xtile_max + 1, ytile_max + 1, zoom_level)
-    return stitched_img, (real_lon_w, real_lat_s, real_lon_e, real_lat_n)
+        if not any_success:
+            return None, None
+
+        real_lat_n, real_lon_w = num2deg(xtile_min, ytile_min, z)
+        real_lat_s, real_lon_e = num2deg(xtile_max + 1, ytile_max + 1, z)
+        return stitched_img, (real_lon_w, real_lat_s, real_lon_e, real_lat_n)
+
+    # Try requested zoom level first, fallback to lower zooms if 404
+    for z in [zoom_level, zoom_level - 1, zoom_level - 2]:
+        img, final_bounds = _try_fetch(z)
+        if img is not None:
+            return img, final_bounds
+            
+    return None, None
 
 
 def get_osm_roads_overpass(bounds, w, h, thickness=4):
