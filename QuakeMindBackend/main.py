@@ -688,7 +688,7 @@ def render_road_screen():
                     st.stop()
 
                 status_text.text("4/4 Running AI Inference (Segformer)...")
-                progress_bar.progress(80)
+                progress_bar.progress(70)
                 raw_probs, boosted_probs, pred_mask_binary, intersection, img_np = run_inference(
                     img,
                     road_mask_binary,
@@ -699,6 +699,22 @@ def render_road_screen():
                     use_imagenet_norm,
                     postprocess_level,
                 )
+                
+                status_text.text("5/5 Graph matrisi çıkarılıyor ve lojistik ağ hesaplanıyor...")
+                progress_bar.progress(90)
+                
+                w, h = img.size
+                G, safe_G, safe_edges, blocked_edges = analyze_road_network_graph(bounds, w, h, intersection)
+                
+                if G is not None:
+                    st.session_state.road_logistic_data = {
+                        "safe_G": safe_G,
+                        "safe_edges": safe_edges,
+                        "blocked_edges": blocked_edges,
+                        "bounds": bounds,
+                        "total": len(safe_edges) + len(blocked_edges),
+                        "blocked_count": len(blocked_edges),
+                    }
 
                 progress_bar.progress(100)
                 status_text.text("Analysis Complete!")
@@ -805,35 +821,75 @@ def render_road_screen():
         st.markdown("### 🚑 Lojistik ve Rota Analizi")
         st.info("Bu modül, tespit edilen enkazları mevcut yol ağının üzerine bindirerek hangi sokakların kapalı olduğunu hesaplar.")
 
-        if st.button("🗺️ Lojistik Ağı Hesapla", key="road_logistics_btn"):
-            with st.spinner("Graph matrisi çıkarılıyor ve kapanan yollar siliniyor..."):
-                w, h = res["original_img"].shape[1], res["original_img"].shape[0]
-                G, safe_G, safe_edges, blocked_edges = analyze_road_network_graph(res["bounds"], w, h, current_intersection)
-                if G is None:
-                    st.error("Bu bölge için OSM yol ağı bulunamadı.")
-                else:
-                    st.session_state.road_logistic_data = {
-                        "safe_G": safe_G,
-                        "safe_edges": safe_edges,
-                        "blocked_edges": blocked_edges,
-                        "bounds": res["bounds"],
-                        "total": len(safe_edges) + len(blocked_edges),
-                        "blocked_count": len(blocked_edges),
-                    }
+        # Lojistik analiz artık otomatik olarak yapılıyor
 
         if st.session_state.road_logistic_data:
             data = st.session_state.road_logistic_data
             st.success(f"Yol Ağı Analizi Tamamlandı! Toplam {data['total']} sokak incelendi. {data['blocked_count']} tanesi ulaşıma kapalı.")
+            if "route_start" not in st.session_state:
+                st.session_state.route_start = None
+            if "route_end" not in st.session_state:
+                st.session_state.route_end = None
+
+            from apps.road_damage.utils.network import calculate_route
+            from folium.plugins import AntPath
+
+            st.info("📍 Haritada iki farklı noktaya tıklayarak Başlangıç ve Hedef belirleyin. Sistem en kısa güvenli rotayı çizecektir.")
+
             center_lat = (data["bounds"][1] + data["bounds"][3]) / 2.0
             center_lon = (data["bounds"][0] + data["bounds"][2]) / 2.0
             route_map = folium.Map(location=[center_lat, center_lon], zoom_start=16, tiles="CartoDB dark_matter")
-            for _, _, _, line in data["safe_edges"]:
-                points = [(lat, lon) for lon, lat in line.coords]
-                folium.PolyLine(points, color="#00FF00", weight=4, opacity=0.8, tooltip="Erişime Açık Yol").add_to(route_map)
-            for _, _, _, line in data["blocked_edges"]:
-                points = [(lat, lon) for lon, lat in line.coords]
-                folium.PolyLine(points, color="#FF0000", weight=4, opacity=0.8, dash_array="5, 5", tooltip="ENKAZ NEDENİYLE KAPALI").add_to(route_map)
-            st_folium(route_map, width="100%", height=500, key="road_logistic_map_viz")
+            
+            safe_lines = [[(lat, lon) for lon, lat in line.coords] for _, _, _, line in data["safe_edges"]]
+            if safe_lines:
+                folium.PolyLine(safe_lines, color="#00FF00", weight=4, opacity=0.8, tooltip="Erişime Açık Yol").add_to(route_map)
+            blocked_lines = [[(lat, lon) for lon, lat in line.coords] for _, _, _, line in data["blocked_edges"]]
+            if blocked_lines:
+                folium.PolyLine(blocked_lines, color="#FF0000", weight=4, opacity=0.8, dash_array="5, 5", tooltip="ENKAZ NEDENİYLE KAPALI").add_to(route_map)
+            
+            if st.session_state.route_start:
+                folium.Marker(st.session_state.route_start, popup="Başlangıç", icon=folium.Icon(color="blue", icon="play")).add_to(route_map)
+            if st.session_state.route_end:
+                folium.Marker(st.session_state.route_end, popup="Hedef", icon=folium.Icon(color="green", icon="flag")).add_to(route_map)
+                
+            if st.session_state.route_start and st.session_state.route_end:
+                with st.spinner("A* ve Dijkstra ile rota hesaplanıyor..."):
+                    route_dijkstra, route_astar = calculate_route(
+                        data["safe_G"],
+                        st.session_state.route_start[0], st.session_state.route_start[1],
+                        st.session_state.route_end[0], st.session_state.route_end[1]
+                    )
+                
+                if route_dijkstra:
+                    st.success("A* ve Dijkstra rotaları başarıyla bulundu!")
+                    AntPath(
+                        route_dijkstra,
+                        color="#00FFFF",
+                        weight=6,
+                        opacity=0.9,
+                        tooltip="En Kısa Rota (Animasyonlu)",
+                        delay=400
+                    ).add_to(route_map)
+                else:
+                    st.error("Bu iki nokta arasında açık yollar üzerinden bir rota bulunamadı!")
+                    
+            route_map_output = st_folium(route_map, width="100%", height=500, key="road_logistic_map_viz", returned_objects=["last_clicked"])
+            
+            if route_map_output.get("last_clicked"):
+                click = route_map_output["last_clicked"]
+                click_coord = (click["lat"], click["lng"])
+                
+                if st.session_state.get("last_processed_click") != click_coord:
+                    st.session_state.last_processed_click = click_coord
+                    
+                    if st.session_state.route_start is None:
+                        st.session_state.route_start = click_coord
+                    elif st.session_state.route_end is None:
+                        st.session_state.route_end = click_coord
+                    else:
+                        st.session_state.route_start = click_coord
+                        st.session_state.route_end = None
+                    st.rerun()
 
 
 def render_risk_screen():
