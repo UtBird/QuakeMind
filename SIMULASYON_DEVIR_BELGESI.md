@@ -35,7 +35,7 @@ uçtan uca koşan bir değerlendirmedir.
 ### Giriş noktası
 
 ```bash
-python QuakeMindBackend/benchmark/full_scenario.py all --seed 42
+python backend/benchmark/full_scenario.py all --seed 42
 ```
 
 Argümanlar: `city` (`hatay` · `kahramanmaras` · `all`), `--run-id`, `--seed`
@@ -347,7 +347,7 @@ raporlanmalı ya da model iyileştirilmeli (kullanıcı kararı).
 |---|---|---|
 | 1 | Hangi commit / dal | `main`, **`32d45a3`** — hâlâ **commit yok, push yok**. Tüm değişiklikler çalışma ağacında. |
 | 2 | Kod değişti mi | **Evet.** Bölüm 11–12'dekilere ek: `network.py` → `closures_from_lines`; `fastapi_app.py` → `POST /api/road_damage/closures_from_emsr`; `copernicus_ground_truth.py` → derece kuralları (katı/orta/gevşek), yol çizgisi ve AOI okuma; `full_scenario.py` → `--closure-source emsr`, `--emsr-rule`, `--zones`; yeni `compare_closure_sources.py`. `scenario_dataset*.py` → HQ-K1 ve HQ-HD2 çıkmaz yoldan kavşağa taşındı. Uygulamanın `/analyze` varsayılanı **eski davranışta** (`blockageRadiusM = 0`). |
-| 3 | Yeni koşum sonucu | **Var:** `QuakeMindBackend/benchmark/runs/{v2-sentetik-8ilce, v2-sentetik-4ilce, v2-emsr-strict, v2-emsr-medium, v2-emsr-loose, drone-sentetik, drone-emsr-loose, drone-model-z18-r0, drone-model-z19-r15}-{hatay,kahramanmaras}/summary.json`; karşılaştırma `runs/closure_source_comparison.json`. Karargâh düzeltmesinden önceki koşular `runs/_superseded/2026-09-16-karargah-duzeltmesi-oncesi/`. |
+| 3 | Yeni koşum sonucu | **Var:** `backend/benchmark/runs/{v2-sentetik-8ilce, v2-sentetik-4ilce, v2-emsr-strict, v2-emsr-medium, v2-emsr-loose, drone-sentetik, drone-emsr-loose, drone-model-z18-r0, drone-model-z19-r15}-{hatay,kahramanmaras}/summary.json`; karşılaştırma `runs/closure_source_comparison.json`. Karargâh düzeltmesinden önceki koşular `runs/_superseded/2026-09-16-karargah-duzeltmesi-oncesi/`. |
 | 4 | Yeni toplamlar | **8 ilçe, sentetik:** 222,2 / 1 744,8 dk, 73 U-dönüşü, 0 ulaşılamayan (eski 206,6 / 1 641,0 / 68 geçersiz). **4 ilçe, EMSR gevşek:** 189,5 / 2 006,7 dk, 87 U-dönüşü, 0 ulaşılamayan. Diğer satırlar aşağıda ve J-28'de. |
 | 5 | Kapanma kaynağı | **Üçü de var ve koşuldu:** sentetik, **EMSR648** (4 ilçe: H-Z1, H-Z3, K-Z1, K-Z2) ve model (yalnız drone sahneleri). Makalenin ana sonucu için EMSR648 satırları önerilir. |
 | 6 | `v_ort`, `t_u` değişti mi | **Hayır.** 15,0 km/sa ve 20,0 dk. |
@@ -373,7 +373,7 @@ raporlanmalı ya da model iyileştirilmeli (kullanıcı kararı).
   taşındı (veri setlerinde gerekçesiyle).
 
 Ayrıntı ve tam tablolar: `EKSIKLER_VE_SORUNLAR.md` **J-12 (kapanış), J-28**.
-Koşular: `QuakeMindBackend/benchmark/runs/{v2-*, drone-*}`.
+Koşular: `backend/benchmark/runs/{v2-*, drone-*}`.
 
 ## 14. EK — 16 Eylül 2026 gece: çoklu tohum (10 tohum)
 
@@ -382,8 +382,8 @@ Koşular: `QuakeMindBackend/benchmark/runs/{v2-*, drone-*}`.
 | # | Soru | Cevap |
 |---|---|---|
 | 1 | Hangi commit / dal | `main`, **`32d45a3`** — hâlâ **commit yok, push yok**. |
-| 2 | Kod değişti mi | Yalnız yeni betik: `QuakeMindBackend/benchmark/multi_seed.py` (koşturucu + özet). Sistem kodu değişmedi. |
-| 3 | Yeni koşum sonucu | `QuakeMindBackend/benchmark/runs/multi_seed/` — 90 koşu (9 yapılandırma × tohum 42–51); tablo `multi_seed_tablo.md`, ham özet `multi_seed_summary.json`. Tohum 42, Bölüm 13'teki koşuları birebir yeniden üretti. |
+| 2 | Kod değişti mi | Yalnız yeni betik: `backend/benchmark/multi_seed.py` (koşturucu + özet). Sistem kodu değişmedi. |
+| 3 | Yeni koşum sonucu | `backend/benchmark/runs/multi_seed/` — 90 koşu (9 yapılandırma × tohum 42–51); tablo `multi_seed_tablo.md`, ham özet `multi_seed_summary.json`. Tohum 42, Bölüm 13'teki koşuları birebir yeniden üretti. |
 | 4 | Yeni toplamlar (ortalama ± ss, 10 tohum) | **8 ilçe sentetik:** QuakeMind 203,5 ± 18,9 / klasik 1 552,0 ± 252,0 dk, U-dönüşü 64,7 ± 11,4, ulaşılamayan 0 (rotalanan 17,8 / 18). **4 ilçe EMSR gevşek:** 154,1 ± 23,3 / 1 433,0 ± 607,8 dk, U-dönüşü 61,4 ± 28,3, ulaşılamayan 0. Yalnız yol farkı: 54,5 ± 15,2 ve 50,9 ± 31,1 dk. Tam tablo: `EKSIKLER_VE_SORUNLAR.md` **J-29**. |
 | 5 | Kapanma kaynağı | Değişmedi (sentetik, EMSR648, model — üçü de 10 tohumla koşuldu). |
 | 6 | `v_ort`, `t_u` değişti mi | **Hayır** (15,0 km/sa, 20,0 dk). t_u = 0–30 dk duyarlılığı aynı koşulardan hesaplandı. |
@@ -401,7 +401,7 @@ Koşular: `QuakeMindBackend/benchmark/runs/{v2-*, drone-*}`.
 ### 15.1 Tablo 18 — "modelle planla, gerçek (EMSR648) dünyada yürü" (J-30 kapandı)
 
 Önceki model koşularında klasik ekip de modelin kapanmalarını gerçek sayıyordu; modelin
-hataları ölçülmüyordu. Yeni deney `QuakeMindBackend/benchmark/model_in_real_world.py`
+hataları ölçülmüyordu. Yeni deney `backend/benchmark/model_in_real_world.py`
 (backend gerektirmez) dünyayı her zaman EMSR648 (gevşek, 8 m) kapanmaları yapar:
 R3 bunları bilir, **model-bilgili QuakeMind** SegFormer'ın kapanmalarını bilir (yanlış alarmı
 sorgulamaz, kaçırdığı kapanmayı sahada keşfeder), R0 hiçbir şey bilmez. 3 drone sahnesi ×
@@ -430,7 +430,7 @@ sorgulamaz, kaçırdığı kapanmayı sahada keşfeder), R0 hiçbir şey bilmez.
 
 R1 (yol boyunca 100 m görüş, aynı kavşaktaki gözlemler tek ceza) ve R2 (bölge içi filo, keşif
 o anda telsizle herkese; telsizle öğrenilen kapanma cezasız; kafilede öndeki keşfeder) aynı
-oturum ve aynı atamalarla, 10 tohumla koşuldu. Tablo: `QuakeMindBackend/benchmark/runs/
+oturum ve aynı atamalarla, 10 tohumla koşuldu. Tablo: `backend/benchmark/runs/
 multi_seed_refs/multi_seed_tablo.md`; ayrıntı ve yorum: `EKSIKLER_VE_SORUNLAR.md` **J-31**.
 
 | t_u = 20 dk, 10 tohum | 8 ilçe sentetik (dk) | kazanç | EMSR648 gevşek (dk) | kazanç |

@@ -1,7 +1,7 @@
 """
 Ortak veri hazirlama ve degerlendirme yardimcilari.
 
-Bu modul, QuakeMindBackend/apps/earthquake_risk/risk_engine.py icindeki
+Bu modul, backend/apps/earthquake_risk/risk_engine.py icindeki
 ozellik muhendisligini birebir yeniden uretir; boylece butun model
 karsilastirma defterleri AYNI veriyle, AYNI etiketle ve AYNI zaman-serisi
 bolme stratejisiyle egitilir. Amac: makale icin adil bir kiyaslama.
@@ -11,7 +11,7 @@ Gorev: ikili siniflandirma
                        bir deprem oluyor.
     label_30d = 0  ->  olmuyor.
 
-Kaynak veri: QuakeMindBackend/apps/earthquake_risk/data/query.csv
+Kaynak veri: backend/apps/earthquake_risk/data/query.csv
              (USGS / Kandilli deprem katalogu, ~20k kayit)
 """
 
@@ -25,7 +25,7 @@ import pandas as pd
 _HERE = Path(__file__).resolve().parent
 DEFAULT_QUERY_CSV = (
     _HERE.parent.parent
-    / "QuakeMindBackend"
+    / "backend"
     / "apps"
     / "earthquake_risk"
     / "data"
@@ -39,7 +39,7 @@ DEFAULT_QUERY_CSV = (
 
 import sys as _sys
 
-_RISK_KOKU = _HERE.parent.parent / "QuakeMindBackend" / "apps" / "earthquake_risk"
+_RISK_KOKU = _HERE.parent.parent / "backend" / "apps" / "earthquake_risk"
 if str(_RISK_KOKU) not in _sys.path:
     _sys.path.insert(0, str(_RISK_KOKU))
 from fay_mesafesi import en_yakin_fay_km  # noqa: E402
@@ -131,7 +131,7 @@ def load_dataset(csv_path=None):
     if not csv_path.exists():
         raise FileNotFoundError(
             f"Veri bulunamadi: {csv_path}\n"
-            "QuakeMindBackend/apps/earthquake_risk/data/query.csv dosyasini kontrol et."
+            "backend/apps/earthquake_risk/data/query.csv dosyasini kontrol et."
         )
 
     df = pd.read_csv(csv_path)

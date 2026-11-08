@@ -52,7 +52,7 @@ import zlib
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO / "QuakeMindBackend"))
+sys.path.insert(0, str(REPO / "backend"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import numpy as np
@@ -67,7 +67,7 @@ from emsr648_closures import closed_osm_edges, _sample_points, METRIC_CRS
 from scenario import DISTRICTS
 
 WAYBACK_ID = "57965"  # 2023-02-23, deprem sonrasi +17 gun -- J-22 ile ayni
-MODEL_PATH = REPO / "QuakeMindBackend" / "apps" / "road_damage" / "models" / "optimized_mitb4_focal_dice30.pth"
+MODEL_PATH = REPO / "backend" / "apps" / "road_damage" / "models" / "optimized_mitb4_focal_dice30.pth"
 
 RADIUS_M = 400.0  # -> ~800m x 800m karo (J-22 ile ayni)
 N_SAMPLES_PER_DISTRICT = 4

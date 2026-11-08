@@ -17,7 +17,7 @@ Her adım için üç şey verilmiştir: **diyagramda ne yazıyor**, **kodda tam 
 
 | # | Diyagram Adımı | Kod Karşılığı | Durum |
 |---|---|---|---|
-| 1 | Deprem oldu → QuakeMind'ı aç | `quakemind/lib/screens/splash_screen.dart` → rol seçimi (survivor/responder) → `AuthController` | 🟢 |
+| 1 | Deprem oldu → QuakeMind'ı aç | `mobile/lib/screens/splash_screen.dart` → rol seçimi (survivor/responder) → `AuthController` | 🟢 |
 | 2 | 🚨 SOS Butonu (Acil Durum) | `screens/survivor/sos_page.dart` — büyük kırmızı daire buton, `SosService.sendAlert()` → `POST /api/sos/alert` | 🟢 |
 | 3 | 📸 Hasar Bildirimi (kamera ile çatlak/enkaz) | `screens/survivor/camera_page.dart` + `widgets/live_camera_view.dart` — **canlı, cihaz-üstü** YOLOv8 (`ultralytics_yolo` paketi, `assets/models/bina.tflite` + `catlak.tflite`) **VEYA** fotoğraf çekip `POST /api/camera/analyze` (bulut YOLOv8, `catlak.pt`/`bina.pt`) | 🟢 (iki yol da gerçek) |
 | 4 | 🆘 Yardım İhtiyaçları (metinsel, "yaşlı, ilk yardım vb.") | Backend `POST /api/nlp/analyze` — BERTurk tabanlı sınıflandırma (`Utbird/EqTwitterTr`) + NER lokasyon çıkarımı (`yhaslan/turkish-earthquake-tweets-ner`) + geopy/Nominatim geokodlama | 🟢 |
@@ -140,7 +140,7 @@ Senaryoyu yazarken bunları **anlatı/vizyon** olarak kullanabilirsiniz ama "sis
 
 ## PART E — Senaryo İçin Hazır, Gerçek Sayısal Veri Seti
 
-Bu veriler `QuakeMindBackend/benchmark/` altında zaten üretilmiş durumda ve gerçek Copernicus EMSR648 hasar tespiti + gerçek AFAD toplanma alanı verisiyle eşleşiyor:
+Bu veriler `backend/benchmark/` altında zaten üretilmiş durumda ve gerçek Copernicus EMSR648 hasar tespiti + gerçek AFAD toplanma alanı verisiyle eşleşiyor:
 
 ### Kahramanmaraş (merkez)
 - **Mahalle**: EKMEKÇİ (gerçek 9 Şubat 2023 uydu görüntüsü, Help.NGO/OpenAerialMap, bbox: 36.9175–36.9239 E, 37.5731–37.5782 N)

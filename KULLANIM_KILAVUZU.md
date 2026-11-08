@@ -36,8 +36,8 @@ Afet mudahale destek sistemi. Bilgisayarda calisan yapay zeka backend'i ile mobi
 
 | Gereksinim | Detay |
 |---|---|
-| **Android** | 6.0+ (API 23+) |
-| **Flutter** | 3.41+ (sadece gelistirme icin) |
+| **Android** | 8.0+ (API 26+) |
+| **Gelistirme** | Kotlin, Jetpack Compose, JDK 17+, Android SDK 37 ve Gradle Wrapper |
 
 ---
 
@@ -46,7 +46,7 @@ Afet mudahale destek sistemi. Bilgisayarda calisan yapay zeka backend'i ile mobi
 ### 2.1. Python Bagimliklarini Kur
 
 ```bash
-cd /home/utku/Desktop/appdeneme/QuakeMindBackend
+cd backend
 pip install -r requirements.txt
 ```
 
@@ -57,7 +57,7 @@ pip install -r requirements.txt
 Uydu modulu ilk kullanildiginda `optimized_mitb4_focal_dice30.pth` modeli HuggingFace'den otomatik indirilir. Elle indirmek icin:
 
 ```bash
-cd /home/utku/Desktop/appdeneme/QuakeMindBackend/apps/road_damage/models/
+cd backend/apps/road_damage/models/
 python3 -c "
 from huggingface_hub import hf_hub_download
 hf_hub_download(repo_id='Utbird/dispath_optimized_mitb4_focal_dice30',
@@ -74,7 +74,7 @@ BERTurk siniflandirma modeli (`Utbird/EqTwitterTr`) ve NER modeli (`yhaslan/turk
 
 Risk modulu icin tarihsel deprem verisi zaten mevcut:
 ```
-QuakeMindBackend/apps/earthquake_risk/data/query.csv
+backend/apps/earthquake_risk/data/query.csv
 ```
 
 Guncel veri cekmek icin uygulama icinden "Veriyi Guncelle" butonu kullanilabilir (internet gerektirir).
@@ -124,7 +124,7 @@ Ayarlar > Ag ve Internet > Mobil etkin nokta > Ac
 ## 4. Backend Sunucusunu Baslatma
 
 ```bash
-cd /home/utku/Desktop/appdeneme/QuakeMindBackend
+cd backend
 python3 fastapi_app.py
 ```
 
@@ -164,21 +164,25 @@ Beklenen yanit:
 
 ## 5. Mobil Uygulamayi Calistirma
 
-### 5.1. Gelistirme Ortaminda (Flutter)
+### 5.1. Gelistirme Ortaminda (Android Studio / Gradle)
 
-```bash
-cd /home/utku/Desktop/appdeneme/quakemind
-flutter run
+Android Studio'da `mobile/` klasorunu acin. Windows PowerShell ile bagli
+cihaza debug derlemesini kurun:
+
+```powershell
+cd mobile
+.\gradlew.bat :app:installDebug
 ```
 
 ### 5.2. APK Olusturma (Dagitim icin)
 
-```bash
-cd /home/utku/Desktop/appdeneme/quakemind
-flutter build apk --release
+```powershell
+cd mobile
+.\gradlew.bat :app:assembleDebug
 ```
 
-APK konumu: `build/app/outputs/flutter-apk/app-release.apk`
+Debug APK konumu: `mobile/app/build/outputs/apk/debug/app-debug.apk`.
+Dagitim icin `:app:assembleRelease` ve release imzalama ayarlari gerekir.
 
 Bu APK'yi telefonlara yukleyerek dagitabilirsiniz.
 
@@ -189,71 +193,43 @@ Bu APK'yi telefonlara yukleyerek dagitabilirsiniz.
 ### 6.1. Ilk Baglanti
 
 1. Uygulamayi ac
-2. **Panel** sekmesinde "Sunucu Ayari" butonuna bas
-3. PC'nin hotspot IP'sini gir:
+2. Android uygulamasinin backend URL ayarini bilgisayarin LAN/hotspot IP'sine gore yapilandir:
    - Linux: `10.42.0.1:8000`
    - Windows: `192.168.137.1:8000`
-4. **Kaydet** butonuna bas
-5. "Baglantiyi Test Et" butonuna bas
-6. Yesil durum gosterilirse baglanti basarili
+3. Telefonla backend sunucusunu ayni ağa bagla. Android emulatoru kullaniyorsan
+   host makine icin `10.0.2.2:8000` adresi kullanilabilir.
+4. Sunucuyu `http://<sunucu-ip>:8000/api/status` uzerinden dogrula;
+   yetki gerektiren islevler icin uygulamada gercek kimlik dogrulama gerekir.
 
 ### 6.2. Deprem Risk Modulu
 
-1. **Risk** sekmesine gec
-2. Dropdown'dan sehir sec (81 il mevcut)
-3. Opsiyonel: "Manuel koordinat kullan" ile ozel konum gir
-4. **"Deprem Riskini Hesapla"** butonuna bas
-5. Sonuclar:
-   - Risk skoru ve seviyesi (Dusuk / Orta / Yuksek / Cok Yuksek)
-   - Folium harita (fay hatlari + deprem odaklari)
-   - Risk faktorleri (kisa vadeli, uzun vadeli, fay yakinligi)
-   - Yakin faylar ve son deprem kayitlari
-6. Harita modlari: Genel Harita / Isi Haritasi / Teknik Katman
+1. Android uygulamasinda **Risk** ekranini ac.
+2. Degerlendirilecek konumun gercek enlem ve boylamini gir.
+3. Sunucuya `POST /api/risk/predict` istegi gonderilir.
+4. Yalnizca modelin dondurdugu risk puani gosterilir. Bu skor deprem tahmini degildir.
 
 ### 6.3. Uydu Yol Hasari Modulu
 
-1. **Uydu** sekmesine gec
-2. Sehir sec (Antakya, Kahramanmaras, Gaziantep, Malatya, Adiyaman)
-3. Uydu kaynagi sec:
-   - **Google Maps** - En guncel, yuksek cozunurluk
-   - **OpenAerialMap** - Afet sonrasi ozel goruntular
-   - **Esri Wayback** - Tarihsel goruntular
-4. Analiz ayarlarini yap:
-   - **Hasar hassasiyeti** (1-10): Yuksek = daha fazla hasar tespit eder
-   - **Tespit esigi** (0.05-0.95): Dusuk = daha hassas ama daha fazla yanlis alarm
-   - **ImageNet normalizasyonu**: Genelde acik birakin
-   - **Post-processing**: Guclu onerilen
-5. **"Analizi Baslat"** butonuna bas
-6. Bekleme suresi: ~1-2 dakika (uydu indirme + AI inference)
-7. Sonuclar:
-   - Hasar orani (%)
-   - Acik / kapali yol sayisi
-   - Analiz gunlugu
-   - Onerilen aksiyon
-
-> **Not:** Bu modul uydu goruntusu indirmek icin internet gerektirir. PC hotspot ile calisirken telefon uzerinden internet paylasimi aktifse calisir, degilse onceden indirilmis verilerle sinirlidir.
+Uydu yol hasari analizi backend tarafindaki `/api/road_damage/*` API'sinde
+bulunur. Eski Flutter uygulamasindaki uydu kaynak secimi ve Folium ekrani
+Kotlin/Compose Android uygulamasina tasinmamistir. Android'deki **Hasar Analizi**
+ekrani kullanicinin sectigi fotografi `/api/afetzede/fotograf-analiz` servisine
+gonderir; uydu analizinin yerine gecmez. Uydu goruntusu indirmek internet gerektirebilir.
 
 ### 6.4. Afet NLP Modulu
 
-1. **NLP** sekmesine gec
-2. Ornek metin sec veya serbest metin gir
-   - Turkce afet ile ilgili sosyal medya paylasimlari, saha raporlari vb.
-3. **"Analizi calistir"** butonuna bas
-4. Sonuclar:
-   - **Kategori**: Enkaz Bildirimi / Acil Yardim / Yol Kapanma / Lojistik / Alakasiz
-   - **Guven skoru**: %0-100
-   - **P-5 Aciliyet**: 1 (dusuk) - 5 (kritik)
-   - **Konum cikarimi**: NER ile bulunan adres + geocoding koordinatlari
-   - **JSON cikti**: Ham pipeline sonucu
+1. Gercek afet metnini NLP ekranina gir.
+2. Analizi baslat; istek `POST /api/afetzede/metin-analiz` uzerinden gonderilir.
+3. Sunucu kategori, aciliyet, guven ve varsa konum bilgisini dondurur.
+4. Bir hata olursa basari yerine hata durumu gosterilir.
 
-### 6.5. Kamera Modulu
+### 6.5. Fotografla Hasar Analizi
 
-1. **Kamera** sekmesine gec
-2. Goruntu kaynagi sec (arka/on kamera)
-3. Canli kamera goruntusu otomatik baslar
-4. Tespit akisi listesinde anlam sonuclari goruntulenir
+1. Hasar analizi ekranindan JPEG/PNG fotografini sec.
+2. Gorsel sunucuda `catlak` ve/veya `bina` modeliyle analiz edilir.
+3. Gercek tespitler ve guven degerleri gosterilir. Resmi bina guvenligi raporu degildir.
 
-> **Not:** Kamera modulu yerel cihaz uzerinde calisir, backend baglantisi gerektirmez.
+> **Not:** Fotograf analizi backend baglantisi ve model dosyalari gerektirir.
 
 ---
 
@@ -307,12 +283,9 @@ Eger `"nlp": false` veya `"risk": false` ise:
 
 ### Uygulama acilmiyor / crash
 
-```bash
-# Temiz baslangic
-cd /home/utku/Desktop/appdeneme/quakemind
-flutter clean
-flutter pub get
-flutter run
+```powershell
+cd mobile
+.\gradlew.bat :app:assembleDebug --stacktrace
 ```
 
 ---
@@ -365,8 +338,8 @@ curl -X POST http://10.42.0.1:8000/api/road_damage/analyze \
 ## 10. Dosya Yapisi
 
 ```
-appdeneme/
-├── QuakeMindBackend/              # Python backend
+QuakeMinds/
+├── backend/              # Python backend
 │   ├── fastapi_app.py             # Ana API sunucusu
 │   ├── requirements.txt           # Python bagimliliklari
 │   └── apps/
@@ -375,14 +348,11 @@ appdeneme/
 │       ├── road_damage/           # Segformer uydu analizi
 │       └── camera_detection/      # YOLO kamera tespiti
 │
-└── quakemind/                     # Flutter mobil uygulama
-    ├── lib/
-    │   ├── main.dart              # Uygulama giris noktasi
-    │   ├── screens/home_shell.dart # Ana ekran (5 sekme)
-    │   ├── services/              # Backend API servisleri
-    │   ├── models/                # Veri modelleri
-    │   ├── widgets/               # UI bilesenleri
-    │   └── data/mock_data.dart    # Sehir ve ornek verileri
-    ├── android/                   # Android konfigurasyonu
-    └── pubspec.yaml               # Flutter bagimliliklari
+└── mobile/                     # Kotlin/Compose Android uygulama
+    ├── app/                       # Activity, ekranlar ve ViewModel'ler
+    ├── core/network/              # HTTP servis sozlesmeleri ve istemci
+    ├── core/data/                 # Veri kaynaklari / repository
+    ├── core/database/             # Room yerel veritabani
+    ├── sync/                      # WorkManager senkronizasyon
+    └── settings.gradle.kts        # Gradle modul ayarlari
 ```

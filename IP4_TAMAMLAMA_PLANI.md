@@ -36,7 +36,7 @@ aynı yeni API'lere bağlamak.
 (çatlak, yıkım, hasarlı yol pikselleri) kalıcı, sorgulanabilir noktalara dönüştürmek —
 ısı haritası ve rota motoru bu tablodan besleniyor.
 
-- `QuakeMindBackend/utils/postgis_manager.py`:
+- `backend/utils/postgis_manager.py`:
   - `init_spatial_tables()` içine yeni tablo ekle: `damage_points`
     `(id, source_type ['crack'|'destruction'|'road_damage'|'sos'], severity FLOAT,
     label VARCHAR, geom GEOMETRY(Point,4326), created_at)` + GIST index
@@ -67,7 +67,7 @@ fırlatmamalı).
 **Amaç:** Rapor 2.4.3'te tanımlanan Gaussian kernel yoğunluk ısı haritasını gerçekten
 üretmek.
 
-- Yeni dosya `QuakeMindBackend/apps/road_damage/utils/heatmap.py`:
+- Yeni dosya `backend/apps/road_damage/utils/heatmap.py`:
   - `build_gaussian_heatmap(points: list[(lat, lon, weight)], bbox, grid_size=100, bandwidth_km=0.5) -> list[[lat, lon, intensity]]`
     — `numpy` ile saf Gaussian kernel smoothing (rapor scipy değil "Gauss çekirdek
     fonksiyonu" diyor; `requirements.txt`'de scipy yok, yeni bağımlılık eklememek için
@@ -92,7 +92,7 @@ fırlatmamalı).
 noktalar + kullanıcı raporları"nı **tek bir ceza-katsayılı graf**te birleştirmek, ve rotayı
 tek bir ephemeral `/analyze` session'ına bağımlı olmaktan çıkarmak.
 
-- `QuakeMindBackend/apps/road_damage/utils/network.py`:
+- `backend/apps/road_damage/utils/network.py`:
   - Yeni fonksiyon `apply_risk_penalties(G, damage_points, blockages, blockage_hard_radius_m=25)`:
     - Blockage'lara `blockage_hard_radius_m` içinde kalan kenarları **kaldır** (bugünkü
       `edges_to_remove` mantığıyla aynı, hard-block).
@@ -166,7 +166,7 @@ noktaları döndürmeli, sabit 5 kayıt değil.
 
 ## Faz 7 — Testler
 
-- Yeni `QuakeMindBackend/tests/test_road_damage_api.py` (proje kökünde hiç test dizini
+- Yeni `backend/tests/test_road_damage_api.py` (proje kökünde hiç test dizini
   yok — bu ilk pytest dosyası olacak): `fastapi.testclient.TestClient` ile
   `/api/road_damage/heatmap`, `/api/road_damage/safe_route`, `/api/road_damage/nearest_debris`
   için smoke testler (PostGIS yokken offline-fallback yolunun da 200 döndüğünü doğrula).

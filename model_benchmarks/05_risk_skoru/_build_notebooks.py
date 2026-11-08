@@ -247,7 +247,7 @@ def make_notebook(key, cfg):
             "",
             f"**Gorev:** ikili siniflandirma - `label_30d` (onumuzdeki 30 gun, 100 km, M>=4.0)",
             "",
-            f"**Veri:** `QuakeMindBackend/apps/earthquake_risk/data/query.csv`",
+            f"**Veri:** `backend/apps/earthquake_risk/data/query.csv`",
             "",
             f"**Bu model:** {cfg['blurb']}",
             "",

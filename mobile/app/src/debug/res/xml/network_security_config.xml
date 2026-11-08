@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Debug may target an Android emulator or a developer's local API over HTTP. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">QuakeMind</string>
+    <string name="onboarding_title">Afet anında net bilgi, güvenli karar</string>
+    <string name="onboarding_body">Akıllı ihbar, güvenli rota ve çevrimdışı kayıt tek uygulamada.</string>
+    <string name="continue_label">Devam et</string>
+    <string name="skip">Geç</string>
+    <string name="auth_title">Nasıl devam etmek istersiniz?</string>
+    <string name="guest_mode">Acil kullanıma devam et</string>
+    <string name="email_login">E-posta ile giriş</string>
+    <string name="phone_login">Telefon ile giriş</string>
+    <string name="home">Ana Sayfa</string>
+    <string name="map">Harita</string>
+    <string name="report">İhbar</string>
+    <string name="alerts">Uyarılar</string>
+    <string name="profile">Profil</string>
+    <string name="nearby_incidents">Yakındaki olaylar</string>
+    <string name="quick_actions">Hızlı işlemler</string>
+    <string name="safe_route">Güvenli rota</string>
+    <string name="damage_analysis">Hasar analizi</string>
+    <string name="risk_information">Risk bilgisi</string>
+    <string name="i_am_safe">Güvendeyim</string>
+    <string name="text_analysis">Metin analizi</string>
+    <string name="assembly_areas">Toplanma alanları</string>
+    <string name="layers">Katmanlar</string>
+    <string name="map_mock_note">Harita sağlayıcısı yapılandırılana kadar çevrimdışı olay görünümü</string>
+    <string name="incident_description">Kısa açıklama</string>
+    <string name="incident_type">Olay türü</string>
+    <string name="save_offline">Kaydet ve gönderim kuyruğuna al</string>
+    <string name="queued_success">İhbar kaydedildi</string>
+    <string name="safety_question">Durumunuzu bildirin</string>
+    <string name="need_help">Yardıma ihtiyacım var</string>
+    <string name="injured">Yaralıyım</string>
+    <string name="cannot_reach">Yakınıma ulaşamıyorum</string>
+    <string name="risk_disclaimer">Bu skor bir depremin ne zaman gerçekleşeceğini tahmin etmez. Bölgesel veriler kullanılarak hazırlanan genel bir risk değerlendirmesidir.</string>
+    <string name="mark_all_read">Tümünü okundu işaretle</string>
+</resources>

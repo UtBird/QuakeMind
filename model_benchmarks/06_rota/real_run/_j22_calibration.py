@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO / "QuakeMindBackend"))
+sys.path.insert(0, str(REPO / "backend"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import numpy as np
@@ -25,7 +25,7 @@ from apps.road_damage.utils.network import apply_risk_penalties, haversine
 from emsr648_closures import closed_osm_edges
 
 WAYBACK_ID = "57965"  # 2023-02-23
-MODEL_PATH = REPO / "QuakeMindBackend" / "apps" / "road_damage" / "models" / "optimized_mitb4_focal_dice30.pth"
+MODEL_PATH = REPO / "backend" / "apps" / "road_damage" / "models" / "optimized_mitb4_focal_dice30.pth"
 RADIUS_M = 400.0  # yaricap -> ~800m x 800m bbox
 R_H_SWEEP = (5, 10, 15, 25, 50, 100)
 

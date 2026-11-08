@@ -1,0 +1,45 @@
+# Gradle & Build Artifacts
+.gradle/
+build/
+**/build/
+*.iml
+.kotlin/
+
+# IDE & Editor Files
+.idea/
+*.ipr
+*.iws
+.vscode/
+
+# Local Configuration & Secrets
+local.properties
+keystore.properties
+secrets.properties
+*.jks
+*.keystore
+
+# Android Build & NDK
+captures/
+.externalNativeBuild/
+.cxx/
+.sdk-recovery/
+.build-process-id
+
+# Logs & Diagnostics
+*.log
+*.err.log
+build*.log
+build*.err.log
+quality*.log
+quality*.err.log
+verify*.log
+verify*.err.log
+
+# Metrics & Benchmark Outputs
+compose_metrics/
+compose_reports/
+benchmark-output/
+
+# OS Specific
+.DS_Store
+Thumbs.db

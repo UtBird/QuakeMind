@@ -25,7 +25,7 @@ Bu doküman, **QuakeMind** projesinin mevcut mimarisini, yapılan tüm geliştir
   3. 🌟 **Onboarding Akışı (`/onboarding`):** 3 adımlı karşılama simülasyonu.
   4. 🔐 **Auth Ekranları (`/login`, `/register`):** Rol bazlı giriş ve kayıt ol arayüzleri.
 
-### ⚙️ B. FastAPI Yapay Zeka Backend (`QuakeMindBackend/fastapi_app.py`)
+### ⚙️ B. FastAPI Yapay Zeka Backend (`backend/fastapi_app.py`)
 - **Erişim Adresi:** `http://127.0.0.1:8000` (Swagger UI: `http://127.0.0.1:8000/docs`)
 - **CORS Middleware:** Next.js (`http://localhost:3000`) erişimi için etkinleştirildi.
 
@@ -61,4 +61,4 @@ Bu doküman, **QuakeMind** projesinin mevcut mimarisini, yapılan tüm geliştir
 ## 💡 4. Çalıştırma Komutları
 
 - **Web Sunucusu:** `cd quakemind-web && npm run dev` (Port 3000)
-- **Backend Sunucusu:** `cd QuakeMindBackend && ..\venv\Scripts\python.exe fastapi_app.py` (Port 8000)
+- **Backend Sunucusu:** `cd backend && venv\Scripts\python.exe fastapi_app.py` (Port 8000)

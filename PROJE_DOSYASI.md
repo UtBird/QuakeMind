@@ -69,7 +69,7 @@ aynı mekânsal katmanda toplanmasını sağlayan tasarım kararıdır. `[T]` `[
 
 **Uygulama yüzeyi:** 38 REST uç noktası (FastAPI), 12 sayfalı web arayüzü
 (Next.js), Flutter mobil istemci, her modülün bağımsız çalıştırılabildiği bir
-çözümleme arayüzü. `[K]` — `QuakeMindBackend/fastapi_app.py` (2 038 satır)
+çözümleme arayüzü. `[K]` — `backend/fastapi_app.py` (2 038 satır)
 
 ### 2.2. Bölge (zone) mimarisi — ölçeklenebilirlik kararı
 
@@ -530,4 +530,4 @@ ekibinin tek başına karara bağlaması uygun görülmemektedir.
 | `MAKALE_TASLAK_TR.md` / `.docx` | Makale taslağı (Türkçe, ulusal dergi formatı) |
 | `EKSIKLER_VE_SORUNLAR.md` | Kimlikli eksik/hata takibi — 30 madde |
 | `QuakeMind_makale/model_benchmarks/` | Ölçüm defterleri ve sonuçları (ayrı çalışma kopyası) |
-| `QuakeMindBackend/benchmark/reports/senaryo_v2_raporu.md` | Uçtan uca senaryo koşum raporu |
+| `backend/benchmark/reports/senaryo_v2_raporu.md` | Uçtan uca senaryo koşum raporu |

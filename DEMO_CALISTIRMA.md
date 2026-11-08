@@ -5,7 +5,7 @@
 ## 1. İki sunucu
 
 ```bash
-venv/Scripts/python.exe -m uvicorn fastapi_app:app --host 127.0.0.1 --port 8000 --app-dir QuakeMindBackend
+backend/venv/Scripts/python.exe -m uvicorn fastapi_app:app --host 127.0.0.1 --port 8000 --app-dir backend
 ```
 
 ```bash
@@ -22,7 +22,7 @@ Sunum hesabı: `demo@quakemind.local`, rol **koordinatör**. Şifre
 `araclar_kullanici.py` içindeki varsayılandır. Hesap yoksa:
 
 ```bash
-QuakeMindBackend/../venv/Scripts/python.exe QuakeMindBackend/araclar_kullanici.py ekle demo@quakemind.local "Demo Sunum" koordinator
+backend/venv/Scripts/python.exe backend/araclar_kullanici.py ekle demo@quakemind.local "Demo Sunum" koordinator
 ```
 
 ## 3. Tatbikatı koşturma

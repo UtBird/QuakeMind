@@ -12,7 +12,7 @@ Son güncelleme: 20 Eylül 2026 · Kapsam: web + backend (Pi/offline ve mobil er
 
 | Bileşen | Yer | Durum |
 |---|---|---|
-| API | `QuakeMindBackend/fastapi_app.py` (61 satır) + `cekirdek.py` + `uclar/` (14 modül, 61 uç) | 21 Eyl'de bölündü (Faz 5), davranış farkı 0 |
+| API | `backend/fastapi_app.py` (61 satır) + `cekirdek.py` + `uclar/` (14 modül, 61 uç) | 21 Eyl'de bölündü (Faz 5), davranış farkı 0 |
 | Uydu bölütleme (SegFormer MiT-B4) | `apps/road_damage/` | Çalışıyor, ayrı işçiye taşınacak |
 | Metin sınıflandırma + NER (BERTurk) | `apps/disaster_nlp/` | Çalışıyor |
 | Deprem riski (CatBoost) | `apps/earthquake_risk/` | İstek yolunda eğitiliyor — düzeltilecek |
@@ -174,7 +174,7 @@ yeniden bulanıklaştırıyor.
 Tek bir SSE akışı: `/api/live`. Sunucu yalnızca değişiklik olduğunda mesaj gönderir;
 mesaj tipleri: yeni SOS, iş durumu, yeni analiz, ısı sürümü, ekip konumu.
 
-**Durum (20 Eyl):** uç kuruldu — `QuakeMindBackend/canli_yayin.py` (süreç içi olay yolu) +
+**Durum (20 Eyl):** uç kuruldu — `backend/canli_yayin.py` (süreç içi olay yolu) +
 `GET /api/live`. Bugün yayınlananlar: hasar analizi iş durumu (ilerleme, bitti, hata),
 yeni analiz ve yeni SOS. Tek uvicorn worker'ı varsayar; çok worker'a geçilince
 `yayinla` gövdesi Postgres `LISTEN/NOTIFY`'a bağlanacak, abonelik ve uç aynı kalacak.

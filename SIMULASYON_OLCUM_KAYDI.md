@@ -443,7 +443,7 @@ kapanmasından yalnız 5'i uçuş izinin dolu olduğu yere düşüyor. Kesinlik 
 verilebilir parçaya dayanıyor. Yalnız yukarıdan görünen moloz yakalanır.
 Görüntü depremden 3 gün sonrasına ait; bir miktar açma çalışması başlamış olabilir.
 
-Veri ve araç: `QuakeMindBackend/benchmark/kapanma_yer_gercegi/`,
+Veri ve araç: `backend/benchmark/kapanma_yer_gercegi/`,
 üretici `araclar_kapanma_etiketle.py` (tohumla yeniden üretilebilir).
 
 ## 14. Başarım — nereye ne kadar süre gidiyor
@@ -500,7 +500,7 @@ orantılı artırmıyor.
 
 ## 15. Makale şekilleri — dosyalar ve önerilen alt yazılar
 
-Dizin: `QuakeMindBackend/benchmark/makale_sekilleri/`. Üreticiler
+Dizin: `backend/benchmark/makale_sekilleri/`. Üreticiler
 `araclar_makale_sekilleri.py` (grafikler) ve `araclar_makale_haritalari.py`
 (haritalar). **Şekillerdeki her sayı bu belgedeki ölçümden gelir;** sayı
 değişirse önce buradaki tablo, sonra şekil güncellenir.
@@ -522,7 +522,7 @@ okunmalıdır.
 
 ## 16. Yeniden üretme
 
-Bütün komutlar `QuakeMindBackend/` içinden, kök `venv/` ortamıyla koşar.
+Bütün komutlar `backend/` içinden, kök `venv/` ortamıyla koşar.
 
 ```bash
 venv/Scripts/python.exe araclar_yerel_osm_kur.py
@@ -649,7 +649,7 @@ gerekir (DepremKit / TSEqD); bu ölçüm onun yerine geçmez.
 > | Kararı veren | anahtar sözcük 12, model 6 | model 15, anahtar sözcük 3 |
 > | Örtüşmeyenlerin gittiği sınıf | Acil Yardım 8, Enkaz 1 | Acil Yardım 4, Enkaz 3 |
 >
-> Rapor: `QuakeMindBackend/benchmark/reports/kanal_olcumu_metin_duzeltilmis.json`
+> Rapor: `backend/benchmark/reports/kanal_olcumu_metin_duzeltilmis.json`
 > (satır başına ham 13 etiketli çıktı ve kararın kaynağı yazılı). Kalan 7 ayrılığın
 > 3'ü eşlemeden (Yemek/Isınma/Arama Ekipmanı → Acil Yardım), 3'ü modelin "Enkaz
 > Kaldırma"sından, 1'i kurtarma önceliğinden ("ambulans giremiyor"). Model 4 yol
@@ -708,8 +708,8 @@ değerlendirme süresi (1,0 dk); geri dönüş manevrası çizgede fiilen yapıl
 olarak ödeniyor.
 
 **Nerede, neyle.** İkinci makine (AMD Ryzen 5 5500, 6 çekirdek; Python 3.12.10,
-PyTorch 2.11.0 CPU). Tek komut: `QuakeMindBackend/araclar_b0_kos.sh` (17 dk).
-Çıktılar `QuakeMindBackend/benchmark/reports/tatbikat_b0/` altında: `sonuc_*.json`,
+PyTorch 2.11.0 CPU). Tek komut: `backend/araclar_b0_kos.sh` (17 dk).
+Çıktılar `backend/benchmark/reports/tatbikat_b0/` altında: `sonuc_*.json`,
 `duy_*.json`, `tatbikat_ozet.json`, `guzergah_nurdagi_unet_t42.json`, `gunluk.txt`,
 `pip_freeze.txt`.
 

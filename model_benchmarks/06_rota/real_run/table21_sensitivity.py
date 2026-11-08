@@ -2,7 +2,7 @@
 Tablo 21, satir 4-5 (Sert kapatma yaricapi r_h, Ceza basamaklari lambda(d))
 icin parametre duyarlilik taramasi.
 
-Uretim kodundaki (QuakeMindBackend/apps/road_damage/utils/network.py)
+Uretim kodundaki (backend/apps/road_damage/utils/network.py)
 apply_risk_penalties/risk_weight fonksiyonlarini BIREBIR kullanir; hasar
 noktalari olarak H-Z1 (Antakya) bolgesindeki gercek EMSR648 (orta kural)
 kapali kenarlarinin orta noktalari verilir (make_figure10.py ile ayni
@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 REPO = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO / "QuakeMindBackend"))
+sys.path.insert(0, str(REPO / "backend"))
 
 from scenario import load_district
 from emsr648_closures import closed_osm_edges

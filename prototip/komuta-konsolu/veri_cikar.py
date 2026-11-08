@@ -5,10 +5,10 @@ Kullanım (depo kökünden):
 
 Kaynaklar (hepsi depoda mevcut):
   - Copernicus EMS EMSR648, AOI11 (Antakya) grading/monit01 katmanları
-  - QuakeMindBackend/apps/earthquake_risk/data/query.csv           (deprem kataloğu)
+  - backend/apps/earthquake_risk/data/query.csv                    (deprem kataloğu)
   - .../fault_maps/fay_haritasi/gem_active_faults_harmonized.geojson (GEM aktif faylar)
   - .../road_damage/data/tum_turkiye_toplanma_alanlari.json        (AFAD toplanma alanları)
-  - QuakeMindBackend/benchmark/scenarios/hatay_orta.json           (senaryo: SOS + ekipler)
+  - backend/benchmark/scenarios/hatay_orta.json                    (senaryo: SOS + ekipler)
 
 Çıktı: qm-data.js  —  `window.QM = {...}`
 Geometriler Douglas-Peucker ile ~2 m toleransla sadeleştirilir, 1e-5 derece tamsayıya
@@ -18,7 +18,7 @@ import csv, datetime, json, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-B = os.path.join(ROOT, "QuakeMindBackend")
+B = os.path.join(ROOT, "backend")
 COP = os.path.join(B, "benchmark", "data", "copernicus", "extracted", "aoi11_monit01")
 SCALE = 100000.0
 EPS = 2.2e-5          # ~2 m sadeleştirme toleransı

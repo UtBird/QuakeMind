@@ -138,7 +138,7 @@ def main():
         "yarıçapında M≥4,0 büyüklüğünde başka bir deprem tetiklenip tetiklenmediğini gösteren "
         "ikili etikettir. Ana şoklara odaklanmak için basit bir artçı-şok ayıklama (declustering) "
         "adımı (1 gün / 50 km penceresi, küçük-büyüklük kriteriyle) uygulanmıştır. Bu görev, "
-        "üretim ortamındaki `QuakeMindBackend/apps/earthquake_risk/risk_engine.py` modülündeki "
+        "üretim ortamındaki `backend/apps/earthquake_risk/risk_engine.py` modülündeki "
         "özellik mühendisliğini birebir yeniden üretmektedir; böylece bu çalışmanın sonuçları "
         "üretim modeliyle doğrudan karşılaştırılabilir."
     )
@@ -278,7 +278,7 @@ def main():
     doc.add_heading("7. Sınırlamalar", level=1)
     doc.add_paragraph(
         f"(1) Veri kümesi küçüktür ({ds['n_total']} kayıt); katalog genişledikçe (özellikle "
-        "QuakeMindBackend'deki güncel veriyle) modellerin yeniden çalıştırılması önerilir. "
+        "backend'deki güncel veriyle) modellerin yeniden çalıştırılması önerilir. "
         "(2) Walk-forward katları arasında gözlenen yüksek varyans (bkz. Şekil 4), bazı "
         "modellerin ortalama skorlarının istikrarsız olduğuna işaret etmektedir; tek bir "
         "ortalama değer yerine daima std ile birlikte raporlanmalıdır. (3) Kısa vadeli "

@@ -16,7 +16,7 @@ olarak yazılır.
 | 03 | `03_yer_seviyesi/` | yer seviyesi çatlak / yapısal hasar tespiti | 2× YOLOv8 | `ultralytics` + `torchvision` | **Roboflow Universe** |
 | 04 | `04_turkce_metin/` | Türkçe metinden ihtiyaç + aciliyet | BERTurk hattı | `transformers` + `scikit-learn` | `data/` (DepremKit / TSEqD) |
 | 04 | `04_turkce_metin/ner/` | konum varlığı çıkarımı | alan-özel NER | `transformers` + `seqeval` | HF `yhaslan/...` veya CoNLL |
-| 05 | `05_risk_skoru/` | 30 günlük deprem risk sınıflandırması | CatBoost | boosting + `scikit-learn` | `QuakeMindBackend/.../query.csv` (repoda) |
+| 05 | `05_risk_skoru/` | 30 günlük deprem risk sınıflandırması | CatBoost | boosting + `scikit-learn` | `backend/.../query.csv` (repoda) |
 | 06 | `06_rota/` | kapanma-farkında rota (algoritma kıyaslaması) | risk-ağırlıklı A* | `networkx` / `osmnx` / OSRM / ORS | Geofabrik PBF + EMSR648 |
 
 ## Görüntü modelleri — veri setini nasıl bağlarsın
@@ -75,7 +75,7 @@ klonda bu klasör olmaz.
 ### Yerelde (bu repoda) çalıştırma
 
 ```bash
-source ../QuakeMindBackend/venv/bin/activate
+source ../backend/venv/bin/activate
 cd 04_turkce_metin && python _build.py         # defterleri (yeniden) üret
 pip install -q transformers datasets accelerate
 jupyter nbconvert --to notebook --execute --inplace 0*.ipynb
@@ -122,5 +122,5 @@ ama her birinin kendi atıf şartı var, dergi gönderiminde istenir.
 | lightgbm | 0.717 ± 0.229 | 0.877 | 0.827 |
 | mlp | 0.428 ± 0.109 | 0.711 | 0.674 |
 
-Veri seti küçük (~454 kayıt); `QuakeMindBackend/apps/earthquake_risk/data_manager.py`
+Veri seti küçük (~454 kayıt); `backend/apps/earthquake_risk/data_manager.py`
 ile katalog uzadıkça defterleri yeniden çalıştır.

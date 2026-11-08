@@ -67,7 +67,7 @@ istek atıyor, hiçbir şey değişmese bile.
 ## 5. Kimlik ve yetki
 
 - **Rol asla istemciden gelmez.** Kayıt ve giriş uçları istemcinin gönderdiği rolü kabul
-  etmez. (Bugün ihlal ediliyor: `QuakeMindBackend/fastapi_app.py:2333`.)
+  etmez. (Bugün ihlal ediliyor: `backend/fastapi_app.py:2333`.)
 - Her uç noktada yetki kontrolü bir bağımlılıkla (`Depends`) yapılır. Bugün 43 uç noktanın
   yalnız 3'ünde var.
 - Kısa ömürlü erişim token'ı + httpOnly çerezde yenileme token'ı. Token URL'de taşınmaz.
@@ -99,15 +99,15 @@ yeni konsol devralır. Eski web'de yalnız kritik düzeltme yapılır.
 
 ## 9. Dal, commit ve dağıtım
 
-- Depolar: origin `Femrei/QuakeMindDev`, upstream `UtBird/QuakeMind`.
+- Bu çalışma kopyasında `origin` `geniusprr/QuakeMind`, `upstream` `UtBird/QuakeMind`; aktif geliştirme dalı `deha/backend-gelistirme`.
 - İş, konusuna göre ayrı bir dalda yapılır; `main` doğrudan değiştirilmez.
 - **Commit, push ve dağıtım kullanıcı o an açıkça söylemeden yapılmaz.**
-- Ağır model dosyaları depoya girmez, Hugging Face'ten indirilir (bkz. `QuakeMindBackend/README.md`).
+- Ağır model dosyaları depoya girmez, Hugging Face'ten indirilir (bkz. `backend/README.md`).
 
 ## 10. Kapsam notları (20 Eylül 2026)
 
 - Raspberry Pi ve internetsiz çalışma **ertelendi**, ayrı bir iş olarak ele alınacak.
-  `QuakeMindBackend/OPTIMIZASYON_ANALIZI.md`'nin Pi/offline bölümleri şu an geçerli değil.
-- Mobil (Flutter) şu an kapsam dışı; odak web + backend.
+  `backend/OPTIMIZASYON_ANALIZI.md`'nin Pi/offline bölümleri şu an geçerli değil.
+- 7 Kasım 2026 itibarıyla eski Flutter klasörü yerini `mobile/` altındaki Kotlin/Compose Android uygulamasına bıraktı; Android-backend entegrasyonu geliştirme kapsamındadır.
 - `OPTIMIZASYON_ANALIZI.md` içindeki durum alanları bayat (hepsi "Bekliyor" görünüyor ama
   bazıları yapılmış). Oradan madde kullanmadan önce koda bak.

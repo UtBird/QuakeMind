@@ -34,7 +34,7 @@ güncel docx'in kopyasını `SRC` olarak verin; revize13–16'da `sys.path` Utku
     62,3 / 77,6 ms verdi. Raporlanan değer kararlı banttır, hücre notunda yazılı.
   - Tablo 15 satırı, §4.5 "Kanal ölçümleri" cümlesi ve Tablo 15 altyazısı güncellendi.
 - Betik: `makale/analiz_arsivi/revize19.py`. Rapor:
-  `QuakeMindBackend/benchmark/reports/kanal_olcumu_metin_i7.json`.
+  `backend/benchmark/reports/kanal_olcumu_metin_i7.json`.
 - Denetim: `atif.py` temiz. Gönderim kopyası yenilendi.
 - C listesinden kalan: YOLO bağımsız saha sınama kümesi; veri miktarıyla eşlenmiş genelleme kıyası.
 
@@ -110,7 +110,7 @@ güncel docx'in kopyasını `SRC` olarak verin; revize13–16'da `sys.path` Utku
   sayılmıyor); Türkçe küçük harf; gösterilen güven gösterilen kategorinin. Eşik ve
   13→5 eşlemesi değişmedi (test metnine ayar yapılmadı). Örtüşme **9/18 → 11/18**;
   kararın kaynağı model 15, anahtar sözcük 3 (eskiden 12'si anahtar sözcük). Rapor:
-  `QuakeMindBackend/benchmark/reports/kanal_olcumu_metin_duzeltilmis.json` (i7 raporu
+  `backend/benchmark/reports/kanal_olcumu_metin_duzeltilmis.json` (i7 raporu
   `kanal_olcumu.json`'a dokunulmadı). Sınama: `testler/test_siniflandirma.py` 7/7.
 - **Yeni bulgu (J-123):** model yol kapanması metinlerini tanımıyor (4/4'ünde ulaşım
   etiketi yok); yol bilgisi bugün yalnız anahtar sözcükten geliyor. Makaleye yazıldı.
@@ -124,7 +124,7 @@ güncel docx'in kopyasını `SRC` olarak verin; revize13–16'da `sys.path` Utku
   kaynağa bağlı değildi ve sağ üstteki üç nokta §2.3'teki "rastlanmamıştır" ifadesiyle
   çelişiyordu; eksen yazıları da üst üste biniyordu. Yeni şekilde her kutu §2'deki bir
   kaynak numarası (19 kaynak), yeri betikte gerekçesiyle yazılı
-  (`QuakeMindBackend/araclar_makale_yazin_konumu.py`); §2.5'teki atıf cümlesi ve altyazı
+  (`backend/araclar_makale_yazin_konumu.py`); §2.5'teki atıf cümlesi ve altyazı
   güncellendi (revize8). **Bakmanızı isterim:** sınıflama niteliksel bir karardır.
 - **Şekil 5 üreticisi:** künye satırı artık sarmalanıyor (`araclar_makale_haritalari.py`);
   yeniden üretim i7'de (B0).
@@ -147,7 +147,7 @@ güncel docx'in kopyasını `SRC` olarak verin; revize13–16'da `sys.path` Utku
   ölçüldü → CatBoost'u geçiyor. §4.11 beşinci gözlem tersine döndü; Sonuç'a eklendi.
   Tablo 21'deki yanlış kalın işaretler düzeltildi.
 - **Şekiller:** Şekil 2 (mimari), 4 (karolama/morfoloji), 6 (protokol) koda göre yeniden
-  çizildi (`QuakeMindBackend/araclar_makale_semalar.py`); Şekil 20 "7 olaylık" etiketiyle
+  çizildi (`backend/araclar_makale_semalar.py`); Şekil 20 "7 olaylık" etiketiyle
   aynı veriden yeniden üretildi.
 - **Kaynakça (J-121):** 53 DOI doğrulandı; 4 hatalı DOI düzeltildi ([9] başka makaleyi
   gösteriyordu); 13 URL'nin erişim tarihi güncellendi.
@@ -210,7 +210,7 @@ olanlar: A'daki beş madde ve B'deki yazar okuması.
 ### B. 🟠 İnsan işi
 - [ ] **İkinci insan etiketleyici (önerilir).** Utku dışında bir yazar aynı 33 kapanma kesitini etiketlesin
   (~20 dk); insanlar arası κ ölçülür, §4.3 güçlenir.
-  - Kit: `QuakeMindBackend/benchmark/kapanma_yer_gercegi/insan_kiti/etiketle.html`
+  - Kit: `backend/benchmark/kapanma_yer_gercegi/insan_kiti/etiketle.html`
   - Ölçüm: `araclar_kapanma_uyum.py`
 - [ ] **Yazar okuması.** Bütün makale baştan sona okunmalı. Sarı vurgulu revizyon cümlelerinin (204 vurgu)
   iç tutarlılığı da bu okumada denetlenmeli; eski listelerdeki "sarı vurgu tutarlılık taraması" maddesi budur.

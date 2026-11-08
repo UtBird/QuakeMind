@@ -41,19 +41,19 @@ makale/scratch*/
 .claude/
 
 # Regenerable OSM graph cache (rebuilt automatically on first request)
-QuakeMindBackend/apps/road_damage/data/osm_graph_cache/
+backend/apps/road_damage/data/osm_graph_cache/
 
 # Large manually-downloaded third-party ground-truth data (Copernicus EMS) --
 # too large for git history, user re-downloads from the Copernicus portal
-QuakeMindBackend/benchmark/data/copernicus/
+backend/benchmark/data/copernicus/
 
 # Geocoding onbellegi -- yeniden uretilebilir, makineye ozgu
-QuakeMindBackend/apps/disaster_nlp/data/geocode_cache.json
+backend/apps/disaster_nlp/data/geocode_cache.json
 
 # Ham benchmark kosu ciktilari (yuzlerce MB, yeniden uretilebilir). Ozet tablolar
 # (multi_seed_tablo.md, tablo18.md, *summary.json) `git add -f` ile izlenir; bir kez
 # izlenen dosyanin sonraki degisiklikleri normal gorunur.
-QuakeMindBackend/benchmark/runs/*/
+backend/benchmark/runs/*/
 
 # Office kilit dosyalari
 ~$*
@@ -71,5 +71,5 @@ quakemind-web/tsconfig.tsbuildinfo
 
 # Tanılama ekran görüntüleri: hiçbir belge/ölçüm kaydı bunlara atıf yapmıyor,
 # üçü toplam 27 MB. Depoya girmiyor (27 Eylül 2026).
-QuakeMindBackend/benchmark/reports/zoom_test_r*.png
+backend/benchmark/reports/zoom_test_r*.png
 makale/arsiv/

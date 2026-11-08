@@ -39,14 +39,14 @@ Sana ulaşmaları için Utku'nun push etmesi gerekiyor. Önerilen commit gruplar
 
 1. `docs(makale)`: makale docx, gönderim kopyası, `makale/KALAN_ISLER_2026-09-27.md`, bu dosya.
 2. `feat(ölçüm)`: kapanma için insan etiketi ve uyum.
-   - `QuakeMindBackend/benchmark/kapanma_yer_gercegi/etiketler_insan_1.json`
-   - `QuakeMindBackend/benchmark/kapanma_yer_gercegi/uyum.json`
-   - `QuakeMindBackend/benchmark/kapanma_yer_gercegi/insan_kiti/*`
-3. `feat(metin)`: `QuakeMindBackend/araclar_metin_maskele.py` ve `QuakeMindBackend/benchmark/reports/metin_maskeleme_raporu.json` (yalnız sayı içerir).
+   - `backend/benchmark/kapanma_yer_gercegi/etiketler_insan_1.json`
+   - `backend/benchmark/kapanma_yer_gercegi/uyum.json`
+   - `backend/benchmark/kapanma_yer_gercegi/insan_kiti/*`
+3. `feat(metin)`: `backend/araclar_metin_maskele.py` ve `backend/benchmark/reports/metin_maskeleme_raporu.json` (yalnız sayı içerir).
 4. `feat(gpu)`: bütün `makale/analiz_arsivi/kaggle/` (defterler, `gunluk_ayikla.py`, `sonuclar/`) ve `makale/analiz_arsivi/GPU_IS_PAKETI_2026-09-28.md`.
 5. `feat(şekil)`:
-   - `QuakeMindBackend/araclar_makale_sekilleri.py`
-   - `QuakeMindBackend/araclar_makale_semalar.py`
+   - `backend/araclar_makale_sekilleri.py`
+   - `backend/araclar_makale_semalar.py`
    - üç png: `sekil_protokol`, `sekil_kesif_kazanc`, `sekil_model_secimi`
 6. `docs(makale)`: betikler (`makale/analiz_arsivi/revize13–16.py`, `yardimci.py`, `cikar.py`, `atif.py`) ve `EKSIKLER_VE_SORUNLAR.md`.
 
@@ -139,7 +139,7 @@ Kaynak dosyalar (`makale/analiz_arsivi/kaggle/sonuclar/`):
 5. Denetim:
    - `python makale/analiz_arsivi/cikar.py <docx> makale.txt`, sonra `python makale/analiz_arsivi/atif.py`. Bütün tablo, şekil ve kaynaklar 1..N sıralı ve atıflı olmalı.
    - PDF'e çevir: Word COM, PowerShell'de `ExportAsFixedFormat(<pdf>, 17)`.
-   - Sayfa düzenini PyMuPDF ile tara: tablo başlığı sayfa sonunda kalmasın. PyMuPDF `QuakeMindBackend/venv` içinde.
+   - Sayfa düzenini PyMuPDF ile tara: tablo başlığı sayfa sonunda kalmasın. PyMuPDF `backend/venv` içinde.
 6. Gönderim kopyasını yenile. `revize13.py`'nin sonundaki "vurgu kaldır" bloğu bunu yapıyor.
 7. `EKSIKLER_VE_SORUNLAR.md`'ye bir satır, `makale/KALAN_ISLER_2026-09-27.md`'ye tur özeti ekle.
 
@@ -187,7 +187,7 @@ Kaynak dosyalar (`makale/analiz_arsivi/kaggle/sonuclar/`):
 | 3 | Hedef dergi seçimi. Ardından kaynak stili ve sayfa sınırına göre kısaltma (72 sayfa uzun). | ekip kararı |
 | 4 | GitHub deposunun görünürlüğü (Veri Erişilebilirliği'ndeki bağlantı özel depoda açılmıyor) | depo sahibi |
 | 5 | Roboflow API anahtarının iptali ve yenilenmesi (git geçmişinde açık) | Roboflow hesabı sahibi |
-| 6 | **Önerilir:** ikinci insan etiketleyici. Başka bir yazar aynı 33 kesiti etiketlesin (~20 dk), insanlar arası κ ölçülsün. Kit: `QuakeMindBackend/benchmark/kapanma_yer_gercegi/insan_kiti/etiketle.html`; ölçüm: `araclar_kapanma_uyum.py`. | yazarlardan biri (Utku değil) |
+| 6 | **Önerilir:** ikinci insan etiketleyici. Başka bir yazar aynı 33 kesiti etiketlesin (~20 dk), insanlar arası κ ölçülsün. Kit: `backend/benchmark/kapanma_yer_gercegi/insan_kiti/etiketle.html`; ölçüm: `araclar_kapanma_uyum.py`. | yazarlardan biri (Utku değil) |
 | 7 | İsteğe bağlı: i7 makinesinde `pip freeze` (Tablo 11 sürümleri, J-118) ve `python araclar_kanal_olc.py` (Tablo 15 metin gecikmesi) | i7 makinesi |
 | 8 | YOLO için bağımsız saha sınama kümesi (etiketli fotoğraf). Makalede şimdilik eğitim doğrulama değeri var; iyimser olduğu yazılı. | insan işi |
 | 9 | Son adım: yazar gözüyle bütün makalenin içerik okuması | yazarlar |

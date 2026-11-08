@@ -1,6 +1,6 @@
 """
 Sentetik ihbar metinleri icin GERCEK BERTurk siniflandiricisiyla (
-QuakeMindBackend/apps/disaster_nlp/src/classification.py::DisasterClassifier)
+backend/apps/disaster_nlp/src/classification.py::DisasterClassifier)
 kategori uretir ve sonucu bir kere onbelleklerki assignment.py her
 kosumda modeli yeniden yuklemesin (yukleme ~100 sn, cikarim ~3-4 sn/metin).
 """
@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO / "QuakeMindBackend"))
+sys.path.insert(0, str(REPO / "backend"))
 
 from apps.disaster_nlp.src.classification import DisasterClassifier  # noqa: E402
 

@@ -5,8 +5,8 @@ Gercek veri kaynaklari:
     (scenario.py DISTRICTS sozlugundeki Nominatim sorgularindan geocode edilmis)
   - Analiz yaricapi 3 km: scenario.py RADIUS_M = 3000.0 (OSM graph indirme yaricapi)
   - Iki dis merkez (Pazarcik Mw7.8/AFAD 7.7, Elbistan Mw7.5/AFAD 7.6):
-    QuakeMindBackend/apps/earthquake_risk/data/query.csv (USGS katalogu)
-  - Fay hatti: QuakeMindBackend/.../fault_maps/fay_haritasi/gem_active_faults_harmonized.geojson
+    backend/apps/earthquake_risk/data/query.csv (USGS katalogu)
+  - Fay hatti: backend/.../fault_maps/fay_haritasi/gem_active_faults_harmonized.geojson
     (GEM global aktif fay veritabani, calisma alani bounding box'iyla filtrelenmis)
   - Zemin: OpenStreetMap karo servisi (contextily), acik lisansli.
 """

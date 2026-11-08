@@ -139,7 +139,7 @@ girdinin tanımını bulamaz.
 ekle ve şunları yaz: üretici algoritma, kapanma sayısı ve yol ağına oranı,
 uzamsal seçim kuralı (rastgele mi, yol sınıfına göre ağırlıklı mı, kümelenmiş mi),
 rastgelelik tohumu, EMSR648 oranlarıyla (%1,58 / %1,71) nasıl kalibre edildiği.
-Kod: `QuakeMindBackend/benchmark/` altındaki senaryo üreticisi referans verilmeli.
+Kod: `backend/benchmark/` altındaki senaryo üreticisi referans verilmeli.
 
 ### ☐ M-05 🔴 Ekip–hedef atama kuralı tanımsız `[D]`
 **Nerede:** Bölüm 3.9 (102 kelime) ↔ Bölüm 4.5
@@ -707,7 +707,7 @@ belirt; hakem yeniden üretilebilirlik açısından sorar.
 
 ### ☐ M-48 🟠 Görüntü kaynağı lisansı `[B]`
 Kodda Google uydu karoları çekiliyor
-(`QuakeMindBackend/apps/road_damage/utils/fetcher.py`, `mt1.google.com/vt/lyrs=s`).
+(`backend/apps/road_damage/utils/fetcher.py`, `mt1.google.com/vt/lyrs=s`).
 Makale koşumlarının **Maxar Open Data** ile yapıldığı Veri Erişilebilirliği
 beyanında açıkça belirtilmeli; aksi hâlde kod paylaşıldığında çelişki doğar.
 
