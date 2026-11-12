@@ -168,10 +168,56 @@ görsel olarak kullanılabilir ama makaleye giren bu.
 > noktalardan birinin gerçek fotoğrafı ve modelin üzerinde bulduğu kutulardır.
 > Görüntü, fotoğraflar ve bütün model çıktıları gerçektir; ihbar metinleri ile
 > kamera ve metin kayıtlarının harita konumları üretilmiştir. Fotoğraflar aynı
-> depremin (6 Şubat 2023) Hatay ve Adıyaman'dan çekilmiş kareleridir, gösterilen
+> depremlerin ardından çekilmiş gerçek kareleridir (dokuzu Hatay/Antakya'da,
+> dördünün ili kaynakta belirtilmemiş), gösterilen
 > mahallenin fotoğrafı değildir.
 
 **Neden bu şekil gerekli:** §1'de "yazında hasar algılama, yol erişilebilirliği
 ve ihtiyaç çıkarımı ayrı ayrı çözülmüş, tek karar zincirinde birleştirilmemiştir"
 deniyor. Katkı iddiası bu. Şekil onun tek karelik kanıtı — okuyucu üç kanalın
 aynı mahalleye indiğini ve sonucun güzergâha döndüğünü bir bakışta görür.
+
+## G. Şekil dengesi — yeni şekil değil, sıralama önerisi
+
+29 Eylül 2026'da yapılan bakışta çıktı. **Yeni şekil üretilmesi gerekmiyor**; öneri
+yalnızca vurguyla ilgili ve yazar okumasında (KALAN_ISLER B) değerlendirilmeli.
+
+### Gözlem
+
+23 şeklin dağılımı:
+
+| Ne gösteriyor | Şekil | Sayı |
+|---|---|---|
+| **Zincir — çalışmanın özgünlük iddiası** | 5, 9, 10, 11, 12 | **5** |
+| Bileşen kıyası (bölütleme 7–8, metin 13–15, risk 16–20) | 7, 8, 13, 14, 15, 16, 17, 18, 19, 20 | **10** |
+| Yöntem ve bağlam | 1, 2, 3, 4, 6 | 5 |
+| Arayüz | 21, 22, 23 | 3 |
+
+Bileşen kıyasına zincirin **iki katı** yer ayrılmış. Oysa §2 ve §5'te açıkça yazıldığı
+gibi katkı, bileşenlerin tek tek başarımında değil, üçünün tek karar zincirinde
+birleştirilmesindedir; bileşen düzeyinde emsaller çoğu ölçütte önde. Şekil bütçesi
+bu yüzden iddianın zayıf olduğu tarafa ağırlık veriyor.
+
+### Zincir şekilleri güçlü, sorun onlarda değil
+
+- **Şekil 10** (üç kanal tek haritada) tek karede uydu + kamera + metin kanallarını,
+  kapanan yolları ve güzergâhı gösteriyor; altyazısı neyin gerçek neyin üretilmiş
+  olduğunu da yazıyor. Katkı iddiasının tek karelik kanıtı budur.
+- **Şekil 11** (kolların erişim süresi) Nurdağı'da 3,82 → 1,51 dk farkını hata
+  çubuklarıyla veriyor ve **zayıf durumu saklamıyor**: İslahiye'de 1,26 → 1,15.
+  Ayrıca Defne ve İslahiye'de "kapanmayı bilmeyen" ile "telsizle paylaşan" kolların
+  **birebir aynı** çıktığı (2,35 = 2,35 · 1,26 = 1,26), yani telsizle paylaşmanın o iki
+  alanda katkısının sıfır olduğu grafikten okunuyor. Olumsuz sonuç görünür durumda.
+
+### Öneri (karar yazarlarda)
+
+1. **Sıralama.** Hakem çoğu zaman önce şekillere bakar; şu an ilk gördüğü şey on tane
+   model kıyası grafiği. Şekil 10 ve 11'in metin içindeki konumu öne alınabilir ya da
+   §4.5–4.6'ya yapılan atıflar erken bölümlerden (ÖZ sonrası, §1 sonu) güçlendirilebilir.
+2. **Anlatı bağı.** §5.1'deki *"sınama IoU'su operasyonel faydanın iyi bir göstergesi
+   değildir"* cümlesini şekille destekleyen tek görsel **Şekil 12**. Bu karşıtlık
+   makalenin en aktarılabilir bulgusu; okuma turunda Şekil 12'ye yapılan atıfların
+   yeterli olup olmadığına bakılmalı.
+
+**Yapılmaması gereken:** bu gözlem yüzünden bileşen şekillerini çıkarmak. Onlar
+ölçülmüş sonuçlar ve hakem kıyas ister; mesele hangisinin önce görüldüğü.

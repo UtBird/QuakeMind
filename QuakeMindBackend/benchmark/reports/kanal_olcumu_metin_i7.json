@@ -1,0 +1,253 @@
+{
+ "tarih": "2026-09-29",
+ "makine": {
+  "islemci": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+  "sistem": "Windows-11-10.0.26200-SP0"
+ },
+ "kamera": null,
+ "metin": {
+  "kararKaynagi": {
+   "model": 15,
+   "anahtar_sozcuk": 3
+  },
+  "birim": "ihbar metni",
+  "metinSayisi": 18,
+  "ortusen": 11,
+  "ortusmeNotu": "Bu bir DOĞRULUK DEĞİLDİR: 'beklenen' metni yazan tek kişinin etiketidir, yer gerçeği değil. Kategori sınırları bulanıktır.",
+  "kaymaDagilimi": {
+   "Acil Yardım İhtiyacı": 4,
+   "Enkaz Bildirimi": 3
+  },
+  "medyanMs": 62.3,
+  "enUzunMs": 77.6,
+  "satirlar": [
+   {
+    "il": "hatay",
+    "beklenen": "Enkaz Bildirimi",
+    "model": "Enkaz Bildirimi",
+    "ortusuyor": true,
+    "guven": 0.971,
+    "ms": 67.2,
+    "hamEtiket": "Enkaz Kaldirma",
+    "hamSkor": 0.971,
+    "kaynak": "model"
+   },
+   {
+    "il": "hatay",
+    "beklenen": "Enkaz Bildirimi",
+    "model": "Enkaz Bildirimi",
+    "ortusuyor": true,
+    "guven": 0.946,
+    "ms": 67.4,
+    "hamEtiket": "Enkaz Kaldirma",
+    "hamSkor": 0.946,
+    "kaynak": "model"
+   },
+   {
+    "il": "hatay",
+    "beklenen": "Yol Kapanma Bilgisi / Lojistik",
+    "model": "Acil Yardım İhtiyacı",
+    "ortusuyor": false,
+    "guven": 0.045,
+    "ms": 77.6,
+    "hamEtiket": "Alakasiz",
+    "hamSkor": 0.583,
+    "kaynak": "anahtar_sozcuk"
+   },
+   {
+    "il": "hatay",
+    "beklenen": "Yol Kapanma Bilgisi / Lojistik",
+    "model": "Enkaz Bildirimi",
+    "ortusuyor": false,
+    "guven": 0.891,
+    "ms": 48.8,
+    "hamEtiket": "Enkaz Kaldirma",
+    "hamSkor": 0.891,
+    "kaynak": "model"
+   },
+   {
+    "il": "hatay",
+    "beklenen": "Acil Yardım İhtiyacı",
+    "model": "Acil Yardım İhtiyacı",
+    "ortusuyor": true,
+    "guven": 0.703,
+    "ms": 62.7,
+    "hamEtiket": "Saglik",
+    "hamSkor": 0.703,
+    "kaynak": "model"
+   },
+   {
+    "il": "hatay",
+    "beklenen": "Lojistik İhtiyaç Bildirimi",
+    "model": "Lojistik İhtiyaç Bildirimi",
+    "ortusuyor": true,
+    "guven": 0.967,
+    "ms": 62.4,
+    "hamEtiket": "Barınma",
+    "hamSkor": 0.967,
+    "kaynak": "model"
+   },
+   {
+    "il": "hatay",
+    "beklenen": "Lojistik İhtiyaç Bildirimi",
+    "model": "Acil Yardım İhtiyacı",
+    "ortusuyor": false,
+    "guven": 0.832,
+    "ms": 46.9,
+    "hamEtiket": "Yemek",
+    "hamSkor": 0.832,
+    "kaynak": "model"
+   },
+   {
+    "il": "hatay",
+    "beklenen": "Enkaz Bildirimi",
+    "model": "Enkaz Bildirimi",
+    "ortusuyor": true,
+    "guven": 0.508,
+    "ms": 52.5,
+    "hamEtiket": "Enkaz Kaldirma",
+    "hamSkor": 0.508,
+    "kaynak": "model"
+   },
+   {
+    "il": "hatay",
+    "beklenen": "Alakasız",
+    "model": "Alakasız",
+    "ortusuyor": true,
+    "guven": 0.854,
+    "ms": 62.2,
+    "hamEtiket": "Alakasiz",
+    "hamSkor": 0.854,
+    "kaynak": "model"
+   },
+   {
+    "il": "gaziantep",
+    "beklenen": "Enkaz Bildirimi",
+    "model": "Enkaz Bildirimi",
+    "ortusuyor": true,
+    "guven": 0.92,
+    "ms": 57.1,
+    "hamEtiket": "Enkaz Kaldirma",
+    "hamSkor": 0.92,
+    "kaynak": "model"
+   },
+   {
+    "il": "gaziantep",
+    "beklenen": "Yol Kapanma Bilgisi / Lojistik",
+    "model": "Yol Kapanma Bilgisi / Lojistik",
+    "ortusuyor": true,
+    "guven": 0.025,
+    "ms": 65.2,
+    "hamEtiket": "Alakasiz",
+    "hamSkor": 0.602,
+    "kaynak": "anahtar_sozcuk"
+   },
+   {
+    "il": "gaziantep",
+    "beklenen": "Enkaz Bildirimi",
+    "model": "Enkaz Bildirimi",
+    "ortusuyor": true,
+    "guven": 0.969,
+    "ms": 48.0,
+    "hamEtiket": "Enkaz Kaldirma",
+    "hamSkor": 0.969,
+    "kaynak": "model"
+   },
+   {
+    "il": "gaziantep",
+    "beklenen": "Lojistik İhtiyaç Bildirimi",
+    "model": "Acil Yardım İhtiyacı",
+    "ortusuyor": false,
+    "guven": 0.513,
+    "ms": 47.5,
+    "hamEtiket": "Arama Ekipmani",
+    "hamSkor": 0.513,
+    "kaynak": "model"
+   },
+   {
+    "il": "gaziantep",
+    "beklenen": "Acil Yardım İhtiyacı",
+    "model": "Enkaz Bildirimi",
+    "ortusuyor": false,
+    "guven": 0.546,
+    "ms": 65.5,
+    "hamEtiket": "Enkaz Kaldirma",
+    "hamSkor": 0.546,
+    "kaynak": "model"
+   },
+   {
+    "il": "kahramanmaras",
+    "beklenen": "Enkaz Bildirimi",
+    "model": "Enkaz Bildirimi",
+    "ortusuyor": true,
+    "guven": 0.96,
+    "ms": 67.4,
+    "hamEtiket": "Enkaz Kaldirma",
+    "hamSkor": 0.96,
+    "kaynak": "model"
+   },
+   {
+    "il": "kahramanmaras",
+    "beklenen": "Yol Kapanma Bilgisi / Lojistik",
+    "model": "Yol Kapanma Bilgisi / Lojistik",
+    "ortusuyor": true,
+    "guven": 0.027,
+    "ms": 61.3,
+    "hamEtiket": "Alakasiz",
+    "hamSkor": 0.649,
+    "kaynak": "anahtar_sozcuk"
+   },
+   {
+    "il": "kahramanmaras",
+    "beklenen": "Lojistik İhtiyaç Bildirimi",
+    "model": "Acil Yardım İhtiyacı",
+    "ortusuyor": false,
+    "guven": 0.816,
+    "ms": 71.5,
+    "hamEtiket": "Isinma",
+    "hamSkor": 0.816,
+    "kaynak": "model"
+   },
+   {
+    "il": "kahramanmaras",
+    "beklenen": "Acil Yardım İhtiyacı",
+    "model": "Enkaz Bildirimi",
+    "ortusuyor": false,
+    "guven": 0.956,
+    "ms": 57.8,
+    "hamEtiket": "Enkaz Kaldirma",
+    "hamSkor": 0.956,
+    "kaynak": "model"
+   }
+  ]
+ },
+ "_tekrar": {
+  "makine": "Intel Core i7-12700H (14/20), 16 GB, Windows 11 10.0.26200 — Tablo 11'in birinci sütunu",
+  "kod": "J-111/J-116 düzeltmesinden sonraki sınıflandırıcı",
+  "not": "Aracın kendi ısınma çağrısı SOĞUK BAŞLANGICI kapatmıyor: ilk koşum medyan 62,3 / en uzun 77,6 ms verdi, sonraki beş koşum 47,8–48,5 ms bandında kaldı. Raporlanacak değer kararlı banttır; ilk koşum ayrıca yazılır.",
+  "ilkKosumMedyanMs": 62.3,
+  "ilkKosumEnUzunMs": 77.6,
+  "kararliMedyanlarMs": [
+   47.8,
+   47.8,
+   48.5,
+   48.5,
+   48.2
+  ],
+  "kararliEnUzunlarMs": [
+   52.3,
+   52.0,
+   58.9,
+   53.8,
+   52.6
+  ],
+  "medyanOrtMs": 48.2,
+  "medyanSsMs": 0.31,
+  "enUzunEnBuyukMs": 58.9,
+  "tabloda yazan": {
+   "medyanMs": 36.6,
+   "enUzunMs": 43.0,
+   "durum": "BAYAT — düzeltme öncesi sınıflandırıcıdan"
+  }
+ }
+}

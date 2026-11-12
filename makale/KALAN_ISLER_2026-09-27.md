@@ -21,6 +21,36 @@ güncel docx'in kopyasını `SRC` olarak verin; revize13–16'da `sys.path` Utku
 
 ---
 
+## Bu turda yapılanlar (11. tur, 29 Eylül) — i7 doğrulamaları (revize19)
+
+- **J-118 kapandı.** Tablo 11'in birinci sütunu (i7-12700H) doğrulandı: Python 3.12.6,
+  PyTorch 2.13.0 (CUDA yok), Ultralytics 8.4.116, Transformers 5.14.1, NetworkX 3.6.1,
+  OSMnx 2.1.1, pyrosm 0.13.1, FastAPI 0.141.1, smp 0.5.0 — dokuzunun dokuzu tabloda yazanla aynı.
+- **J-133 bulundu ve kapandı: Tablo 15'in metin gecikmesi bayattı.** Örtüşme (11/18) düzeltme
+  sonrasıydı ama gecikme (36,6 / 43,0 ms) düzeltme öncesinden kalmıştı. Aynı makinede
+  düzeltilmiş kodla yeniden ölçüldü: **medyan 48,2 ms, en uzun 58,9 ms** (beş koşum:
+  47,8 · 47,8 · 48,5 · 48,5 · 48,2). Fark %32.
+  - **Tuzak kaydedildi:** aracın ısınma çağrısı soğuk başlangıcı kapatmıyor; ilk koşum
+    62,3 / 77,6 ms verdi. Raporlanan değer kararlı banttır, hücre notunda yazılı.
+  - Tablo 15 satırı, §4.5 "Kanal ölçümleri" cümlesi ve Tablo 15 altyazısı güncellendi.
+- Betik: `makale/analiz_arsivi/revize19.py`. Rapor:
+  `QuakeMindBackend/benchmark/reports/kanal_olcumu_metin_i7.json`.
+- Denetim: `atif.py` temiz. Gönderim kopyası yenilendi.
+- C listesinden kalan: YOLO bağımsız saha sınama kümesi; veri miktarıyla eşlenmiş genelleme kıyası.
+
+## Bu turda yapılanlar (10. tur, 29 Eylül) — Tablo 1'e KATE kümeleri (revize18)
+
+- **Tablo 1'e KATE-PD ve KATE-CD satırları eklendi** (J-132). Tablo Türkiye'ye özgü kümeleri sayıyordu
+  ama bu çalışmanın kendi eğitim verisini saymıyordu.
+  - Sınıf sayısı (2) yereldeki KATE-PD maskelerinden ölçüldü, kestirilmedi; diğer hücreler makalenin
+    kendi §3.2.1 ve §4.2 metninden, yıl kaynak [56]'dan.
+  - Tablo 1 altyazısına hangi kümelerin eğitimde kullanıldığı yazıldı.
+- **§2.1 cümlesi tabloyla uyumlandı:** "TUE-CD ve TE23D öne çıkmaktadır" artık KATE'leri de sayıyor;
+  "Her iki küme de" → "Bu kümelerin tümü"; KATE'leri tanıtan bir cümle eklendi.
+- Betik: `makale/analiz_arsivi/revize18.py`. Yedek: `makale/arsiv/…_pre_revize18_2026-09-29.docx`.
+- Denetim: `atif.py` temiz. Gönderim kopyası yenilendi.
+- **Kalan:** PDF sayfa düzeni taraması (Word COM gerekiyor; iki satır tabloyu sayfa sonuna itmiş olabilir).
+
 ## Bu turda yapılanlar (9. tur, 29 Eylül) — genelleme üç tohumla (revize17)
 
 - Kaggle oturum 5 ve 6 bitti (il dışarıda bırakma, tohum 7 ve 2026). Tablo 14 artık üç tohumun ortalama ± SS'si.
@@ -163,6 +193,13 @@ olanlar: A'daki beş madde ve B'deki yazar okuması.
   - etik kurul / KVKK değerlendirmesi gerekiyor mu.
 
   Maskeli yerel kopya hazır: `C:/Users/utkuc/quakemind_ozel/intent_test_v13_maskeli/`.
+- [ ] **İntihal taraması (iThenticate / Turnitin).** Gönderimden önce şart. KTO Karatay aboneliğinden
+  (kütüphane ya da enstitü) yapılmalı; Claude'un erişimi yok.
+  - Belge **içi** tekrar taraması 29 Eylül'de yapıldı ve temiz çıktı (`makale/analiz_arsivi/tekrar.py`;
+    784 cümlede 3 birebir tekrar, hepsi meşru). **Bu intihal taraması değildir**, dışarıdan kopyalanan
+    metni bulmaz — yalnızca belge içi tekrarı gösterir.
+  - Tarama sonucu gelince: eşleşme oranı ve kaynak listesi değerlendirilmeli; kendi önceki
+    yayınlarımızla örtüşme varsa (öz-intihal) atıfla belirtilmeli.
 - [ ] **ORCID numaraları ve sorumlu yazar** (başlıktaki yer tutucu).
 - [ ] **Hedef dergi.** Seçilince kaynak stili, sayfa sınırı ve kör hakem başlığı ayarlanır. Makale 72
   sayfa; en büyük iş muhtemelen kısaltma.
