@@ -1,0 +1,346 @@
+{
+ "kopya": "C:\\Users\\femre\\AppData\\Local\\Temp\\qm_sqlite_olcum_jk7hkqmn\\olcum.sqlite3",
+ "zaman": "2026-11-13 10:06",
+ "olcekler": [
+  {
+   "sos_satir": 12,
+   "hasar_satir": 2076,
+   "dolum_sn": 0.0,
+   "dosya_mb": 1.0,
+   "tek_yazma": {
+    "n": 500,
+    "ortanca": 0.04,
+    "p95": 0.099,
+    "p99": 0.602,
+    "en_cok": 4.784
+   },
+   "esz_yazma_16": {
+    "n": 1600,
+    "ortanca": 0.92,
+    "p95": 5.875,
+    "p99": 7.101,
+    "en_cok": 10.612,
+    "is_parcacigi": 16,
+    "islem_sn": 10992.0
+   },
+   "okuma": {
+    "sos_son6sa": {
+     "n": 30,
+     "ortanca": 8.793,
+     "p95": 13.022,
+     "p99": 15.057,
+     "en_cok": 15.057,
+     "donen_satir": 2100
+    },
+    "sos_son6sa_antakya": {
+     "n": 30,
+     "ortanca": 8.936,
+     "p95": 11.126,
+     "p99": 11.143,
+     "en_cok": 11.143,
+     "donen_satir": 2100
+    },
+    "hasar_son6sa_antakya": {
+     "n": 30,
+     "ortanca": 0.047,
+     "p95": 0.145,
+     "p99": 0.797,
+     "en_cok": 0.797,
+     "donen_satir": 0
+    },
+    "hasar_son24sa_100bin": {
+     "n": 30,
+     "ortanca": 0.006,
+     "p95": 0.007,
+     "p99": 0.008,
+     "en_cok": 0.008,
+     "donen_satir": 0
+    },
+    "sos_sayilari": {
+     "n": 30,
+     "ortanca": 0.282,
+     "p95": 0.759,
+     "p99": 1.026,
+     "en_cok": 1.026,
+     "donen_satir": 1
+    }
+   },
+   "karisik": {
+    "okuyucu": 16,
+    "yazici": 8,
+    "sure_sn": 9.03,
+    "yazma": {
+     "n": 5208,
+     "ortanca": 5.486,
+     "p95": 15.954,
+     "p99": 18.742,
+     "en_cok": 49.038,
+     "islem_sn": 577.0
+    },
+    "okuma": {
+     "n": 32,
+     "ortanca": 4277.344,
+     "p95": 7311.762,
+     "p99": 7346.595,
+     "en_cok": 7346.595,
+     "islem_sn": 3.5
+    }
+   }
+  },
+  {
+   "sos_satir": 10000,
+   "hasar_satir": 10000,
+   "dolum_sn": 0.3,
+   "dosya_mb": 5.0,
+   "tek_yazma": {
+    "n": 500,
+    "ortanca": 0.172,
+    "p95": 0.297,
+    "p99": 0.771,
+    "en_cok": 14.739
+   },
+   "esz_yazma_16": {
+    "n": 1600,
+    "ortanca": 2.001,
+    "p95": 21.473,
+    "p99": 31.672,
+    "en_cok": 43.172,
+    "is_parcacigi": 16,
+    "islem_sn": 3544.0
+   },
+   "okuma": {
+    "sos_son6sa": {
+     "n": 30,
+     "ortanca": 41.067,
+     "p95": 50.165,
+     "p99": 55.31,
+     "en_cok": 55.31,
+     "donen_satir": 5000
+    },
+    "sos_son6sa_antakya": {
+     "n": 30,
+     "ortanca": 41.994,
+     "p95": 63.977,
+     "p99": 69.787,
+     "en_cok": 69.787,
+     "donen_satir": 5000
+    },
+    "hasar_son6sa_antakya": {
+     "n": 30,
+     "ortanca": 0.285,
+     "p95": 0.35,
+     "p99": 2.629,
+     "en_cok": 2.629,
+     "donen_satir": 9
+    },
+    "hasar_son24sa_100bin": {
+     "n": 30,
+     "ortanca": 15.573,
+     "p95": 18.777,
+     "p99": 20.178,
+     "en_cok": 20.178,
+     "donen_satir": 2596
+    },
+    "sos_sayilari": {
+     "n": 30,
+     "ortanca": 3.335,
+     "p95": 3.499,
+     "p99": 3.783,
+     "en_cok": 3.783,
+     "donen_satir": 3
+    }
+   },
+   "karisik": {
+    "okuyucu": 16,
+    "yazici": 8,
+    "sure_sn": 7.98,
+    "yazma": {
+     "n": 4081,
+     "ortanca": 9.605,
+     "p95": 15.385,
+     "p99": 17.417,
+     "en_cok": 28.036,
+     "islem_sn": 511.7
+    },
+    "okuma": {
+     "n": 16,
+     "ortanca": 7692.911,
+     "p95": 7937.425,
+     "p99": 7974.09,
+     "en_cok": 7974.09,
+     "islem_sn": 2.0
+    }
+   }
+  },
+  {
+   "sos_satir": 100000,
+   "hasar_satir": 100000,
+   "dolum_sn": 11.4,
+   "dosya_mb": 47.3,
+   "tek_yazma": {
+    "n": 500,
+    "ortanca": 0.124,
+    "p95": 0.213,
+    "p99": 0.443,
+    "en_cok": 12.228
+   },
+   "esz_yazma_16": {
+    "n": 1600,
+    "ortanca": 1.616,
+    "p95": 22.847,
+    "p99": 42.848,
+    "en_cok": 60.996,
+    "is_parcacigi": 16,
+    "islem_sn": 3175.9
+   },
+   "okuma": {
+    "sos_son6sa": {
+     "n": 30,
+     "ortanca": 42.372,
+     "p95": 59.35,
+     "p99": 63.252,
+     "en_cok": 63.252,
+     "donen_satir": 5000
+    },
+    "sos_son6sa_antakya": {
+     "n": 30,
+     "ortanca": 41.229,
+     "p95": 46.581,
+     "p99": 55.968,
+     "en_cok": 55.968,
+     "donen_satir": 5000
+    },
+    "hasar_son6sa_antakya": {
+     "n": 30,
+     "ortanca": 8.846,
+     "p95": 13.225,
+     "p99": 14.45,
+     "en_cok": 14.45,
+     "donen_satir": 66
+    },
+    "hasar_son24sa_100bin": {
+     "n": 30,
+     "ortanca": 502.495,
+     "p95": 540.089,
+     "p99": 544.022,
+     "en_cok": 544.022,
+     "donen_satir": 32710
+    },
+    "sos_sayilari": {
+     "n": 30,
+     "ortanca": 9.061,
+     "p95": 12.387,
+     "p99": 20.729,
+     "en_cok": 20.729,
+     "donen_satir": 3
+    }
+   },
+   "karisik": {
+    "okuyucu": 16,
+    "yazici": 8,
+    "sure_sn": 7.89,
+    "yazma": {
+     "n": 4322,
+     "ortanca": 9.268,
+     "p95": 12.592,
+     "p99": 16.052,
+     "en_cok": 26.704,
+     "islem_sn": 547.6
+    },
+    "okuma": {
+     "n": 16,
+     "ortanca": 7604.945,
+     "p95": 7865.956,
+     "p99": 7890.735,
+     "en_cok": 7890.735,
+     "islem_sn": 2.0
+    }
+   }
+  },
+  {
+   "sos_satir": 1000000,
+   "hasar_satir": 1000000,
+   "dolum_sn": 200.5,
+   "dosya_mb": 474.6,
+   "tek_yazma": {
+    "n": 500,
+    "ortanca": 0.145,
+    "p95": 0.241,
+    "p99": 0.72,
+    "en_cok": 18.697
+   },
+   "esz_yazma_16": {
+    "n": 1600,
+    "ortanca": 2.563,
+    "p95": 24.914,
+    "p99": 30.897,
+    "en_cok": 44.978,
+    "is_parcacigi": 16,
+    "islem_sn": 3046.2
+   },
+   "okuma": {
+    "sos_son6sa": {
+     "n": 10,
+     "ortanca": 42.026,
+     "p95": 51.548,
+     "p99": 51.548,
+     "en_cok": 51.548,
+     "donen_satir": 5000
+    },
+    "sos_son6sa_antakya": {
+     "n": 10,
+     "ortanca": 41.818,
+     "p95": 43.294,
+     "p99": 43.294,
+     "en_cok": 43.294,
+     "donen_satir": 5000
+    },
+    "hasar_son6sa_antakya": {
+     "n": 10,
+     "ortanca": 99.473,
+     "p95": 104.033,
+     "p99": 104.033,
+     "en_cok": 104.033,
+     "donen_satir": 602
+    },
+    "hasar_son24sa_100bin": {
+     "n": 10,
+     "ortanca": 1776.29,
+     "p95": 1856.902,
+     "p99": 1856.902,
+     "en_cok": 1856.902,
+     "donen_satir": 100000
+    },
+    "sos_sayilari": {
+     "n": 10,
+     "ortanca": 68.814,
+     "p95": 98.108,
+     "p99": 98.108,
+     "en_cok": 98.108,
+     "donen_satir": 3
+    }
+   },
+   "karisik": {
+    "okuyucu": 16,
+    "yazici": 8,
+    "sure_sn": 6.84,
+    "yazma": {
+     "n": 4875,
+     "ortanca": 8.013,
+     "p95": 11.632,
+     "p99": 15.186,
+     "en_cok": 19.171,
+     "islem_sn": 712.4
+    },
+    "okuma": {
+     "n": 16,
+     "ortanca": 6594.397,
+     "p95": 6816.137,
+     "p99": 6837.95,
+     "en_cok": 6837.95,
+     "islem_sn": 2.3
+    }
+   }
+  }
+ ]
+}

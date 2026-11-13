@@ -27,7 +27,15 @@ import {
   useGorunenAltlik,
 } from '@/harita/altlikGorunumu'
 import { sonIsSec, useIsler } from '@/durum/islerDurumu'
-import { MODLAR, VARSAYILAN_MOD, modBul, type ModId } from '@/modlar/modlar'
+import {
+  MODLAR,
+  VARSAYILAN_MOD,
+  modBul,
+  sayfaModuMu,
+  type ModId,
+  type PanelModu,
+} from '@/modlar/modlar'
+import { HesapYonetimi } from '@/modlar/kullanicilar'
 import { UstCubuk } from './UstCubuk'
 import { SolPanel } from './SolPanel'
 import { SagPanel } from './SagPanel'
@@ -51,6 +59,7 @@ export function KonsolKabugu() {
   const tanim = modBul(mod)
 
   if (!tanim) return <Navigate to={`/konsol/${VARSAYILAN_MOD}`} replace />
+  const sayfa = sayfaModuMu(tanim.id)
 
   return (
     <div className="flex h-full flex-col">
@@ -67,7 +76,9 @@ export function KonsolKabugu() {
           <KatmanKopru />
           <AlanSecici />
 
-          {/* Dar ekranda (<= 980 px) harita üstte, paneller altında dikey sıralanır. */}
+          {/* Dar ekranda (<= 980 px) harita üstte, paneller altında dikey sıralanır.
+              Tam sayfa modda (Kullanıcılar) paneller hiç çizilmez. */}
+          {!sayfa && (
           <div className="relative z-10 flex flex-col gap-gutter p-gutter genis:pointer-events-none genis:absolute genis:inset-0 genis:h-full genis:overflow-hidden">
             <div className="flex min-h-0 flex-1 flex-col gap-gutter genis:flex-row genis:items-stretch">
               {/* Dar ekranda katmanlar düğmesi panellerin üstünde, aşağı açılır. */}
@@ -76,7 +87,7 @@ export function KonsolKabugu() {
               </div>
               {/* Sol panel içeriği kadar uzar (en çok sütun boyu), altında harita görünür. */}
               <div className="genis:pointer-events-auto genis:w-panel-l genis:shrink-0 genis:self-start genis:max-h-full flex min-h-0">
-                <SolPanel mod={tanim.id} />
+                <SolPanel mod={tanim.id as PanelModu} />
               </div>
               <div className="hidden flex-1 genis:flex genis:flex-col genis:items-center genis:justify-between">
                 <div className="genis:pointer-events-auto">
@@ -95,7 +106,7 @@ export function KonsolKabugu() {
                 </div>
               </div>
               <div className="genis:pointer-events-auto genis:w-panel-r genis:shrink-0 flex min-h-0">
-                <SagPanel mod={tanim.id} />
+                <SagPanel mod={tanim.id as PanelModu} />
               </div>
             </div>
 
@@ -105,7 +116,15 @@ export function KonsolKabugu() {
               <ZamanSeridi />
             </div>
           </div>
+          )}
         </HaritaKabugu>
+
+        {/* Harita altında kurulu kalır; tam sayfa onu örter (J-157). */}
+        {sayfa && (
+          <div className="absolute inset-0 z-20 overflow-auto bg-ground">
+            <HesapYonetimi />
+          </div>
+        )}
       </div>
 
       <KomutPaleti />

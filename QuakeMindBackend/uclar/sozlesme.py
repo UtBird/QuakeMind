@@ -437,18 +437,17 @@ def ozet(
     b, s = _sn(baslangic), _sn(bitis)
 
     sos_sayilari = depo.sos_sayilari(b, s)
-    hasar = depo.hasar_listele(baslangic=b, bitis=s, sinir=100000)
-    kapanmalar = depo.kapanma_listele(baslangic=b, bitis=s, sinir=100000)
-
-    uydu = [h for h in hasar if h["kaynak"] == "uydu"]
+    # Sayilar SQL'de (J-158): eskiden 100 000'er satir Python'a cekilip sayiliyordu;
+    # yavasti ve 100 000'i asan kayitta sessizce eksik sayiyordu.
+    hasar = depo.hasar_ozeti(b, s, yikik_esigi=0.8)
     # Ekip sayilari zaman araligina bagli degil: su anki durum (J-54).
     ekipler_simdi = ekipler_cikti(depo.ekip_listele())
     acik_gorevler = depo.gorev_listele(yalniz_acik=True)
     return {
         # Yikik/hasarli ayrimi skor esigiyle: 0,8 ustu yikik sayilir.
-        "yikikYapi": sum(1 for h in uydu if h["skor"] >= 0.8),
-        "hasarliYapi": sum(1 for h in uydu if h["skor"] < 0.8),
-        "hasarliYol": len(kapanmalar),
+        "yikikYapi": hasar["yikikYapi"],
+        "hasarliYapi": hasar["hasarliYapi"],
+        "hasarliYol": depo.kapanma_sayisi(b, s),
         "bekleyenSos": sos_sayilari.get("bekliyor", 0),
         "atananSos": sos_sayilari.get("atandi", 0),
         "kapananSos": sos_sayilari.get("kapandi", 0),
@@ -456,13 +455,6 @@ def ozet(
         "musaitEkip": sum(1 for e in ekipler_simdi if e["musait"]),
         "gorevdekiEkip": sum(1 for e in ekipler_simdi if e["gorev"]),
         "sahadakiKisi": sum(g["kisi_sayisi"] for g in acik_gorevler),
-        "kaynakSayilari": _kaynak_sayilari(hasar),
+        "kaynakSayilari": hasar["kaynakSayilari"],
         "olusturuldu": _ms(time.time()),
     }
-
-
-def _kaynak_sayilari(hasar: list[dict]) -> dict[str, int]:
-    sayac: dict[str, int] = {}
-    for h in hasar:
-        sayac[h["kaynak"]] = sayac.get(h["kaynak"], 0) + 1
-    return sayac

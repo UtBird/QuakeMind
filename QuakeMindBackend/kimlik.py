@@ -122,17 +122,35 @@ def _jetonu_al(authorization: Optional[str]) -> str:
     return authorization.split(" ", 1)[1].strip()
 
 
-def kullanici(authorization: Optional[str] = Header(default=None)) -> dict:
-    """Korunan uclarin temel bagimliligi.
+ASKIDA_MESAJI = "Hesabın askıya alınmış. Koordinasyon merkezine başvur."
+#: Istemci bu oneki gorunce zorunlu sifre degistirme ekranina gider (J-157).
+SIFRE_DEGISMELI_MESAJI = "SIFRE_DEGISMELI: Devam etmeden önce geçici şifreni değiştir."
 
-    Rol, jetonun govdesinden DEGIL depodan okunur: bir kullanicinin rolu
-    degistirildiginde eldeki jeton eski rolu tasimaya devam etmesin.
-    """
+
+def kullanici_sifre_serbest(authorization: Optional[str] = Header(default=None)) -> dict:
+    """Kimlik dogrular, askidaki hesabi reddeder; gecici sifreyi DENETLEMEZ.
+    Yalniz `/ben` ve sifre degistirme ucu kullanir."""
     govde = erisim_jetonu_coz(_jetonu_al(authorization))
     kayit = aktif_depo().kullanici_id(govde["sub"])
     if kayit is None:
         raise HTTPException(status_code=401, detail="Kullanici bulunamadi.")
+    if kayit.get("askida"):
+        # Askiya alinanin elindeki jeton da o an gecersiz olur (J-157).
+        raise HTTPException(status_code=401, detail=ASKIDA_MESAJI)
     kayit.pop("sifre_ozeti", None)
+    return kayit
+
+
+def kullanici(authorization: Optional[str] = Header(default=None)) -> dict:
+    """Korunan uclarin temel bagimliligi.
+
+    Rol, jetonun govdesinden DEGIL depodan okunur: bir kullanicinin rolu
+    degistirildiginde eldeki jeton eski rolu tasimaya devam etmesin. Askidaki
+    hesap 401 alir; gecici sifresini degistirmemis hesap 403 alir (J-157).
+    """
+    kayit = kullanici_sifre_serbest(authorization)
+    if kayit.get("sifre_degismeli"):
+        raise HTTPException(status_code=403, detail=SIFRE_DEGISMELI_MESAJI)
     return kayit
 
 
@@ -203,13 +221,42 @@ def kullanici_kaydet(eposta: str, ad_soyad: str, sifre: str) -> dict:
     )
 
 
-def giris_yap(eposta: str, sifre: str) -> dict:
-    """Bilinmeyen e-posta OTOMATIK KAYDEDILMEZ; 401 doner."""
+#: Giris ekraninin kapilari (J-156). Kapi ROL VERMEZ: rol yine depodan okunur;
+#: kapi yalniz "bu hesap bu kapidan girer mi" sorusunu sunucuda denetler.
+GIRIS_KAPILARI = {
+    "afetzede": ("afetzede",),
+    "ekip": ("saha",),
+    "koordinasyon": ("koordinator", "yonetici"),
+}
+KAPI_ADI = {"afetzede": "Afetzede", "ekip": "Saha ekibi", "koordinasyon": "Koordinasyon"}
+
+
+def rolun_kapisi(rol: str) -> str:
+    return next(k for k, roller in GIRIS_KAPILARI.items() if rol in roller)
+
+
+def giris_yap(eposta: str, sifre: str, kapi: Optional[str] = None) -> dict:
+    """Bilinmeyen e-posta OTOMATIK KAYDEDILMEZ; 401 doner.
+
+    `kapi` verilirse hesabin rolu o kapiya uymali; uymazsa oturum ACILMAZ ve
+    dogru kapi soylenir (403). Kapi verilmezse eski davranis (mobil istemci)."""
+    if kapi is not None and kapi not in GIRIS_KAPILARI:
+        raise HTTPException(status_code=422, detail=f"Bilinmeyen giris turu: {kapi}")
     depo = aktif_depo()
     kayit = depo.kullanici_eposta(eposta)
     if not kayit or not sifre_dogrula(sifre, kayit["sifre_ozeti"]):
         # Kullanicinin var olup olmadigi disari sizmasin diye tek mesaj.
         raise HTTPException(status_code=401, detail="E-posta veya sifre hatali.")
+    if kayit.get("askida"):
+        raise HTTPException(status_code=403, detail=ASKIDA_MESAJI)
+    if kapi is not None and kayit["rol"] not in GIRIS_KAPILARI[kapi]:
+        dogru = KAPI_ADI[rolun_kapisi(kayit["rol"])]
+        # Sifre dogrulandiktan SONRA soylenir: rol yalniz hesabin sahibine gorunur.
+        raise HTTPException(
+            status_code=403,
+            detail=f"Bu hesap {KAPI_ADI[kapi].lower()} hesabı değil. "
+                   f"Yukarıdan “{dogru}” girişini seç.",
+        )
     depo.giris_isle(kayit["id"])
     kayit.pop("sifre_ozeti", None)
     return kayit
@@ -234,7 +281,7 @@ def cerezden_kullanici(cerez: Optional[str]) -> Optional[dict]:
     if not oturum:
         return None
     kayit = depo.kullanici_id(oturum["kullanici_id"])
-    if not kayit:
+    if not kayit or kayit.get("askida"):
         return None
     return {"id": kayit["id"], "rol": kayit["rol"]}
 
@@ -249,6 +296,9 @@ def oturum_yenile(yanit: Response, cerez: Optional[str] = Cookie(default=None, a
     kayit = depo.kullanici_id(oturum["kullanici_id"])
     if not kayit:
         raise HTTPException(status_code=401, detail="Kullanici bulunamadi.")
+    if kayit.get("askida"):
+        depo.oturumlari_iptal(kayit["id"])
+        raise HTTPException(status_code=401, detail=ASKIDA_MESAJI)
 
     # Donusumlu jeton: her yenilemede eski jeton iptal edilir.
     depo.oturum_iptal(oturum["jeton_ozeti"])

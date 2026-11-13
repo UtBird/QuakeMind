@@ -11,14 +11,14 @@ import { MetinSol } from '@/modlar/metin'
 import { RiskSol } from '@/modlar/risk'
 import { YolSol } from '@/modlar/yol'
 import { SimulasyonSol } from '@/modlar/simulasyon'
-import { modBul, type ModId } from '@/modlar/modlar'
+import { modBul, type PanelModu } from '@/modlar/modlar'
 
 /* Sol panel: seçili modun paneli (J-56). Başlıkta modun adı yazar; üst
    çubukta mod değişince burada neyin değiştiği görünür. Eskiden başlık her
    modda "Katmanlar"dı ve altına her modda aynı katman ve kaynak listesi
    ekleniyordu; katmanlar artık haritanın köşesindeki düğmede. */
 
-const MOD_PANELI: Record<ModId, () => React.JSX.Element> = {
+const MOD_PANELI: Record<PanelModu, () => React.JSX.Element> = {
   genel: GenelSol,
   sos: SosSol,
   ekipler: EkiplerSol,
@@ -32,7 +32,7 @@ const MOD_PANELI: Record<ModId, () => React.JSX.Element> = {
   simulasyon: SimulasyonSol,
 }
 
-export function SolPanel({ mod }: { mod: ModId }) {
+export function SolPanel({ mod }: { mod: PanelModu }) {
   const ModPaneli = MOD_PANELI[mod]
   return (
     <Panel baslik={modBul(mod)?.ad ?? 'Mod'}>
