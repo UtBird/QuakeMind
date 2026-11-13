@@ -1,59 +1,55 @@
 package com.quakemind.feature.auth
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.quakemind.core.designsystem.*
+import com.quakemind.core.designsystem.AfetLogoHeader
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(
     onLogin: (String, String) -> Unit,
@@ -61,198 +57,149 @@ fun AuthScreen(
     onGuest: () -> Unit,
     isBusy: Boolean = false,
     error: String? = null,
+    onClearError: () -> Unit = {},
 ) {
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    var identity by rememberSaveable { mutableStateOf("") }
+    var registering by rememberSaveable { mutableStateOf(false) }
+    var email by rememberSaveable { mutableStateOf("") }
     var fullName by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    val focusManager = LocalFocusManager.current
+    val canSubmit = !isBusy && email.isNotBlank() && password.isNotBlank() &&
+        (!registering || fullName.isNotBlank())
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .imePadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
-        horizontalAlignment = Alignment.CenterHorizontally,
+    fun submit() {
+        if (!canSubmit) return
+        focusManager.clearFocus()
+        if (registering) onRegister(email, fullName, password) else onLogin(email, password)
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize().background(colors.background).statusBarsPadding(),
+        contentAlignment = Alignment.Center,
     ) {
-        // Header
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .widthIn(max = 460.dp)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(Modifier.height(16.dp))
-            AfetLogoHeader(textColor = Zinc950, showSubtitle = true)
-        }
+            AfetLogoHeader(showSubtitle = false)
 
-        // Form Card
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            // Segmented Control Tabs
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 52.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = Zinc100,
-                border = androidx.compose.foundation.BorderStroke(1.dp, Zinc200),
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Row(Modifier.padding(3.dp)) {
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { selectedTab = 0 },
-                            ),
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (selectedTab == 0) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        border = if (selectedTab == 0) androidx.compose.foundation.BorderStroke(1.dp, Zinc200) else null,
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "Giriş Yap",
-                                fontWeight = if (selectedTab == 0) FontWeight.SemiBold else FontWeight.Medium,
-                                color = if (selectedTab == 0) AfetAccent else Zinc500,
-                                fontSize = 14.sp,
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    listOf("Giriş", "Kayıt").forEachIndexed { index, label ->
+                        val isRegistration = index == 1
+                        SegmentedButton(
+                            selected = registering == isRegistration,
+                            onClick = {
+                                if (registering != isRegistration) {
+                                    focusManager.clearFocus()
+                                    registering = isRegistration
+                                    password = ""
+                                    passwordVisible = false
+                                    onClearError()
+                                }
+                            },
+                            enabled = !isBusy,
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = 2),
+                            label = { Text(label) },
+                        )
+                    }
+                }
+
+                if (registering) {
+                    OutlinedTextField(
+                        value = fullName,
+                        onValueChange = { fullName = it; onClearError() },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Ad soyad") },
+                        enabled = !isBusy,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    )
+                }
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it; onClearError() },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("E-posta adresi") },
+                    enabled = !isBusy,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it; onClearError() },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Şifre") },
+                    enabled = !isBusy,
+                    trailingIcon = {
+                        IconButton(enabled = !isBusy, onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = if (passwordVisible) "Şifreyi gizle" else "Şifreyi göster",
                             )
                         }
-                    }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                )
+
+                if (error != null) {
                     Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { selectedTab = 1 },
-                            ),
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (selectedTab == 1) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        border = if (selectedTab == 1) androidx.compose.foundation.BorderStroke(1.dp, Zinc200) else null,
+                        modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+                        shape = MaterialTheme.shapes.medium,
+                        color = colors.errorContainer,
+                        contentColor = colors.onErrorContainer,
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "Kayıt Ol",
-                                fontWeight = if (selectedTab == 1) FontWeight.SemiBold else FontWeight.Medium,
-                                color = if (selectedTab == 1) AfetAccent else Zinc500,
-                                fontSize = 14.sp,
-                            )
-                        }
+                        Text(error, Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
                     }
+                }
+
+                Button(
+                    onClick = { submit() },
+                    enabled = canSubmit,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Text(
+                        text = when {
+                            isBusy -> "Bağlanılıyor…"
+                            registering -> "Hesap oluştur"
+                            else -> "Giriş yap"
+                        },
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                TextButton(
+                    onClick = {
+                        focusManager.clearFocus()
+                        onGuest()
+                    },
+                    enabled = !isBusy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Text("Misafir Oturumu Aç (Acil Mod)", textAlign = TextAlign.Center)
                 }
             }
 
-            if (selectedTab == 1) {
-                OutlinedTextField(
-                    value = fullName,
-                    onValueChange = { fullName = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Ad soyad") },
-                    placeholder = { Text("Ad Soyad", fontSize = 14.sp, color = Zinc400) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(8.dp),
-                )
-            }
-            // Input Fields
-            OutlinedTextField(
-                value = identity,
-                onValueChange = { identity = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("E-posta adresi") },
-                placeholder = { Text("E-posta Adresi", fontSize = 14.sp, color = Zinc400) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                shape = RoundedCornerShape(8.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AfetAccent,
-                    unfocusedBorderColor = Zinc200,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                ),
+            Text(
+                text = "Hayati tehlikede 112’yi arayın.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant,
+                textAlign = TextAlign.Center,
             )
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Şifre") },
-                placeholder = { Text("Şifre", fontSize = 14.sp, color = Zinc400) },
-                trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                            contentDescription = "Şifre göster",
-                            tint = Zinc400,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                shape = RoundedCornerShape(8.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AfetAccent,
-                    unfocusedBorderColor = Zinc200,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                ),
-            )
-
-            Button(
-                onClick = {
-                    if (selectedTab == 0) onLogin(identity, password)
-                    else onRegister(identity, fullName, password)
-                },
-                enabled = !isBusy && identity.isNotBlank() && password.isNotBlank() && (selectedTab == 0 || fullName.isNotBlank()),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 52.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AfetAccent,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            ) {
-                Text(
-                    text = if (isBusy) "Sunucuyla bağlantı kuruluyor..." else if (selectedTab == 0) "Giriş Yap" else "Hesap Oluştur",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                )
-            }
-
-            if (error != null) {
-                Text(error, fontSize = 12.sp, color = AfetCrimson, textAlign = TextAlign.Center)
-            }
-
-            TextButton(
-                onClick = onGuest,
-                enabled = !isBusy,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = "Misafir Oturumu Aç (Acil Mod)",
-                    color = Zinc600,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp,
-                )
-            }
         }
-
-        // Footer
-        Text(
-            text = "Hayati tehlikede 112’yi arayın.",
-            fontSize = 12.sp,
-            color = Zinc400,
-        )
     }
 }

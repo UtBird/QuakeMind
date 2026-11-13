@@ -6,6 +6,24 @@ venv/
 .playwright_venv/
 **/apps/models/
 .git_backup_*
+
+# Runtime secrets and server state are never part of the open-source tree.
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.jks
+*.keystore
+id_ed25519*
+id_rsa*
+*.sqlite3
+*.sqlite3-*
+deploy/backend.env
+deploy/tunnel.yml
+deploy/prepared/
+deploy/backups/
 node_modules/
 **/node_modules/
 .next/

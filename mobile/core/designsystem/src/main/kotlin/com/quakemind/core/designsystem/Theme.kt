@@ -1,7 +1,6 @@
 package com.quakemind.core.designsystem
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalContentColor
@@ -24,10 +23,10 @@ private val LightColors = lightColorScheme(
     secondaryContainer = Color(0xFFE4ECE7), onSecondaryContainer = Color(0xFF253C33),
     tertiary = Color(0xFF305F82), onTertiary = Color.White,
     tertiaryContainer = Color(0xFFE2EDF7), onTertiaryContainer = Color(0xFF214563),
-    background = Color(0xFFF3F5F1), onBackground = Color(0xFF192D25),
-    surface = Color(0xFFFCFDFA), onSurface = Color(0xFF192D25),
+    background = Color(0xFFF4F6F3), onBackground = Color(0xFF192D25),
+    surface = Color(0xFFFEFFFC), onSurface = Color(0xFF192D25),
     surfaceVariant = Color(0xFFE5EBE4), onSurfaceVariant = Color(0xFF536159),
-    surfaceDim = Color(0xFFDCE3DA), surfaceBright = Color(0xFFFCFDFA),
+    surfaceDim = Color(0xFFDCE3DA), surfaceBright = Color(0xFFFEFFFC),
     surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFF6F8F3),
     surfaceContainer = Color(0xFFEDF1EA), surfaceContainerHigh = Color(0xFFE6ECE3),
     surfaceContainerHighest = Color(0xFFDFE6DC),
@@ -139,7 +138,7 @@ fun Double.formatMagnitude(): String {
 
 @Composable
 fun QuakeMindTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colors = if (darkTheme) DarkColors else LightColors

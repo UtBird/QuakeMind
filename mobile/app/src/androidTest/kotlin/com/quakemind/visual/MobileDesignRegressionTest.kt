@@ -18,6 +18,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.quakemind.core.designsystem.QuakeMindTheme
 import com.quakemind.core.model.ChecklistItem
 import com.quakemind.core.model.Earthquake
+import com.quakemind.feature.auth.AuthScreen
 import com.quakemind.feature.checklist.ChecklistScreen
 import com.quakemind.feature.home.HomeScreen
 import com.quakemind.feature.home.HomeUiState
@@ -114,6 +115,32 @@ class MobileDesignRegressionTest {
         capture("profile-dark-phone")
     }
 
+    @Test fun profileThemeSwitchUpdatesBothWays() {
+        val dark = mutableStateOf(false)
+        compose.setContent {
+            QuakeMindTheme(darkTheme = dark.value) {
+                ProfileScreen(ProfileUiState(), {}, darkTheme = dark.value, onDarkThemeChange = { dark.value = it })
+            }
+        }
+        val theme = compose.onNodeWithText("Koyu tema")
+        theme.assertIsOff().performClick().assertIsOn().performClick().assertIsOff()
+    }
+
+    @Test fun registrationAndPasswordControlsAreAccessible() {
+        compose.setContent {
+            QuakeMindTheme { AuthScreen({ _, _ -> }, { _, _, _ -> }, {}) }
+        }
+        compose.onNodeWithText("Giriş yap").assertIsNotEnabled()
+        capture("auth-light-phone")
+        compose.onNodeWithText("Kayıt").performClick().assertIsSelected()
+        compose.onNodeWithText("Ad soyad").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Şifreyi göster").performClick()
+        compose.onNodeWithContentDescription("Şifreyi gizle").assertIsDisplayed()
+        compose.onNodeWithText("Giriş").performClick().assertIsSelected()
+        compose.onNodeWithText("Ad soyad").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Şifreyi göster").assertIsDisplayed()
+    }
+
     @Test fun themeForegroundPairsMeetContrast() {
         val dark = mutableStateOf(false)
         val ratios = mutableListOf<Double>()
@@ -125,7 +152,9 @@ class MobileDesignRegressionTest {
                     androidx.compose.material3.LocalContentColor.current to scheme.background,
                     scheme.onSurface to scheme.surface,
                     scheme.onSurfaceVariant to scheme.background,
+                    scheme.primary to scheme.background,
                     scheme.onPrimary to scheme.primary,
+                    scheme.onSecondaryContainer to scheme.secondaryContainer,
                     scheme.onError to scheme.error,
                     scheme.onErrorContainer to scheme.errorContainer,
                 )

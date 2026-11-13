@@ -19,7 +19,13 @@ import com.quakemind.navigation.components.QuakeBottomBar
 import com.quakemind.navigation.components.defaultBottomDestinations
 
 @Composable
-fun QuakeMindApp(navController: NavHostController = rememberNavController()) {
+fun QuakeMindApp(
+    onboardingCompleted: Boolean,
+    onOnboardingCompleted: () -> Unit,
+    darkTheme: Boolean,
+    onDarkThemeChange: (Boolean) -> Unit,
+    navController: NavHostController = rememberNavController(),
+) {
     val entry by navController.currentBackStackEntryAsState()
     val destination = entry?.destination
     val bottomItems = remember { defaultBottomDestinations() }
@@ -43,6 +49,10 @@ fun QuakeMindApp(navController: NavHostController = rememberNavController()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             AppNavHost(
                 navController = navController,
+                onboardingCompleted = onboardingCompleted,
+                onOnboardingCompleted = onOnboardingCompleted,
+                darkTheme = darkTheme,
+                onDarkThemeChange = onDarkThemeChange,
                 modifier = Modifier
                     .then(if (fullScreenMap) Modifier else Modifier.widthIn(max = 840.dp))
                     .fillMaxSize()

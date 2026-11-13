@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -37,27 +38,35 @@ import com.quakemind.feature.report.ReportRoute
 @Composable
 fun AppNavHost(
     navController: NavHostController,
+    onboardingCompleted: Boolean,
+    onOnboardingCompleted: () -> Unit,
+    darkTheme: Boolean,
+    onDarkThemeChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Navigation remembers the graph builder. Read appearance from current state inside destinations.
+    val currentDarkTheme = rememberUpdatedState(darkTheme)
+    val updateDarkTheme = rememberUpdatedState(onDarkThemeChange)
     NavHost(
         navController = navController,
         startDestination = SplashRoute,
         modifier = modifier,
         enterTransition = {
             if (initialState.destination.isMainDestination() && targetState.destination.isMainDestination()) EnterTransition.None
-            else fadeIn(tween(160)) + slideInHorizontally(tween(180, easing = FastOutSlowInEasing)) { it / 12 }
+            else fadeIn(tween(100))
         },
         exitTransition = {
             if (initialState.destination.isMainDestination() && targetState.destination.isMainDestination()) ExitTransition.None
-            else fadeOut(tween(100))
+            else fadeOut(tween(80))
         },
-        popEnterTransition = { fadeIn(tween(120)) },
-        popExitTransition = { fadeOut(tween(100)) },
+        popEnterTransition = { fadeIn(tween(100)) },
+        popExitTransition = { fadeOut(tween(80)) },
     ) {
         composable<SplashRoute> {
             SplashRoute(
                 onFinished = {
-                    navController.navigate(OnboardingRoute) {
+                    val destination = if (onboardingCompleted) AuthRoute else OnboardingRoute
+                    navController.navigate(destination) {
                         popUpTo(SplashRoute) { inclusive = true }
                     }
                 },
@@ -65,16 +74,23 @@ fun AppNavHost(
         }
 
         composable<OnboardingRoute> {
+            val completeOnboarding = {
+                onOnboardingCompleted()
+                navController.navigate(AuthRoute) {
+                    popUpTo(OnboardingRoute) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
             OnboardingRoute(
-                onContinue = { navController.navigate(AuthRoute) },
-                onSkip = { navController.navigate(AuthRoute) },
+                onContinue = completeOnboarding,
+                onSkip = completeOnboarding,
             )
         }
 
         composable<AuthRoute> {
             AuthRoute(
                 onSuccess = {
-                    navController.navigate(HomeRoute) { popUpTo(OnboardingRoute) { inclusive = true } }
+                    navController.navigate(HomeRoute) { popUpTo(AuthRoute) { inclusive = true } }
                 },
             )
         }
@@ -125,6 +141,8 @@ fun AppNavHost(
             ProfileRoute(
                 onBack = { navController.popBackStack() },
                 onOperations = { navController.navigate(OperationsRoute) },
+                darkTheme = currentDarkTheme.value,
+                onDarkThemeChange = updateDarkTheme.value,
             )
         }
 

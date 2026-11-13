@@ -88,3 +88,47 @@ interaction captures contain ripples. Release smoothness is not established.
 
 Latest design tools: Unslop installed from heydamir/unslop and its signs/craft pass
 applied to heading weight, AI icon treatment and native light/dark input surfaces.
+
+## Follow-up performance work
+
+Vivo V2205, Android 14. Macrobenchmark used a separate non-debuggable, R8-optimized
+app with local FastAPI and a dedicated SQLite database. The local run skipped AI
+worker initialization. The public endpoint returned HTTP 403 for guest login from
+this environment. Combined repeated guest logins also hit the local rate limit,
+so the final navigation benchmark ran separately.
+
+- Compose now infers stability instead of forcing structural comparisons for all
+  app types and collections. Map distance calculations run off the UI thread and
+  point sorting computes distance once per point. Native map markers remove
+  offscreen Compose bitmap rendering. The SDK's default marker style replaces the
+  colored custom dots. Cards use native clickable surfaces, and the magnitude
+  display has a clearer typographic hierarchy.
+- Generated a device profile covering startup, home scrolling and tab switching.
+  Merged 2,541 distinct app/SDK and existing rules into `app/src/main/baseline-prof.txt`.
+  Both optimized APKs include `assets/dexopt/baseline.prof` and `baseline.profm`.
+- Debug build, lint, 10 unit tests, 19 device screen tests, release build and device
+  profile generation passed. Vivo screenshots covered the actual Home and Map
+  shells in dark mode. Tablet and IME acceptance remain open.
+
+| Vivo Macrobenchmark, five iterations each | Before | Final |
+| --- | ---: | ---: |
+| Home scroll CPU frame duration p95 | 7.49 ms | 7.10 ms |
+| Home scroll frame overrun p99 | +1.85 ms | -0.94 ms |
+| Tab switch frame overrun p95 | +7.60 ms | +7.33 ms |
+| Tab switch frame overrun p99 | +97.10 ms | +29.94 ms |
+| Tab switch CPU frame duration p95 | 13.60 ms | 16.67 ms |
+
+Positive frame overrun indicates a missed deadline. Negative values indicate
+remaining budget. Both final scenarios completed all five repetitions, with
+navigation measured in its own run. One final scroll iteration recorded 324
+frames while the median was 157. The combined changes and run variability limit
+attribution to any one change. The latest navigation trace still shows layout,
+recomposition and drawing work above frame budget. The scope of these numbers
+is the tested Home scroll and Home → Map → Alerts → Checklist → Home sequence.
+
+Reproduce with the existing `HomeScrollBenchmark` and `NavigationBenchmark`,
+running them separately when using guest login. Build with `:app:assembleBenchmark`
+and `:benchmark:assembleBenchmark`. For the device loopback API, set
+`-PquakemindBenchmarkApiBaseUrl=http://127.0.0.1:8000/` and use `adb reverse tcp:8000 tcp:8000`.
+Use `:app:assembleBaseline` and `BaselineProfileGenerator` to regenerate the source
+profile, then verify the binary profile in the R8 build.

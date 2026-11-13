@@ -804,7 +804,7 @@
       "refersTo": "input-description",
       "description": "Report field with semantic surface and emergency focus border. Illustrative light-theme HTML translation; Android remains authoritative.",
       "html": "<label class=\"ds-label\" for=\"ds-description\">Durum Açıklaması</label><textarea class=\"ds-description\" id=\"ds-description\" placeholder=\"Yardım ihtiyacını yazın...\"></textarea>",
-      "css": ".ds-label{font-family:system-ui,sans-serif;font-size:14px;display:block;color:#192D25;font-weight:700;margin-bottom:8px}.ds-description{font-family:system-ui,sans-serif;font-size:14px;background:#FCFDFA;color:#192D25;border:1px solid #D4DDD2;border-radius:8px;height:100px;padding:12px}.ds-description:hover{border-color:#77877C}.ds-description:focus-visible{outline:2px solid #AB302F;outline-offset:-2px}"
+      "css": ".ds-label{font-family:system-ui,sans-serif;font-size:14px;display:block;color:#192D25;font-weight:700;margin-bottom:8px}.ds-description{font-family:system-ui,sans-serif;font-size:14px;background:#FEFFFC;color:#192D25;border:1px solid #D4DDD2;border-radius:8px;height:100px;padding:12px}.ds-description:hover{border-color:#77877C}.ds-description:focus-visible{outline:2px solid #AB302F;outline-offset:-2px}"
     },
     {
       "name": "Status badge",
@@ -820,7 +820,7 @@
       "refersTo": "card",
       "description": "Flat, bordered information container. Illustrative light-theme HTML translation; Android remains authoritative.",
       "html": "<section class=\"ds-card\"><strong>Deprem kayıtları</strong><p class=\"ds-detail\">Kaynak ve zaman bilgisi burada görünür.</p></section>",
-      "css": ".ds-card{font-family:system-ui,sans-serif;font-size:14px;background:#FCFDFA;color:#192D25;border:1px solid #D4DDD2;border-radius:16px;padding:20px}.ds-detail{color:#536159;font-size:14px;line-height:21px;margin-bottom:0}"
+      "css": ".ds-card{font-family:system-ui,sans-serif;font-size:14px;background:#FEFFFC;color:#192D25;border:1px solid #D4DDD2;border-radius:16px;padding:20px}.ds-detail{color:#536159;font-size:14px;line-height:21px;margin-bottom:0}"
     },
     {
       "name": "Selected filter",
@@ -836,7 +836,7 @@
       "refersTo": "navigation",
       "description": "Label-only palette/state illustration, not a pixel replica of the native icon bar. Illustrative light-theme HTML translation; Android remains authoritative.",
       "html": "<nav class=\"ds-nav\" aria-label=\"Ana gezinme\"><button class=\"ds-control ds-tab ds-selected\" aria-current=\"page\">Ana Sayfa</button><button class=\"ds-control ds-tab\">Harita</button><button class=\"ds-control ds-tab ds-sos\">SOS</button><button class=\"ds-control ds-tab\">Uyarılar</button><button class=\"ds-control ds-tab\">Çanta</button></nav>",
-      "css": ".ds-nav{display:flex;background:#FCFDFA;gap:4px;padding:8px}.ds-tab{font-family:system-ui,sans-serif;font-size:14px;font-size:11px;min-height:64px;border:0;border-radius:16px;padding:8px;background:transparent;color:#536159}.ds-selected{background:#E0EFE8;color:#176758;font-weight:600}.ds-sos{color:#AB302F}.ds-control:hover{filter:brightness(.97)}.ds-control:focus-visible{outline:2px solid #176758;outline-offset:3px}.ds-control:active{filter:brightness(.92)}"
+      "css": ".ds-nav{display:flex;background:#FEFFFC;gap:4px;padding:8px}.ds-tab{font-family:system-ui,sans-serif;font-size:14px;font-size:11px;min-height:64px;border:0;border-radius:16px;padding:8px;background:transparent;color:#536159}.ds-selected{background:#E0EFE8;color:#176758;font-weight:600}.ds-sos{color:#AB302F}.ds-control:hover{filter:brightness(.97)}.ds-control:focus-visible{outline:2px solid #176758;outline-offset:3px}.ds-control:active{filter:brightness(.92)}"
     }
   ],
   "narrative": {

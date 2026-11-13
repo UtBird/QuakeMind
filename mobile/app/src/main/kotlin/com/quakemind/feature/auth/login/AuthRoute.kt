@@ -22,5 +22,6 @@ fun AuthRoute(
         onGuest = viewModel::createGuestSession,
         isBusy = state.isBusy,
         error = state.error,
+        onClearError = viewModel::clearError,
     )
 }

@@ -5,8 +5,9 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightNavigationBar">false</item>
-        <item name="android:windowSplashScreenBackground">#07111D</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher</item>
-        <item name="android:windowSplashScreenAnimationDuration">120</item>
+        <item name="android:windowSplashScreenBackground">#101A16</item>
+        <item name="android:windowBackground">#101A16</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="android:windowSplashScreenAnimationDuration">400</item>
     </style>
 </resources>

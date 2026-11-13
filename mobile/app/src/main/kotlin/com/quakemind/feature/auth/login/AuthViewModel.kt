@@ -43,6 +43,10 @@ class AuthViewModel @Inject constructor(
 
     fun createGuestSession() = authenticate { authService.createGuestSession() }
 
+    fun clearError() {
+        _state.update { if (it.error == null) it else it.copy(error = null) }
+    }
+
     private fun authenticate(action: suspend () -> com.quakemind.core.model.UserSession) {
         if (_state.value.isBusy || _state.value.isAuthenticated) return
         _state.update { it.copy(isBusy = true, error = null) }

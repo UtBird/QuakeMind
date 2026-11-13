@@ -360,14 +360,26 @@ private fun AlertPreview(alert: Alert, onClick: () -> Unit) {
 
 @Composable
 private fun EarthquakeListRow(earthquake: Earthquake, hasLocation: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    val formattedTime = remember(earthquake.occurredAt) { compactTimestamp(earthquake.occurredAt) }
+    val formattedDistance = remember(earthquake.distanceKm, hasLocation) {
+        if (hasLocation) distanceLabel(earthquake.distanceKm) else null
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
         SeismicMagnitudeBadge(earthquake.magnitude)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(earthquake.epicenter, style = MaterialTheme.typography.titleSmall)
-            Text("${compactTimestamp(earthquake.occurredAt)} · ${earthquake.depthKm.toInt()} km",
+            Text("$formattedTime · ${earthquake.depthKm.toInt()} km",
                 style = MaterialTheme.typography.bodySmall, color = Zinc500)
-            if (hasLocation) Text(distanceLabel(earthquake.distanceKm), style = MaterialTheme.typography.bodySmall, color = Zinc500)
+            if (formattedDistance != null) {
+                Text(formattedDistance, style = MaterialTheme.typography.bodySmall, color = Zinc500)
+            }
         }
         Icon(Icons.Outlined.ChevronRight, null, tint = Zinc500)
     }
@@ -399,8 +411,11 @@ private fun HomeDarkPreview() {
     }
 }
 
-private fun distanceLabel(distanceKm: Double): String =
-    if (distanceKm < 1.0) "${(distanceKm * 1_000).toInt()} m" else String.format(TurkishLocale, "%.1f km", distanceKm)
+private fun distanceLabel(distanceKm: Double): String {
+    if (distanceKm < 1.0) return "${(distanceKm * 1_000).toInt()} m"
+    val tenths = (distanceKm * 10.0 + 0.5).toLong()
+    return "${tenths / 10}.${tenths % 10} km"
+}
 
 private fun compactTimestamp(value: String): String = value
     .replace('T', ' ')

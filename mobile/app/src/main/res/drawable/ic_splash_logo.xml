@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="160dp"
+    android:height="160dp"
+    android:viewportWidth="160"
+    android:viewportHeight="160">
+    <!-- Centered squircle container -->
+    <path
+        android:fillColor="#176758"
+        android:pathData="M56,36 C42,36 36,42 36,56 L36,104 C36,118 42,124 56,124 L104,124 C118,124 124,118 124,104 L124,56 C124,42 118,36 104,36 Z" />
+    <!-- Centered QuakeMind mark -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M63.2,96.8 L80,63.2 L96.8,96.8 L87.2,96.8 L80,80 L72.8,96.8 Z" />
+</vector>

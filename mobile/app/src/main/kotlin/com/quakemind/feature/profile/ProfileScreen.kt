@@ -3,14 +3,17 @@ package com.quakemind.feature.profile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.quakemind.core.designsystem.*
 import com.quakemind.core.ui.state.AppUiState
@@ -21,7 +24,13 @@ fun ProfileScreen(state: AppUiState, onOperations: () -> Unit, onBack: (() -> Un
 }
 
 @Composable
-fun ProfileScreen(state: ProfileUiState, onOperations: () -> Unit, onBack: (() -> Unit)? = null) {
+fun ProfileScreen(
+    state: ProfileUiState,
+    onOperations: () -> Unit,
+    onBack: (() -> Unit)? = null,
+    darkTheme: Boolean = false,
+    onDarkThemeChange: ((Boolean) -> Unit)? = null,
+) {
     val session = state.session
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
         ScreenHeader("Profil", subtitle = "Hesabın ve erişimlerin", onBack = onBack)
@@ -41,6 +50,32 @@ fun ProfileScreen(state: ProfileUiState, onOperations: () -> Unit, onBack: (() -
                                 style = MaterialTheme.typography.bodyMedium, color = Zinc500)
                             session?.city?.takeIf { it.isNotBlank() }?.let {
                                 Text(it, style = MaterialTheme.typography.bodyMedium, color = Zinc500)
+                            }
+                        }
+                    }
+                }
+            }
+            if (onDarkThemeChange != null) {
+                item(key = "appearance", contentType = "settings") {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Ayarlar", style = MaterialTheme.typography.titleMedium)
+                        Surface(
+                            shape = MaterialTheme.shapes.large,
+                            color = MaterialTheme.colorScheme.surface,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .toggleable(darkTheme, role = Role.Switch, onValueChange = onDarkThemeChange)
+                                    .heightIn(min = 64.dp)
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Outlined.DarkMode, contentDescription = null, tint = AfetAccent)
+                                Text("Koyu tema", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                                Switch(checked = darkTheme, onCheckedChange = null)
                             }
                         }
                     }
