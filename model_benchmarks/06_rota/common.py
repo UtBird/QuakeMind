@@ -25,10 +25,10 @@ RESULTS_DIR = HERE / "results"
 REPO = HERE.parent.parent
 
 CONFIG = {
-    # PBF: Geofabrik'ten indir ya da depodaki QuakeMindBackend yolunu goster
-    "osm_pbf": str(REPO / "QuakeMindBackend" / "apps" / "road_damage" / "data" / "osm" / "turkey.osm.pbf"),
+    # PBF: Geofabrik'ten indir ya da depodaki backend yolunu goster
+    "osm_pbf": str(REPO / "backend" / "apps" / "road_damage" / "data" / "osm" / "turkey.osm.pbf"),
     "place": "Antakya, Hatay, Turkey",       # veya "Kahramanmaras, Turkey"
-    "closures_geojson": str(REPO / "QuakeMindBackend" / "apps" / "road_damage" / "data" / "osm" / "safety_areas.geojson"),
+    "closures_geojson": str(REPO / "backend" / "apps" / "road_damage" / "data" / "osm" / "safety_areas.geojson"),
     "emsr648_dir": None,                       # Copernicus EMSR648 vektor klasoru
     "hard_close_radius_m": 25.0,
     "penalty_radius_m": 150.0,

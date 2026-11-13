@@ -1,0 +1,6 @@
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
+-keep class com.quakemind.core.model.**$$serializer { *; }
+-keepclassmembers class com.quakemind.core.model.** { *** Companion; }
+-dontwarn org.conscrypt.**
+-dontwarn androidx.window.extensions.**
+-dontwarn androidx.window.sidecar.**

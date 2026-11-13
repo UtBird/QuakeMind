@@ -2,7 +2,7 @@
 Tablo 21, satir 7 (Risk skoru agirliklari) icin parametre duyarlilik
 taramasi.
 
-Uretim kodundaki (QuakeMindBackend/apps/earthquake_risk/risk_engine.py)
+Uretim kodundaki (backend/apps/earthquake_risk/risk_engine.py)
 EarthquakeRiskEngine sinifini BIREBIR kullanir; short_risk (CatBoost),
 long_hazard ve fault_score bilesenleri sabit tutulup nihai agirliklar
 (w_short, w_long, w_fault; varsayilan 0.4/0.3/0.3) izgara halinde
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO / "QuakeMindBackend"))
+sys.path.insert(0, str(REPO / "backend"))
 
 from apps.earthquake_risk.risk_engine import (
     EarthquakeRiskEngine,

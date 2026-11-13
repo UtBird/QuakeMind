@@ -5,7 +5,7 @@ artçı ayıklama + fay hattı mesafesi öznitelikleriyle, 30 günlük etiketlem
 üzerinden. Nihai skor: `0,4 × kısa vadeli ML + 0,3 × uzun vadeli tehlike + 0,3 × fay skoru`.
 
 Bu alan **repodaki veriyle şimdi çalışır** —
-`QuakeMindBackend/apps/earthquake_risk/data/query.csv`.
+`backend/apps/earthquake_risk/data/query.csv`.
 
 ## Görev
 
@@ -50,7 +50,7 @@ kalibrasyon eğrisi · SHAP değerleri (kara kutu itirazına cevap).
 ## Çalıştırma
 
 ```bash
-source ../../QuakeMindBackend/venv/bin/activate
+source ../../backend/venv/bin/activate
 pip install -q xgboost lightgbm shap
 python _build_notebooks.py          # 01–06'yı yeniden üretir
 jupyter nbconvert --to notebook --execute --inplace 0*.ipynb

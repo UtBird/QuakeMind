@@ -1,0 +1,5 @@
+# GitHub dil istatistiği (linguist) ayarları
+# Benchmark etiketleme aracı ve üretilmiş raporlar kod değil.
+QuakeMindBackend/benchmark/** linguist-generated
+*.html linguist-detectable=false
+*.scm linguist-vendored

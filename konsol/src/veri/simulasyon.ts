@@ -215,8 +215,11 @@ export type SimSonuc = {
   /** Bütün ekip–afetzede çiftlerinden; ekranda yalnız özet (§4). */
   olcum?: {
     ciftSayisi: number
-    ortalamaUzamaM: number
-    ortalamaUzamaYuzde: number
+    /** Uzama yalnız araçla ulaşılan çiftlerden alınır (yürüme gerekenler dışarıda);
+        öyle çift yoksa sunucu null döner — ekran "hesaplanamadı" yazar, sıfır değil. */
+    uzamaHesabindakiCift?: number
+    ortalamaUzamaM: number | null
+    ortalamaUzamaYuzde: number | null
     ulasilamayanCift: number
     /* Ucun eklediği gerçek ölçümler (J-62). */
     enBuyukUzamaM?: number
@@ -229,7 +232,8 @@ export type SimSonuc = {
       Kod adı (R0–R3) kullanılmaz; ad doğrudan ekrana yazılır. */
   referansAjanlar?: Record<
     string,
-    { ortalamaSureDk: number; uDonusuSayisi?: number; ulasanGorev?: number }
+    /** ortalamaSureDk: kolun araçla ulaştığı görev yoksa null. */
+    { ortalamaSureDk: number | null; uDonusuSayisi?: number; ulasanGorev?: number }
   >
   /** Dönüş maliyeti (sağdan trafik) uygulandı mı — panel varsayımı yazar. */
   donusMaliyetli?: boolean

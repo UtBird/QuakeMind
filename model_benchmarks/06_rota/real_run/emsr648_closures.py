@@ -6,7 +6,7 @@ Kaynak veri: https://mapping.emergency.copernicus.eu/activations/EMSR648/
   AOI-04 Kahramanmaras -> GRA_MONIT01 transportationL katmani
   AOI-11 Hatay          -> GRA_MONIT01 transportationL katmani
 Bu iki katman dogrudan Copernicus S3 kovasindan indirilip
-QuakeMindBackend/apps/road_damage/data/emsr648/{AOI04,AOI11}/ altina
+backend/apps/road_damage/data/emsr648/{AOI04,AOI11}/ altina
 kondu (2026-09-17). damage_gra alani: "No visible damage" | "Possibly
 damaged" | "Damaged" | "Destroyed" | "Not Analysed".
 
@@ -29,7 +29,7 @@ from shapely.ops import unary_union
 from shapely.prepared import prep
 
 REPO = Path(__file__).resolve().parents[3]
-EMSR_DIR = REPO / "QuakeMindBackend" / "apps" / "road_damage" / "data" / "emsr648"
+EMSR_DIR = REPO / "backend" / "apps" / "road_damage" / "data" / "emsr648"
 
 AOI_FILES = {
     "AOI04": EMSR_DIR / "AOI04" / "EMSR648_AOI04_GRA_MONIT01_transportationL_r1_v1.json",

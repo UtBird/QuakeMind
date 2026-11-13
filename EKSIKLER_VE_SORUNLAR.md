@@ -106,7 +106,7 @@ hangi dağılım, hangi uzamsal kural, hangi tohum.
 
 **Yapılacak.** Bölüm 3'e "3.10. Sentetik Kapanma Üretimi" alt bölümü ekle; üretici
 algoritmayı, kapanma sayısını/oranını, uzamsal seçim kuralını, tohumu ve EMSR648
-oranlarıyla (%1,58 / %1,71) kalibrasyonu yaz. Kod referansı: `QuakeMindBackend/benchmark/`.
+oranlarıyla (%1,58 / %1,71) kalibrasyonu yaz. Kod referansı: `backend/benchmark/`.
 
 ---
 
@@ -646,7 +646,7 @@ yapılmış, kabul edilebilir).
 ## D-01 🟠 Google Earth karoları yayında kullanılamaz
 **Durum:** AÇIK
 
-`QuakeMindBackend/apps/road_damage/utils/fetcher.py` içinde
+`backend/apps/road_damage/utils/fetcher.py` içinde
 `mt1.google.com/vt/lyrs=s` üzerinden Google uydu karosu çekiliyor. Toplu indirme
 ve akademik yayında kullanım izne tabi. Makale koşumları **Maxar Open Data** ile
 yapılmalı (hem ücretsiz hem 17 408² çözünürlükte).
@@ -1170,7 +1170,7 @@ toplandığı ve R0'ın öğrenmeyen ajan olduğu açıkça yazılmalı.
 **Durum:** KAPALI (25 Eylül 2026) — arayüz iskeleti gerçek uçlarla uçtan uca koşturuldu; uç sözleşmeden sapıyor, sapmalar aşağıda · **Bulundu:** 25 Eylül 2026 (SIMULASYON_SOZLESMESI.md'ye göre kurulurken) · **İlgili:** J-56, kural 2, kural 4
 
 **Yapıldı.** Sözleşmenin §5'indeki dokuz madde konsola kuruldu; katman ve alan adları §4
-ile birebir. Backend'e (`QuakeMindBackend/`) dokunulmadı, orayı öbür oturum yazıyor.
+ile birebir. Backend'e (`backend/`) dokunulmadı, orayı öbür oturum yazıyor.
 
 | Sözleşme maddesi | Nerede | Durum |
 |---|---|---|
@@ -4251,7 +4251,7 @@ kararlı hâle geldi (243 → 26,6 sn) ve kalan 14 çekirdek API sürecine ve ta
 **Durum:** AÇIK · **Bulundu:** 25 Eylül 2026
 
 Depoda iki sanal ortam var: kök `venv` (torch 2.11.0, jwt var → API bunu kullanıyor) ve
-`QuakeMindBackend/venv` (torch 2.13.0, jwt YOK → API başlatılamaz). Aynı modelin 512×512
+`backend/venv` (torch 2.13.0, jwt YOK → API başlatılamaz). Aynı modelin 512×512
 ileri geçişi kök venv'de 0,61 sn, backend venv'de 4,39 sn — **6 kat**. Model künyelerindeki
 ölçüm notu hangi ortamda alındığını yazıyor, ama depoda hangi venv'in ürün olduğu ve
 diğerinin niye durduğu yazılı değil. Yanlış venv ile alınan bir ölçüm makaleye girerse
@@ -4292,7 +4292,7 @@ ve sokağa dökülen moloz görünmez; büyüdükçe açık sokaklar da kapalı 
 **Ölçüm.** Hatay/Defne — Elektrik, geniş katman (Maxar 2023-02-08), U-Net MiT-B4, eşik 0,5,
 tohum 42; graf 4 164 düğüm / 11 491 kenar / **831,6 km**; 5 gerçek ekip üssü × 5 senaryo
 afetzedesi = 25 çift. Çıkarım bir kez koştu, dört yarıçap aynı maske ve aynı graf üzerinde
-denendi. Betik `QuakeMindBackend/benchmark/rh_duyarlilik.py`, kayıt
+denendi. Betik `backend/benchmark/rh_duyarlilik.py`, kayıt
 `benchmark/reports/rh_duyarlilik_hatay_elektrik.json`.
 
 | r_h | Kapanan kenar | Kapanan yol | Yolun payı | Tam araç rotası kalan çift | Ort. uzama (o çiftlerde) | Araç giremeyen çift | Ort. yürüme |
@@ -4595,6 +4595,588 @@ hasar %0,58 (geçerli alanda %1,49) · açık yol 333 / **kapalı 30** · önces
 
 ---
 
+## PR #5 incelemesi — Android uygulaması (J-141…J-148)
+
+**Kaynak:** [UtBird/QuakeMind#5](https://github.com/UtBird/QuakeMind/pull/5) (Deha, dal
+`codex/quakeminds-app`, uç `c515203`). **İnceleme tarihi:** 12 Kasım 2026. Bulgular PR'a yorum olarak
+yazıldı; düzeltmeyi PR sahibi yapacak. **Bu maddeler `main`'de değil, PR dalında**; PR birleşmeden
+kapatılırsa birleşme sonrası yeniden denetlenmeli.
+
+**Nasıl sınandı.** PR dalı ayrı çalışma ağacında; backend ayrı SQLite veritabanıyla (`QUAKEMIND_SQLITE`),
+yerel model dosyalarıyla. `:app:assembleDebug` temiz (JDK 21, AGP 9.3, compileSdk 37). Pixel 6 /
+Android 36 emülatörü, debug derlemesi `10.0.2.2:8000`. `backend/tests/test_mobile_*.py` 12/12 geçti.
+Çalışanlar: misafir girişi, deprem listesi, ihbar (201), SOS (GPS ±5 m), "Yardım Gerekli" (SOS
+açmıyor), harita (OSM + 83 yakın yer), risk puanı, Idempotency-Key (aynı içerik → aynı kayıt,
+farklı içerik → 409).
+
+## J-141 🔴 Sunucuya ulaşılamazken eşitleme worker'ı sonsuz döngüye giriyor
+**Durum:** AÇIK (PR #5) · **Ölçüldü**
+
+`mobile/sync/.../IncidentSyncWorker.kt:34` `while (true)` + `IncidentDao.kt:20` `claimPendingBatch`
+`PENDING` **ve** `FAILED` kayıtları çekiyor. Ağ hatasında kayıt `FAILED` yapılıyor, döngü aynı
+çalışmada onu hemen yeniden çekiyor; `Result.retry()` satırına hiç ulaşılmıyor, WorkManager backoff'u
+devreye girmiyor.
+
+**Ölçüm.** Backend durduruldu, 8000 portuna bağlantı sayıp yanıt vermeden kapatan bir dinleyici
+kondu, uygulamadan tek ihbar gönderildi: **80 sn'de ~12 000 bağlantı (~150/sn), uygulama %112 CPU**,
+kendiliğinden durmadı. Afet anında sunucu çöktüğünde pil tükenir, sunucu dönünce de boğulur.
+
+**Çözüm önerisi.** Bir çalışmada yalnız `PENDING` al ya da kurtarılabilir hatada döngüden çıkıp
+`Result.retry()` dön.
+
+## J-142 🟠 İhbar formundaki kategori, aciliyet ve kişi sayıları sunucuya gitmiyor
+**Durum:** AÇIK (PR #5) · **Ölçüldü** · **İlgili:** CLAUDE.md §2
+
+`BackendServices.kt:166` gövdeye yalnız `tur`, `metin`, `lat/lon`, `konumKaynagi` koyuyor. Formda
+"Enkaz / Mahsur · Kritik · 1 mahsur kişi" seçilip gönderildi; veritabanındaki kayıt:
+`tur=metin, etiket="Model incelemedi", ek={"konumKaynagi":"manuel"}`. Konsol bunun kritik enkaz
+ihbarı olduğunu göremez. Çevrimdışı kuyruk yolu da (`IncidentSyncWorker.kt:41`) `IncidentDraft`'ı
+kurarken `urgency`, `peopleCount`, `injuredCount`, `locationSource` alanlarını doldurmuyor →
+varsayılana düşüyor. Backend tarafında da bu alanları taşıyacak yer yok (`IhbarIstegi` yalnız
+`kisiSayisi` ve `ihtiyaclar` biliyor); sözleşme iki tarafta birlikte genişletilmeli.
+
+## J-143 🟠 İhbar formu GPS kullanmıyor; afetzededen koordinat elle isteniyor
+**Durum:** AÇIK (PR #5) · **Emülatörde görüldü** · **İlgili:** afetzede UX kararları
+
+Ana ekran "Konum hazır · ±5 m" derken ve SOS ekranı GPS'i sorunsuz alırken `ReportScreen.kt:210`
+"GPS bu formda otomatik alınmıyor" diyip enlem/boylam istiyor. Alanlar rakam klavyesi değil tam
+QWERTY açıyor (`KeyboardType.Decimal` yok); emülatörde otomatik tamamlama boylama kendiliğinden
+`" ft"` ekledi. GPS varsayılan olmalı, elle giriş yedek kalmalı.
+
+## J-144 🟠 Risk ekranı etkenleri atıyor ve "servis bildirmedi" diyor
+**Durum:** AÇIK (PR #5) · **Ölçüldü** · **İlgili:** CLAUDE.md §1
+
+`BackendServices.kt:408` `factors = emptyList()` sabit. Aynı istekte backend
+`factors: {"Kisa vadeli risk": 0.25, "Uzun vadeli tehlike": 0.43, "Fay etkisi": 1.0}` dönüyor
+(Defne, 36.2021 / 36.1612). Ekranda "Servis bu analiz için ek etken bildirmedi" yazıyor — doğru değil.
+
+## J-145 🟠 `/api/oturum/misafir` sınırsız hesap açıyor; kişi başı ihbar sınırı aşılıyor
+**Durum:** AÇIK (PR #5) · **Ölçüldü** · **İlgili:** CLAUDE.md §5
+
+`backend/uclar/oturum.py:58` kimliksiz, hız sınırsız; her çağrıda yeni `afetzede` hesabı. 30 misafir
+art arda → 30 × 201; her biriyle SOS → 10 × 201. Her misafir yeni "kişi" olduğundan
+`KISI_BASI_SINIR` anlamını yitiriyor; `/api/sos`'ta zaten sınır yok (eski sorun), `/kayit` de
+sınırsız (eski sorun). Sahte SOS yağmuru riski → IP başına hız sınırı gerekli.
+
+## J-146 🟡 Birleştirme sırası, klasör yeniden adlandırma ve mobil kapsamı karar bekliyor
+**Durum:** KARAR BEKLİYOR
+
+- PR `main`'e değil #4'ün dalına (`feat/altlik-hf-otomatik-indirme`) açık: önce #4, sonra taban `main`.
+- `QuakeMindBackend/` → `backend/` (~640 dosya): açık dallar (#3 dahil) ve yerel
+  `QuakeMindBackend/venv` kurulumları etkilenir. Belgelerde yalnız yol değişmiş (denetlendi).
+- CLAUDE.md §10 mobili kapsam dışı sayıyor; PR Flutter uygulamasını cihaz içi `bina.tflite` ve
+  `catlak.tflite` ile siliyor. `PROJE_DOSYASI.md:71` hâlâ "Flutter mobil istemci" diyor.
+
+## J-147 🟡 Mobilde kaynak etiketi ve ölçümsüz iddia eksikleri
+**Durum:** AÇIK (PR #5) · **İlgili:** CLAUDE.md §1, §6, §8
+
+- Ana ekran "Yakındaki depremler" kartı 2026-08-12 tarihli kaydı gösteriyor (inceleme 12 Kasım),
+  kaynak (Kandilli/AFAD) yazmıyor; tanıtım ekranı "saniyeler içinde takip edin" diyor.
+- Haritada lejant ve kaynak yok; kırmızı iğnelerin ne olduğu belirsiz.
+- Koyu kırmızı marka rengi olarak kullanılıyor (kırmızı yalnız hasar/aciliyet için).
+- `mobile/README.md`: "120 FPS", "0 per-frame allocation" kaynaksız; "aile fertlerinin pil/konum
+  takibi" yazıyor ama uygulama "bu sürümde doğrulanamıyor" diyor.
+
+## J-148 ⚪ PR #5 küçük notlar
+**Durum:** AÇIK (PR #5)
+
+- `backend/fastapi_app.py:135` doğrudan çalıştırınca varsayılan `0.0.0.0` (API yerel ağa açılır).
+- `BackendClient.kt:47` yenileme jetonu düz `SharedPreferences`'ta.
+- `start.sh` "konsol klasörü yok" diyor ama denetlediği `quakemind-web`.
+- PR açıklaması "`QuakeMinds/` altında" diyor; klasörler kökte.
+
+## J-149 🟠 Üründeki risk modeli makaledeki risk tablosundan ayrıştı
+**Durum:** AÇIK · **Kodda/ölçümde görüldü** · **İlgili:** CLAUDE.md §8, Utku `07e3bfb`
+
+`07e3bfb` (20 Ekim, `main`'de) fay mesafesini elle yazılmış ~38 noktadan GEM Global Active Faults
+çizgilerine taşıdı ve modeli yeniden eğitti. Commit iletisine göre ROC-AUC: CatBoost 0,611 → 0,606,
+lojistik regresyon 0,639 → 0,642. Gönderim belgesi (`makale/QuakeMind_Makale_GONDERIM_vurgusuz.docx`)
+ise lojistik regresyon için 0,6370 ± 0,0637, R0b için 0,6143 yazıyor. Bu değer iki koşudan da farklı.
+Ya makale tablosu yeni koşuyla güncellenmeli, ya da makalede "üründeki model farklı fay mesafesi
+yöntemiyle yeniden eğitildi" diye belirtilmeli. Word'e dokunulmadı; karar makaleyi düzelten arkadaşta.
+Bu dal (`makale-simulasyon-guncel`) `07e3bfb`'yi henüz içermiyor.
+
+## J-150 🟠 Tatbikat sağ paneli, uzama ölçülemeyen koşuda çöküyordu
+**Durum:** KAPALI (12 Kasım 2026, dal `teslim-toparlama`) · **Ölçüldü**
+
+Defne / Elektrik Mah., Hızlı model (SegFormer-B0), 5 ekip / 5 kişi / tohum 42: model %0,26 piksel hasar
+buldu, 4 kenar kapandı, yalnız **1 çift** oluştu ve son adımı yürüme gerektirdiği için uzama hesabına
+girmedi. Sunucu bu durumda bilerek `olcum.ortalamaUzamaYuzde = null` ve kıyas kollarında
+`ortalamaSureDk = null` döndürüyor (`tatbikat.py:967`, `:598`). Konsol `null.toFixed` ile çöktü:
+"Bu panel açılamadı" (`simulasyon.tsx:500`). Kıyas kollarında aynı durumda "NaN dk" yazacaktı.
+
+**Düzeltme.** `veri/simulasyon.ts` tipleri `number | null` yapıldı. Panel uzama yoksa "Uzama
+hesaplanamadı: uzama yalnız araçla ulaşılan çiftlerden alınır, bu koşuda öyle çift yok", kol için
+"araçla ulaşılan görev yok" yazıyor. `tsc -b` ve `kontrol:token` temiz; tarayıcıda aynı koşuyla
+panelin açıldığı görüldü.
+
+**Açık kalan.** Hızlı modelle bu alanda tanıtım içi boş kalıyor (1 afetzede, kıyas yok). Sunumda
+"En iyi" model kullanılmalı (DEMO_CALISTIRMA.md zaten öyle diyor).
+
+## J-151 🟡 Utku'nun 81 il ekranı yerel üretim istiyor; üretim süresi ve altlık eksiği
+**Durum:** KISMEN · **Ölçüldü** · **İlgili:** `07e3bfb`, PR #4
+
+- `veri/il_merkezleri.json` depoya girmiyor (`.gitignore`). Dosya yokken risk ekranı "il merkezleri
+  üretilmedi" diyor, 81 il listesi boş. `araclar_il_merkezleri_uret.py` ile üretildi: 81 il.
+  **Süre:** betik başlığı "~50 sn" diyor, bu makinede (14 çekirdek, D: sürücüsündeki
+  `turkey-latest.osm.pbf`) okuma **245,7 sn**, toplam 4 dk 13 sn.
+- 76 il altlığı bu makinede yok; yalnız 5 operasyon bölgesi var. İl seçince "harita altlığı bu alan
+  için üretilmedi" yazıyor. PR #4 (HF'ten otomatik indirme) bunu çözüyor; il merkezleri dosyası da
+  aynı yolla HF'ten gelebilir.
+
+## J-152 🔴 Risk uçlarında kimlik denetimi yok; canlı veri tazeleme istek yolunda
+**Durum:** KAPALI (13 Kasım 2026, dal `teslim-toparlama`) · **Ölçüldü** · **İlgili:** CLAUDE.md §3, §5
+
+`uclar/risk.py`: `/api/risk/predict` ve `/api/risk/refresh_live_data` `Depends` almıyor (yalnız
+`/api/risk/iller` alıyor). Oturumsuz `curl -X POST /api/risk/predict` → 200 ve tam skor döndü.
+`refresh_live_data` oturumsuz herkesin Kandilli ve USGS'e dış istek attırıp `query.csv`'yi yeniden
+yazdırmasına izin veriyor. `predict` içindeki `refreshData=true` da dış servisi istek yolunda çağırıyor.
+
+**Düzeltme (13 Kasım).**
+- `POST /api/risk/predict` artık giriş ister; her rol kullanabilir.
+- `refreshData` (dış servise istek, `query.csv`'yi yeniden yazma) yalnız koordinatör ve
+  yöneticide çalışır; diğer rollerde yok sayılır.
+- `POST /api/risk/refresh_live_data` yalnız koordinatör ve yönetici.
+- Ölçüldü (canlı API):
+  - tahmin jetonsuz 401, saha 200, koordinatör 200;
+  - saha `refreshData=true` → 200 ve katalog dosyası değişmedi;
+  - tazeleme jetonsuz 401, saha 403;
+  - `fault_lines` açık veri olarak açık kaldı.
+- **Etkisi:** eski web (`quakemind-web`) ve eski Flutter uygulaması risk uçlarını jetonsuz
+  çağırıyor; risk ekranları 401 alır. Eski web'in giriş uçları zaten kapalı (J-53), Flutter PR #5
+  ile değişiyor. Yeni konsol etkilenmez. Tazelemenin istek yolunda dış servise gitmesi (§3) hâlâ
+  böyle; artık yalnız koordinasyon tetikleyebiliyor.
+
+## J-153 🟠 Deprem kataloğu kendiliğinden güncellenmiyordu; 3 ay bayattı
+**Durum:** KISMEN · **Ölçüldü**
+
+`apps/earthquake_risk/data/query.csv` içindeki en yeni kayıt 2026-08-13 idi (12 Kasım'da bakıldı).
+Risk ekranındaki "Son depremler" 3 ay önceyi gösteriyordu. Otomatik tazeleme yok; yalnız elle
+`/api/risk/refresh_live_data` ya da `fetch_and_update_data()` çağrılınca güncelleniyor. 12 Kasım'da
+elle tazelendi: +50 Kandilli, +34 USGS (M≥4 boşluk doldurma), 20.471 satır, 6,9 sn.
+
+Ardından risk modeli `araclar_risk_egit.py` ile yeniden eğitildi. Önceki model 20 Eylül tarihliydi,
+454 kayıtlı künyeyle; sunucu "başka bir veri sürümüyle eğitilmiş" uyarısı veriyordu. Yeni model
+13.709 kayıt, 33,8 sn eğitim, parmak izi `bba9a9a7e74a42c9`; uyarı kalktı.
+
+**Dikkat.** Van'ın skoru 73,3 → 48,7 düştü. Kısa vadeli bileşen 82,0 → 20,6; fay mesafesi
+11,2 → 10,9 km. Kısa vadeli model zayıf (ROC-AUC ~0,61) ve veriye çok duyarlı. Ekranda tek sayı
+olarak durması yanıltıcı olabilir.
+
+**Yapılacak.** Kataloğu bir işçi süreçte zamanlı tazeleme (istek yolunda değil, §3), ekranda "katalog
+son güncelleme" tarihi.
+
+## J-154 🟠 Tatbikat kıyas kolları dakikaya yuvarlanıp QuakeMind farkını siliyordu
+**Durum:** KAPALI (12 Kasım 2026, dal `teslim-toparlama`) · **Ölçüldü**
+
+Defne / Elektrik Mah., En iyi model (U-Net MiT-B4), tohum 42. Koşu 84,1 sn sürdü (AI 73,3 sn),
+12 kapalı kenar, 9 çift, kollar 6/9 göreve araçla ulaştı. Sunucunun verdiği ortalamalar:
+bilmeyen ekip 2,400 · telsizle paylaşan filo 2,233 · QuakeMind 1,573 dk. Panel
+`sureMetni(Math.round(...))` ile üçünü de **"2 dk"** yazıyordu. Tanıtımın ana mesajı (kapanmayı
+önceden bilmek erişimi kısaltır) ekranda görünmüyordu. 10 dakikanın altı artık bir ondalıkla
+yazılıyor: 2,4 · 2,2 · 1,6 dk. `tsc -b` ve `kontrol:token` temiz; tarayıcıda görüldü.
+
+## J-155 🟠 Saha ekibi ekranına girecek yol yoktu: rol verme ekranı yok, demo saha şifresi kayıp
+**Durum:** BÜYÜK ÖLÇÜDE KAPALI (rol ekranı eklendi) · **Görüldü** · **İlgili:** CLAUDE.md §5, J-54
+
+Kullanıcı ekip ekranına giremedi. Nedenleri:
+- Kayıt ekranından açılan her hesap `afetzede` olarak açılıyor (doğru davranış, §5). `/ekip` rotası
+  `saha / koordinator / yonetici` istiyor, bu yüzden hesap afetzede ekranına geri gönderiliyor.
+- Rol yükseltmenin tek yolu `POST /api/oturum/rol` (yönetici) ya da `araclar_kullanici.py ekle`.
+  Konsolda bunu yapacak ekran **yok**: yönetici kayıt olmuş bir gönüllüyü saha ekibine alamıyor.
+- Yerel veritabanındaki `saha@quakemind.local` hesabının şifresi depoda hiçbir yerde yazılı değil,
+  varsayılan şifre de tutmuyor. Hiçbir ekibe bağlı değil.
+
+**Yapılan (12 Kasım).** `saha-demo@quakemind.local` (saha, varsayılan şifre) açıldı ve AKUT 1
+(`EKP-01`) ekibine bağlandı; `DEMO_CALISTIRMA.md` §2'ye yazıldı. `/ekip` açıldı; görev kartı,
+durum düğmeleri ve konum paylaşımı göründü.
+
+**Rol ekranı eklendi (12 Kasım, aynı gün).** Konsolda yeni **Kullanıcılar** modu
+(`modlar/kullanicilar.tsx`); yalnız koordinatör ve yöneticiye görünür (`modlar.ts` `roller`
+alanı, sekme ve komut paletinde süzülür).
+- Sunucu: `GET /api/oturum/kullanicilar` (koordinasyon; şifre özeti dönmez) ve genişletilmiş
+  `POST /api/oturum/rol`. **Kural [T]:** yönetici her rolü verir; koordinatör yalnız
+  afetzede ↔ saha geçişi yapar ve koordinasyon rolündeki birine dokunamaz; kimse kendi rolünü
+  değiştiremez (409; son yöneticinin kendini düşürmesi de böylece kapalı). Saha dışına çıkan kişi
+  ekibinden çıkar, rolü değişenin açık oturumları düşer.
+- Test: `tests/test_oturum_rol.py`, 7/7 geçti. Ayrı geçici SQLite kullanıyor, gerçek veritabanına
+  dokunmuyor. Venv'e `pytest` kuruldu; daha önce yoktu.
+- Tarayıcıda (koordinatör): saha hesabında sekme görünmüyor; `vatandas@ornek.com` afetzede →
+  saha → afetzede çevrildi, iki `POST /rol` 200, liste ve sayılar tazelendi.
+
+**Açık.**
+- Rol değişikliğinin kim tarafından ve ne zaman yapıldığı kayda geçmiyor (denetim izi yok).
+- Kayıt ucu `son_giris` yazmıyor; ekran bu yüzden "son giriş" yerine kayıt tarihini gösteriyor.
+- AKUT 1'in açık görevi 22 Eylül'den kalma bir deneme kaydı (51 gün önce, 178 km, not "aa").
+  Tanıtımdan önce deneme kayıtları temizlenmeli ya da tohum veriyle yeniden kurulmalı.
+
+## J-156 🟠 Giriş üç kapıya ayrıldı; ekip hesaplarını koordinasyon açıyor
+**Durum:** KAPALI (12 Kasım 2026, dal `teslim-toparlama`) · **Ölçüldü** · **İlgili:** CLAUDE.md §5, J-155
+
+**İstek (kullanıcı).** Girişte hesap türü seçilsin. Hesap açma yalnız afetzede için olsun. Ekip
+hesaplarını biz açalım ve denetleyebilelim.
+
+**Yapılan.**
+- **Giriş kapıları:** giriş ekranında Afetzede · Saha ekibi · Koordinasyon seçimi. Kapı rol
+  **vermez**: `kimlik.giris_yap(…, kapi)` şifre doğrulandıktan sonra hesabın depodaki rolünü
+  kapıyla karşılaştırır. Uymazsa 403 döner ("Bu hesap … hesabı değil. Yukarıdan “Saha ekibi”
+  girişini seç"), oturum açılmaz, `son_giris` yazılmaz. Yanlış şifrede kapıdan bağımsız tek 401
+  döner, hesabın varlığı sızmaz. Kapı gönderilmezse eski davranış sürer (mobil istemci, PR #5).
+  Son seçilen kapı tarayıcıda hatırlanır (`localStorage`, try/catch'li).
+- **Hesap açma** yalnız Afetzede kapısında. Saha ve Koordinasyon kapılarında "hesabını
+  koordinasyon merkezi / yönetici açar" yazıyor.
+- **Ekip hesabı açma:** `POST /api/oturum/kullanicilar`. Koordinatör yalnız saha hesabı açar;
+  yönetici koordinatör ve yönetici hesabı da açar. Açarken ekibe bağlanabilir. Afetzede hesabı
+  buradan açılmaz (422).
+- **Şifre:** sunucuda 12 karakterlik tek seferlik şifre üretilir; karıştırılan 0/O, 1/l/I harfleri
+  yok. Yalnız yanıtta bir kez döner, depoda özeti kalır. `POST /api/oturum/kullanicilar/{id}/sifre`
+  ile yenilenir; eski şifre ve açık oturumlar düşer. Kimse kendi hesabında bu işlemi yapamaz.
+- Kayıt ucu artık `son_giris` yazıyor (J-155'te kalan madde kapandı).
+- **Kullanıcılar ekranı yeniden düzenlendi.** Sol panel: yeni hesap (tür, ad, e-posta, ekip) ve
+  tek seferlik şifre kartı (kopyala / not aldım). Sağ panel: hesaplar (gruplar ve sayıları, arama,
+  rol değiştir, şifreyi yenile, ekibe bağla).
+
+**Ölçüm.** `tests/test_oturum_rol.py` 12/12 geçti; ayrı geçici SQLite kullanıyor. `tsc -b` ve
+`kontrol:token` temiz. Token kuralı bir keyfi `grid-cols-[…]` değerini yakaladı, düzeltildi.
+Tarayıcıda:
+- Koordinatör "Deneme Ekip Üyesi" (`deneme-ekip@quakemind.local`) hesabını AKUT 1'e bağlı açtı.
+- Saha hesabıyla Afetzede kapısı → 403 ve doğru kapı mesajı.
+- Yeni hesap Saha ekibi kapısından → `/ekip`, AKUT 1.
+- Giriş ekranı 375 px genişlikte taşmıyor.
+
+**Açık.**
+- Tek seferlik şifreyle ilk girişte şifre değiştirme zorunlu değil.
+- Rol ve şifre işlemlerinin denetim izi yok.
+- Hesap kapatma (silme / askıya alma) yok.
+- `deneme-ekip@quakemind.local` deneme hesabı yerel veritabanında duruyor.
+
+## J-157 🟠 Hesap yönetimi tek sayfada: düzenle-kaydet, askıya alma, ilk girişte şifre, kayıt defteri
+**Durum:** KAPALI (13 Kasım 2026, dal `teslim-toparlama`) · **Ölçüldü** · **İlgili:** CLAUDE.md §5, J-155, J-156
+
+**Kullanıcının bulduğu eksik.** Ekipsiz bir saha hesabı (`ali@gmail.com`) açılmıştı. Ekip atamak
+için ayrı Ekipler ekranına gitmek gerekiyordu. Koordinatörün bütün hesapları görüp değiştirip
+kaydedeceği bir yer yoktu. Ayrıca J-156'nın üç açık maddesi vardı: ilk girişte şifre
+değiştirme, denetim izi, hesap kapatma.
+
+**Yapılan.**
+- **Hesaplar sayfası** (Kullanıcılar sekmesi) tam sayfa oldu (`modlar.ts` `sayfa: true`). Harita
+  altında kurulu kalır, yalnız örtülür (CLAUDE.md §6).
+  - Tabloda herkes var: ad / e-posta, rol, ekip ("Ekip yok" vurgulu), durum (Aktif / Askıda /
+    Şifre bekliyor), son giriş.
+  - Gruplar sayılarıyla: Tümü, Saha, Ekibe bağlı olmayan saha, Şifresini koymamış, Askıda,
+    Koordinasyon, Afetzede. Ekipsiz saha varsa üstte uyarı çıkar.
+  - Satıra tıklayınca **düzenleme çekmecesi** açılır: ad, rol, ekip, durum ve tek **Kaydet**
+    düğmesi ("Kaydedince: ekip yok → AKUT 1" özeti, Geri al). Çekmecede geçici şifre üretme ve
+    kişinin işlem geçmişi de var.
+  - "Yeni ekip hesabı" çekmecesi: açılınca doğrudan o hesabın düzenleme çekmecesine geçer.
+  - **Kayıt defteri** sekmesi.
+- **Tek kaydet ucu:** `PATCH /api/oturum/kullanicilar/{id}` (ad, rol, ekipId, askida).
+  Önce hepsi denetlenir, sonra uygulanır: bir alan reddedilirse hiçbiri değişmez (testte
+  doğrulandı). `ekipId: null` ekipten çıkarır. Gönderilmeyen alan değişmez.
+- **Askıya alma:** `kullanicilar.askida` sütunu. Askıdaki hesap doğru şifreyle de giremez (403
+  "Hesabın askıya alınmış"); elindeki erişim jetonu, yenileme ve canlı akış o an düşer. Kayıtları
+  silinmez, geri açılabilir. Kalıcı silme bilerek yok: kişinin SOS ve ihbar kayıtları hesaba bağlı.
+- **İlk girişte şifre:** `kullanicilar.sifre_degismeli` sütunu.
+  - Koordinasyonun açtığı ya da şifresini yenilediği hesapta bayrak açılır.
+  - Bu hesap `/ben` ve `POST /api/oturum/sifre` dışındaki **her** korunan uçta 403 alır; zorunluluk
+    sunucuda.
+  - Konsol `/sifre-degistir` ekranına zorlar (`RolKapisi`, `acilisYolu`).
+  - Şifre değişince bütün eski oturumlar düşer, bu cihaza yeni oturum verilir.
+- **Kayıt defteri:** `hesap_kayitlari` tablosu (yalnız eklenir). Hesap açma, rol, ekip, ad, askı,
+  şifre yenileme ve kişinin kendi şifresini değiştirmesi; kim, kime, ne zaman.
+  `GET /api/oturum/hesap-kayitlari`. Kişi başına geçmiş çekmecede görünür.
+- **Canlı akış:** yeni `hesap` mesajı (yalnız konsol rollerine). Başka bir koordinatörün
+  değişikliği açık listelerde de görünür. Yoklama yok (CLAUDE.md §4).
+- **İstemci düzeltmesi:** jeton yenilemesi `/api/oturum/` altındaki her yolda atlanıyordu. Hesap
+  ekranı 15 dakika açık kalınca 401'de kalacaktı. Artık yalnız giriş, kayıt, yenileme ve çıkış
+  uçlarında atlanıyor. `apiGet` sunucunun hata açıklamasını da gösteriyor.
+- Yanlış "şu anki şifre" 400 dönüyor. 401 olsaydı istemci gereksiz yere jeton yenileyip isteği
+  tekrar gönderirdi.
+
+**Ölçüm.**
+- `tests/test_oturum_rol.py` 16/16 geçti (yeni: zorunlu şifre, askı, tek kaydet ve atomiklik,
+  kayıt defteri).
+- `tsc -b` ve `kontrol:token` temiz.
+- Korunan 9 uç demo jetonuyla 200 döndü, oturumsuz 401 aldı.
+- Var olan veritabanına sütunlar ve tablo açılışta veri kaybı olmadan eklendi.
+- Tarayıcıda "Deneme İki" hesabıyla:
+  1. Ekipsiz açıldı.
+  2. Çekmeceden AKUT 1 seçilip kaydedildi.
+  3. Askıya alındı; doğru şifreyle giriş 403 aldı.
+  4. Yeniden etkinleştirildi.
+  5. Geçici şifreyle giriş `/sifre-degistir`'e gitti; `/ekip`'e elle gidince de geri itildi.
+  6. Şifre değişince AKUT 1 ekip ekranı açıldı.
+  7. Kayıt defterinde 5 satır doğru sırayla, yapanıyla göründü.
+
+**Açık.**
+- Kayıt defteri 13 Kasım 2026'da başladı; daha önceki işlemler yok.
+- `deneme-iki@quakemind.local` ve `deneme-ekip@quakemind.local` deneme hesapları yerel
+  veritabanında duruyor. İstenirse askıya alınabilir.
+- E-posta değiştirme yok.
+
+## J-158 🟠 SQLite yeterli mi? Ham yazma bol; darboğaz tek bağlantı + olay başına tam liste
+**Durum:** BÜYÜK ÖLÇÜDE KAPALI (13 Kasım 2026, iyileştirme ve yeniden ölçüm aşağıda); artımlı tazeleme AÇIK · **Ölçüldü** · **İlgili:** CLAUDE.md §8, §10; MIMARI §3
+
+**Soru.** Çalışan sistem SQLite kullanıyor (PostGIS hedef, yazılmadı). Performans için yeterli mi?
+
+**Ölçümden önce yazılan birim ve hedef.**
+- Birim: depo katmanında işlem gecikmesi (ms; ortanca, p95, p99) ve yazma/okuma sayısı (işlem/sn).
+- Yazma: `sos_ekle`. Okuma: konsolun gerçek sorguları (`sos_listele` son 6 saat, kutulu;
+  `hasar_listele` kutulu; ısı/özet yolunun 100 bin sınırlı hasar okuması; `sos_sayilari`).
+- Ölçek: bugün (12 SOS, 2 076 hasar), 10 bin, 100 bin, 1 milyon satır.
+- Cihaz: bu dizüstü, 20 mantıksal çekirdek. Veri: gerçek veritabanının kopyası, rastgele tekdüze
+  sentetik satırlar. HTTP ve JSON maliyeti hariç.
+- **Hedef `[T]`** (tasarım varsayımı, saha verisi değil): büyük depremin ilk saatinde 100 bin SOS
+  ≈ 28/sn; iki kat payla **50 SOS/sn sürekli yazma, yazma p95 < 50 ms**; konsol listesi
+  **p95 < 100 ms**.
+
+Betik `benchmark/sqlite_yuk_olcumu.py`, sonuç `benchmark/reports/sqlite_yuk_2026-11-13.json`.
+
+**Sonuç `[Ö]`.**
+
+| Satır (SOS / hasar) | Dosya | 16 eşzamanlı yazıcı | SOS listesi p95 | Hasar kutu p95 | Isı yolu (100 bin) p95 | Karışık: yazma p95 / yazma/sn |
+|---|---|---|---|---|---|---|
+| 12 / 2 076 | 1 MB | 9 276/sn, p95 9 ms | 9 ms | 0,1 ms | <0,1 ms | 495 ms / 72,5 |
+| 10 bin | 4,6 MB | 4 112/sn, p95 12 ms | 62 ms | 0,4 ms | 23 ms | 989 ms / 35,2 |
+| 100 bin | 42 MB | 3 868/sn, p95 18 ms | 51 ms | 9,5 ms | 510 ms | 2 836 ms / 17,5 |
+| 1 milyon | 420 MB | 4 176/sn, p95 16 ms | 47 ms | 118 ms | 1 965 ms | 1 800 ms / 15,8 |
+
+"Karışık": 16 okuyucu sürekli SOS listesi ister, 8 yazıcı aynı anda SOS yazar, 5 sn.
+
+**Yorum.**
+1. **Ham yazma kapasitesi hedefin çok üstünde.** 1 milyon satırda bile ~4 000 yazma/sn, p95 16 ms
+   (hedef 50/sn, 50 ms). SQLite'ın kendisi darboğaz değil.
+2. **Okuma ve yazma birlikte gelince hedef kaçıyor.** 10 bin satırdan itibaren yazma p95 1–2,8 sn,
+   yazma 15–35/sn (hedef 50/sn). Sebep bizim erişim desenimiz:
+   - Depo tek bağlantı ve tek `Lock` kullanıyor; WAL eşzamanlı okumaya izin verse de her işlem
+     sırayla yürüyor.
+   - `sos_listele` her çağrıda 5 000 satıra kadar dönüyor (~45 ms kilitte).
+   - Canlı akışta her yeni SOS her açık konsolda listenin **tamamını** yeniden istetiyor.
+     5 konsol ve 50 SOS/sn → saniyede ~250 tam liste ≈ 11 sn kilit süresi/sn. Sistem doyar.
+3. **Isı / özet yolu** 100 bin satırda 0,5 sn, 1 milyonda 2 sn (her çağrıda 100 bin satır okunuyor).
+   Önbelleklenmezse büyür.
+4. Kutu sorgusu mekânsal indeks olmadan 1 milyon satırda 118 ms. Kabul edilebilir; PostGIS GIST
+   burada fark yaratır.
+
+**Karar önerisi.**
+- Tanıtım, teslim ve pilot ölçeği (onlarca kullanıcı, saatte yüzlerce kayıt) için SQLite
+  **yeterli**.
+- Afet ölçeğindeki karışık yük için **önce erişim deseni** düzeltilmeli; bu PostGIS'ten ucuz:
+  1. okuma için ayrı bağlantılar (WAL'de paralel okuyucu);
+  2. canlı akış mesajında yeni kaydın kendisini gönderip tam liste yerine yalnız değişeni
+     tazelemek (ya da `sonrasi=` artımlı sorgu);
+  3. istemcide kısa süreli tazeleme birleştirme.
+- Ardından aynı betikle yeniden ölçülmeli.
+- PostGIS tek başına (2) sorununu çözmez.
+
+**Sınırlar.** Tek makine, sentetik ve tekdüze dağılım. HTTP ve JSON ayrıca maliyet ekler. Gerçek
+afet trafiğinin şekli ölçülmedi.
+
+**İyileştirme (13 Kasım 2026, aynı gün).**
+1. **Okuma bağlantıları.** `depo/sqlite_surucu.py` artık tek yazma bağlantısı (kilitli) ve iş
+   parçacığı başına salt-okunur okuma bağlantısı (`query_only`, WAL) kullanıyor. `_oku`/`_tek`
+   kilit almıyor. Kilit içinde okuma yapan yöntem yok (tarandı). `tests/test_depo_eszamanlilik.py`
+   yeni: bağlantılar arası görünürlük, 50 000 satırlık okuma sürerken yazma < 0,25 sn.
+2. **`/api/ozet` SQL'de sayıyor** (`hasar_ozeti`, `kapanma_sayisi`). Eskisi 100 000'er satırı
+   Python'a çekip sayıyordu; 100 000'den fazla kayıtta **sessizce eksik sayıyordu** (testte
+   100 050 kayıt → eski yol 100 000). Gerçek veride üç zaman aralığında eskisiyle birebir aynı.
+3. **Kapsayıcı indeksler.** Planlayıcı `GROUP BY` yüzünden `durum`/`kaynak` indeksini seçip tabloyu
+   tarıyordu; `ANALYZE` de değiştirmedi. Eski tek sütunlu indeksler açılışta kaldırılıp yerine
+   kapsayıcı olanlar kuruluyor; gruplamada `+durum` / `+kaynak` kullanılıyor. 1 milyon satırda:
+   - `sos_sayilari` 884 → 30 ms (`ix_sos_zaman_kapsar` = zaman, lon, lat, durum);
+   - `hasar_ozeti` 1 436 → 61 ms (`ix_hasar_zaman_kapsar` = zaman, kaynak, skor);
+   - kutulu SOS listesi 498 → 16–30 ms;
+   - **afetzedenin kendi çağrıları 10 085 → < 1 ms** (`ix_sos_kullanici_zaman`). Eski tek sütunlu
+     indeksle tablo zaman sırasıyla taranıyordu; bu sorun bu ölçümde ortaya çıktı.
+   - Aynı desen ihbarlarda da düzeltildi (`ix_ihbar_kullanici_zaman`).
+4. **Konsolda tazeleme birleştirme** (`canli/canliAkis.ts` `birlestirici`). Aynı sorgu anahtarı
+   için ilk mesaj hemen tazeler; 1 sn içindekiler pencere sonunda tek tazelemede birleşir.
+   Tarayıcıda gerçek modülle: 2 sn'ye yayılmış 100 mesaj → 3 tazeleme (0, 1 003, 2 005 ms),
+   son mesaj kaçmadı. Yoklama değil, yalnız mesajla çalışır.
+
+**Yeniden ölçüm `[Ö]`.** Afet senaryosu `benchmark/sqlite_afet_senaryosu.py`: 50 SOS/sn,
+5 konsol (her biri kutulu SOS listesi + özet), 10 sn. "Önce" = commit'li eski depo.
+Sonuç: `benchmark/reports/sqlite_afet_2026-11-13.json`.
+
+| Durum (100 bin satır) | Yazma p95 | 10 sn'de yazılan | Tazeleme p95 | Güncellik gecikmesi p95 | İşlenmeyen mesaj |
+|---|---|---|---|---|---|
+| Önce | 723 ms | 41 (hedef 501) | 997 ms | 6,1 sn | 103 |
+| Yalnız okuma bağlantısı + SQL özet | 1,2 ms | 501 | 309 ms | 8,9 sn | 2 304 |
+| + birleştirme | 0,5 ms | 501 | 589 ms | 1,4 sn | 0 |
+| **+ kapsayıcı indeksler (son)** | **0,8 ms** | **501** | **199 ms** | **1,07 sn** | **0** |
+| Son, 1 milyon satır | 1,2 ms | 501 (50,0/sn) | 547 ms | 1,45 sn | 0 |
+
+Hedefe göre: yazma 50/sn ve p95 < 50 ms **sağlandı**. Konsol tazelemesi p95 < 100 ms (liste ve
+özet birlikte, 5 konsol eşzamanlı) **sağlanmadı**: 199 ms (100 bin), 547 ms (1 milyon). Güncellik
+gecikmesi ~1–1,5 sn; bunun yaklaşık 1 sn'si bilinçli birleştirme penceresi.
+
+Temel ölçüm de yeniden koşuldu (`benchmark/reports/sqlite_yuk_2026-11-13_sonra.json`).
+- Karışık yükte (16 okuyucu + 8 yazıcı, **sınırsız** hız) yazma p95 0,5–2,8 sn'den 12–16 ms'ye
+  indi; saniyede 15–72 yerine 500–700 yazma.
+- **Ama okuyucular aç kaldı:** okuma p95 ~7 sn, saniyede 2–3,5 okuma.
+- Sebep Python GIL'i: 5 000 satırlık okuma her satırda GIL'i bırakıp geri alıyor, sürekli yazan
+  iş parçacıkları araya giriyor. Eskiden tersiydi: okuyucu kilitle yazıcıyı bekletiyordu.
+- Gerçekçi hızda (50/sn, yukarıdaki tablo) sorun görülmedi. Saniyede yüzlerce yazmada büyük
+  liste okumaları yavaşlar.
+- Daha çok indeks yüzünden 16 yazıcının ham hızı ~3 900'den ~3 000–3 500/sn'ye indi; hedefin
+  60 katı.
+
+**Açık.**
+- **Artımlı tazeleme** (önerinin 2. maddesi, uygulanmadı): canlı akış mesajı yeni kaydı taşısın
+  ya da `sonrasi=` ile yalnız değişen satırlar gelsin. Böylece her tazelemede 5 000 satır
+  dönmez; hem 547 ms'lik tazeleme hem doyumdaki GIL açlığı küçülür.
+- Isı ızgarası yolu (`/api/road_damage/heatmap`) bu ölçüme girmedi.
+- HTTP ve JSON maliyeti ölçülmedi; uvicorn tek worker.
+- Ölçüm betiğinin ilk sürümünde "gerçekleşen hız" konsol bekleme süresini de paydaya katıyordu
+  (47,5 ve 39,9 gibi düşük değerler). Düzeltildi; bütün koşularda 10 sn'de 501 yazma = 50/sn.
+
+## J-159 🔴 SOS ve ihbar kimlikleri 32 bitti: ~77 bin kayıtta çakışma olasılığı %50
+**Durum:** KAPALI (13 Kasım 2026, dal `teslim-toparlama`) · **Hesap + ölçümde görüldü**
+
+J-158 ölçümünde 1 milyon satır doldururken `UNIQUE constraint failed: hasar_noktalari.id` alındı.
+Bu, ölçüm betiğinin kısa kimliklerinden geliyordu ama depoda da aynı desen vardı:
+`sos-` + `uuid4().hex[:8]` (32 bit), `ihb-` 32 bit, `grv-` 32 bit, `hsr-` ve `kap-` 40 bit,
+`ekp-` 24 bit.
+
+Doğum günü sınırı: 32 bitte 10 bin kayıtta %1, ~77 bin kayıtta %50 çakışma. Çakışan `INSERT`
+`IntegrityError` → HTTP 500 olur; **afetzedenin SOS'u kaydedilmez**. Büyük bir afette bu sayılara
+ulaşılabilir.
+
+**Düzeltme.** SOS, ihbar, görev, hasar noktası ve yol kapanması 64 bit (`hex[:16]`), ekip 40 bit.
+Mevcut kayıtlar aynı kalır (kimlik `TEXT`). Kimlik uzunluğuna bağlı kod bulunmadı.
+`tests/test_oturum_rol.py` 16/16 geçti.
+
+**Açık.**
+- `bil-` (bildirim, 32 bit) ve eski uçlar (`usr-`, `blk-`) düşük hacimli olduğu için bırakıldı.
+- Çakışmada yeniden deneme yok; 64 bitte gerek görülmedi.
+
+## J-160 🔴 Hasar analizi drone görüntüsünde "0 kapalı yol": alan görüntüye taşınmıyor, çözünürlük sessizce düşüyordu
+**Durum:** KAPALI (13 Kasım 2026, dal `teslim-toparlama`) · **Ölçüldü** · **İlgili:** J-20, J-76, J-35
+
+**Görülen (kullanıcı).** Hasar analizi → OpenAerialMap → "Help.NGO · Hatay - Defne - Elektrik Mah."
+seçildi, analiz başlatıldı. Sonuç 0 kapalı yol, 6 482 açık. Kullanıcı daha önce aynı yerde kapalı yol
+görmüştü.
+
+**Sebep (ölçüldü, aynı model ve görüntü, veritabanı kopyasında).**
+
+| Analiz alanı | Kullanılan zoom | İncelenen alan | Kapalı yol | Süre |
+|---|---|---|---|---|
+| Ekrandaki: "Şehir merkezi" Antakya + 2,5 km | z17 (0,96 m/px); z18 istendi | 3,9 / 25,1 km² | **0** | 69 sn |
+| Görüntünün kendi alanı (katalog `analizBbox`) | z18 (0,48 m/px) | 0,38 km² | **8** | 23 sn |
+
+1. Listeden görüntü seçmek analiz alanını **değiştirmiyordu**. Görüntü (~0,5 km'lik drone sahnesi)
+   alanın ~%1'ini kapsıyordu. Panel uyarı yazıyor ama analiz yine başlıyordu.
+2. Sunucu (`fetch_satellite_area`) 64 karolık pencereyi analiz merkezinden kırpıyor. Merkez görüntünün
+   dışında kalınca z18'de karo bulamadı ve bunu "bu zoomda karo yok" sayıp **sessizce z17'ye indi**.
+   Model eğitim ölçeğinin iki katı kaba ve çoğu boş görüntü gördü; standart çözünürlük kuralı (J-76)
+   delindi.
+3. Sonuç ekranı bu koşuda "Bu görüntüde yolu kapatan hasar bulunmadı" dedi. Yanıltıcı: incelenen
+   kutunun çok küçük bir kısmında görüntü vardı.
+
+**Düzeltme.**
+- `veri/analiz.ts` `goruntuyeTasinmisAlan`: listeden görüntü seçince, kapsama %95'in altındaysa alan
+  görüntünün üstüne taşınır. Görüntü alandan küçükse alan görüntünün kendisi olur; büyükse boyu
+  korunup içine kaydırılır. Mod "Alan çiz" olur, harita oraya uçar.
+- Kapsama `EN_AZ_KAPSAMA` (%50) altındaysa "Analizi başlat" kapalı; yerine "Alanı görüntüye taşı"
+  düğmesi.
+- Başlatınca harita şehir merkezine değil analiz alanına uçar. Künyedeki yarıçap gerçekte incelenen
+  kutudan yazılır (eskiden hep hazır ayarın 2,5 km'si).
+- `worker.py`: OpenAerialMap (özel karo) kaynağında istenen zoomda karo yoksa koşu **durur** ve
+  "Seçilen görüntü analiz alanının merkezinde yok… alanı görüntüye taşı" der. Wayback ve Esri'nin
+  alt zooma inmesi değişmedi.
+- Sonuç ekranı: `validPixelRatio` %50'nin altındaysa "görüntü incelenen kutunun ~%X kadarını
+  dolduruyor" notu çıkar. Hiç kapalı yol yoksa sunucunun "hasar bulunmadı" önerisi gizlenir.
+
+**Doğrulama.**
+- Betikte: ekrandaki ayar artık açıklamalı hatayla duruyor; görüntü alanı z18'de 8 kapalı yol.
+- Tarayıcıda, API ile uçtan uca:
+  - Defne/Elektrik'e tıklanınca kapsama %1 → %100 oldu, analiz başladı;
+  - sonuç **8 kapalı / 662 açık segment, z18, 0,48 m/px**;
+  - haritada 8 kırmızı segment çizildi.
+  - Bu koşu gerçek veritabanına normal kullanım gibi yazıldı.
+- `tsc -b` ve `kontrol:token` temiz.
+
+**Not.** Drone sahnelerinde görüntü kutunun ~%39'unu doldurur (katalogda `gecerliPikselOraniZ18`
+0,387); kenarlar düzensizdir. Not bu yüzden "taşı" demez, yalnız sayıların görüntülü kısmı anlattığını
+yazar.
+
+**Açık.** Sınır kutusundan hesaplanan kapsama görüntünün gerçek izinden büyük olabilir. Gerçek iz
+(OAM footprint çokgeni) kullanılmıyor.
+
+## J-161 🟠 Hasar analizi ekranı: panel genişlik sıçraması, yanıltıcı alan ayarları, yakın çekim seçeneği
+**Durum:** KAPALI (13 Kasım 2026, dal `teslim-toparlama`) · **Ölçüldü** · **İlgili:** J-160, J-76, J-20, J-26
+
+**Kullanıcının bildirdikleri.** (1) Sağ paneldeki iş alanı küçük başlıyor, ilerleme çubuğu gelince
+sağa doğru büyüyor. (2) "Yakından bakınca daha iyi buluyor"; bu da eklenmeli mi? (3) Ekranın
+UI/UX'i daha kullanışlı olsun.
+
+**1. Panel genişliği.** `kabuk/Panel.tsx`'te `section` sabit genişlikli sütunun içinde ama `w-full`
+değildi. İçerik kadar daralıyor, ilerleme çubuğu gelince genişliyordu (bütün modlarda, iki panelde).
+`w-full` eklendi. 1 600 px'te ölçüldü: sağ panel 336/336, sol 292/292 px. Analiz boyunca genişlik
+sabit kaldı.
+
+**2. Hazır ayarlar yanıltıcıydı (yeni bulgu).** Analiz her zaman eğitim ölçeğinde (z18 ≈ 0,48 m/px)
+koşuyor ve `fetcher.py` en çok 8×8 karo indiriyor, yani tek koşu **~0,99 × 0,99 km**. Eski hazır
+ayarlar "Standart 2,5 km", "Geniş alan 4 km" diyordu: 25–50 km² seçiliyor, ortadaki ~1 km² dışında
+hiçbir yer incelenmiyordu. Hazır ayarlar kaldırıldı; varsayılan yarıçap 0,5 km. Ekran tek koşunun
+sınırını hesaplayıp alan sığmazsa açıkça yazıyor.
+
+**3. Yakın çekim (ölçüldü, veritabanı kopyasında, Defne/Elektrik aynı kutu).**
+
+| | z18 (eğitim ölçeği, 0,48 m/px) | z19 (0,24 m/px) |
+|---|---|---|
+| Kapalı yol | 8 | 19 |
+| Hasar oranı (görüntülü kısım) | %1,42 | %1,78 |
+| İncelenen alan | 0,38 km² | 0,24 km² (tek koşu dörtte bir) |
+| Süre | 64 sn | 44 sn |
+
+Gözle bakınca z19'un yeni bulduklarının çoğu enkaza benziyor. **Doğruluk ölçülmedi:** yer gerçeği
+yok. Model 0,3–0,5 m/px ile eğitildi, 0,24 bu aralığın dışında; J-26'da yakınlaştıkça yanlış alarmın
+daha hızlı arttığı görülmüştü.
+
+Karar `[T]`: **isteğe bağlı, varsayılan kapalı** "Yakın çekim (deneysel)" anahtarı.
+- İstekte `yakinCekim`, işçide zoom+1; sonuç künyesine `yakinCekim` yazılır.
+- Standart çözünürlük kuralı (J-76, 26 Eylül kullanıcı kararı) varsayılan olarak değişmedi.
+- Makaleye taşınmaz: yalnız koşu sayısı ölçüldü, doğruluk ölçülmedi.
+
+**4. Ekran yeniden düzeni (`modlar/hasar.tsx`).**
+- **Sol panel üç adım:**
+  1. Görüntü: kaynak seçimi (deprem sonrası OAM / Wayback / güncel); OAM görüntüleri kart olarak
+     (drone ya da uydu, sağlayıcı, tarih, depremden kaç gün sonra, kapsama çubuğu); tarih aralığı
+     katlanır.
+  2. Alan: görüntünün tamamı, alan çiz, çokgen, nokta çevresi, şehir merkezi.
+  3. Özet ve Başlat: alan, görüntü, çözünürlük; başlatılamıyorsa nedeni yazar.
+- **İnce ayar:** hassas tarama ve yakın çekim anahtarları, yarıçap (yalnız nokta ve şehir
+  merkezinde), eşik, son işleme, model.
+- **Sağ panel:** aşama göstergesi (görüntü → yol ağı → model, "12/16 parça" ile → kapanan yollar →
+  sonuç). Sonuçta üç büyük sayı (kapalı yol, açık yol, hasar), öneri, "Sonuca yaklaş" ve "Bu ağda
+  rota planla" düğmeleri; künye katlanır bölümde. Hata olursa sebep kutu içinde.
+
+**Doğrulama.**
+- `tsc -b` ve `kontrol:token` temiz.
+- Tarayıcıda:
+  - Defne/Elektrik seçildi; alan "Görüntünün tamamı" (0,46 × 0,50 km, kapsama %100, z18).
+  - Yakın çekim anahtarı özeti z19 / 0,24 m/px yaptı, geri alınınca z18'e döndü.
+  - Analiz aşama aşama izlendi (13/16 → 16/16 parça → %90 → %97 → bitti).
+  - Sonuç 8 kapalı / 662 açık, %0,5 hasar.
+- Ekran görüntüsü alınamadı (tarayıcı paneli gizliydi); düzen DOM ölçümüyle doğrulandı.
+
+**Ek düzeltme (aynı gün, kullanıcı bildirdi): mahalle sahneleri listeden kayboluyordu.**
+- Görüntü araması o anki analiz alanında yapılıyordu. J-160'tan sonra görüntü seçmek alanı
+  0,5 km'lik sahne kutusuna küçülttüğü için liste de daraldı (11 → 3). Narlıca, Türünçlü gibi
+  öbür mahalle sahneleri kayboldu.
+- Arama artık seçili şehrin çevresinde (~8 km) yapılıyor; çizilen alan dışarı taşarsa birleşimi
+  aranıyor. Şehir seçimi 1. adıma taşındı; şehir değişince alan ve görüntü seçimi sıfırlanıyor.
+- Tarayıcıda: Defne seçilmeden önce de sonra da 11 sahne listelendi (Mansurlu da eklendi).
+  Narlıca'ya geçince alan 0,34 × 0,53 km, kapsama %100 oldu.
+
+**Açık.**
+- Gerçek yer izi (OAM footprint çokgeni) kullanılmıyor; kapsama sınır kutusundan.
+- Büyük alanı birden çok koşuya bölme (döşeme) yok; alan sığmazsa ortası incelenir.
+- Yakın çekimin doğruluğu ölçülmeli; etiketli bir mahalle gerekir.
+
+---
+
 # DEĞİŞİKLİK GÜNLÜĞÜ
 
 | Tarih | Değişiklik |
@@ -4717,7 +5299,7 @@ hasar %0,58 (geçerli alanda %1,49) · açık yol 333 / **kapalı 30** · önces
 | 26 Eylül 2026 | **J-88 ilerleme: kendi yer gerçeğimiz üretildi (deneme, 1 mahalle).** Kullanıcı onayıyla kapanma katmanı elle etiketlendi. Yöntem: yol parçaları modelin ne dediği **görülmeden** (kör), gerçek drone ortofotosunun kesitleri üzerinden işaretlendi; modelin kapalı dediklerinin tamamı + açık dediklerinden %24,8 rastgele örnek. Araç `araclar_kapanma_etiketle.py` (tohumla yeniden üretilebilir), veri `benchmark/kapanma_yer_gercegi/`. Alan Defne / Elektrik Mah., U-Net MiT-B4, 118 etiketlenebilir parça, 33 kesit. **Sonuç:** model KAPALI dediği 5 parçadan 3'ü gerçekten kapalı, **0'ı açık**, 2'si kararsız → **kesinlik %100** (kararsız hariç; %95 Wilson **%44–100**, n=3) ya da %60 (kararsız hata sayılırsa). Model AÇIK dediği 28 örnekte **6 gerçek kapanma** bulundu → 113 parçaya ölçeklenince ~24 kaçırılmış; gerçek kapanma kestirimi ~27/118 (%23), **duyarlılık ≈ %11**. Yani **yüksek kesinlik, düşük duyarlılık** — J-65'teki etiketli karo bulgusuyla tutarlı. Operasyonel anlamı: tatbikattaki kazanç sayıları iyimser değil (gerçekte daha çok kapanma var), ama sistem tek başına güvenilecek bir kapanma haritası vermiyor; ikisi de makalede yazılmalı. **Sınırlar:** tek etiketleyici (ikinci görüş ve etiketleyiciler arası uyum yok), parçaların **%30'u yargılanamadı** (gölge / çözünürlük / çizginin görünür sokağı takip etmemesi), modelin 12 kapanmasından yalnız 5'i uçuş izinin dolu yerine düşüyor, kesinlik 3 karar verilebilir parçaya dayanıyor, yalnız yukarıdan görünen moloz yakalanıyor, görüntü depremden 3 gün sonrasına ait. **Açık kalan:** ikinci etiketleyici ve diğer iki alan. |
 | 26 Eylül 2026 | **J-89 (🔴) bulundu ve kapandı: eksik inen görüntü sessizce zayıf sonuç üretiyordu.** Şekil üretirken aynı alan (Nurdağı) aynı modelle arka arkaya koşuldu ve bir koşuda kapsama **%44,1 yerine %13,9**, kapalı kenar **26 yerine 6** çıktı. Sebep geçici karo indirme hatası: görüntünün bir bölümü boş geldi, hasar ve kapanma onunla birlikte düştü. **Koşu hata vermedi**, sessizce daha zayıf bir sonuç üretti — ölçümü bozan tam olarak bu, ve makaleye yanlış sayı taşınmasının en olası yolu. Sonraki iki koşuda %44,1 / 26 kenar birebir tekrarlandı, yani sapma geçiciydi. **Koruma:** `tatbikat.goruntu_eksik_mi()` — alan kataloğu her alanın uçuş izi doluluğunu ölçerek sakladığı için, koşudaki `validPixelRatio` beklenenin %70'inin altına düşerse koşu **hata verir** ("görüntü eksik indi, koşu tekrarlanmalı"). Hem koşu aracına hem uca bağlandı. **İlk sürümü YANLIŞ ALARM verdi ve düzeltildi:** referans olarak alan kataloğundaki `doluluk` alınmıştı, ama o **tarama zoom'unda** (z16) ölçülüyor, analiz ise z18'de koşuyor ve oran farklı çıkıyor — Defne'de z16 %56, z18'de kararlı %43; sağlam bir koşu reddedildi. Katalog artık analiz zoom'undaki oranı da ölçüp saklıyor (`gecerliPikselOraniZ18`) ve kontrol onu referans alıyor; alan için o ölçüm yoksa kontrol atlanır — yanlış alarm, kaçırılan uyarıdan kötüdür. Üç alanın üçü de yeniden koştu, yanlış alarm yok. |
 | 26 Eylül 2026 | **Başarım çalışması tamamlandı (ölçüldü, üç deneme birden bırakıldı).** Taban: toplam **15,0 sn**, model çıkarımı **9,12 sn (%61)**, lojistik 1,63, kıyas kolları 0,49, rota 0,38, graf 0,32 (20 çekirdek CPU, 6 iş parçacığı, GPU yok). Soğuk koşu 35 sn. **Denenip bırakılanlar:** (1) *Parçaları toplu koşturmak* — çıktı birebir aynı (maske özdeş, ham olasılıkta fark 6·10⁻⁶) ama **%18 yavaş** (8,49→10,02 sn); varsayılan 1'de bırakıldı, knob `QM_CIKARIM_YIGINI` duruyor (GPU'da tersi beklenir). (2) *İş parçacığı sayısı 2–20 tarandı* — 6 en hızlı (9,87 sn), 8'de 14,0'a çıkıyor; mevcut sınır zaten doğruymuş (J-66 teyit edildi). (3) *Parça örtüşmesini azaltmak* (adım 256→384) — süre **%40 düşüyor** ama maske değişiyor (taban maskeyle IoU 0,84 / 0,87); **doğruluk bedeli kabul edilmedi**, knob `QM_CIKARIM_ADIMI` duruyor. **Sonuç: çıkarım bu kurulumda pratik optimumunda; kalan tek kaldıraç model seçimi.** Üç model ölçüldü: MiT-B0 3,7 M / IoU 0,382 / **1,91 sn**, MiT-B2 24,7 M / 0,409 / **4,71 sn**, U-Net MiT-B4 64,1 M / 0,433 / **10,50 sn**. **Makaleye değer bulgu:** 5,5 kat süre yalnız +0,051 IoU veriyor ve operasyonel kazancı tek yönlü artırmıyor — orta boy model İslahiye'de %40,9, en büyük model %9,9. Saniye başına operasyonel değer en yüksek olan **orta boy** modeldir. |
-| 26 Eylül 2026 | **Makale şekilleri üretildi (Word'e dokunulmadan).** `QuakeMindBackend/benchmark/makale_sekilleri/`: kıyas kolları, duyarlılık (eski 20 dk sabitinin etkisi gölgeli), model seçimi (süre/IoU/kazanç), süre dağılımı; ayrıca üç alanın tatbikat haritası (drone görüntüsü + hasar + kapalı yol + güzergâh + giriş ağızları, **göstergeli**, künyesinde kapsama ve kare dışında kalan giriş sayısı yazılı) ve öncesi/sonrası/etiketli üçlüsü. Üreticiler `araclar_makale_sekilleri.py` ve `araclar_makale_haritalari.py`; bütün sayılar `SIMULASYON_OLCUM_KAYDI.md`den gelir, şekilde hiçbir şey uydurulmaz. |
+| 26 Eylül 2026 | **Makale şekilleri üretildi (Word'e dokunulmadan).** `backend/benchmark/makale_sekilleri/`: kıyas kolları, duyarlılık (eski 20 dk sabitinin etkisi gölgeli), model seçimi (süre/IoU/kazanç), süre dağılımı; ayrıca üç alanın tatbikat haritası (drone görüntüsü + hasar + kapalı yol + güzergâh + giriş ağızları, **göstergeli**, künyesinde kapsama ve kare dışında kalan giriş sayısı yazılı) ve öncesi/sonrası/etiketli üçlüsü. Üreticiler `araclar_makale_sekilleri.py` ve `araclar_makale_haritalari.py`; bütün sayılar `SIMULASYON_OLCUM_KAYDI.md`den gelir, şekilde hiçbir şey uydurulmaz. |
 | 26 Eylül 2026 | **J-90 (🔴) bulundu ve kapandı: tatbikat zemin görüntüsü hiç gelmiyordu — karo adresi çiftleniyordu.** Konsolda tatbikat koşuldu, bütün katmanlar geldi ama zemin **bomboş siyahtı** ve tarayıcı 180 karo isteğinin hepsine 404 alıyordu. Sebep: `uclar/simulasyon.py` alan yükleyicisi `oamTmsUrl` kurarken `a["tmsUrl"] + "/{z}/{x}/{y}.png"` yapıyordu, oysa katalogdaki adres **zaten** `{z}/{x}/{y}` ile bitiyor → `.../{z}/{x}/{y}/{z}/{x}/{y}.png`. Vekil yer tutucuların hepsini doldurunca OAM 404 döndürüyordu. **J-75'te aynı hata bir kez düzeltilmişti**, yeni yazdığım alan yükleyicisinde geri gelmiş — aynı tuzağa iki kez düştük, bu yüzden düzeltme koşullu yapıldı (`"{z}" in tmsUrl` ise olduğu gibi kullan). Doğrulandı: karo 16/39455/25468 ve 17/78910/50937 → **200**, konsolda Nurdağı tatbikatında drone ortofotosu zeminde görünüyor. **Teşhis sorunu da kapatıldı (aynı gün):** uç "kapsama dışı karo" ile "yanlış adres"i aynı 404'te birleştirdiği için hata sessiz kalıyordu. `uclar/goruntu.py` artık adres şablonunda `{z}`/`{x}`/`{y}` **birden çok kez** geçiyorsa isteği **422** ile ne yapılacağını söyleyen bir mesajla reddediyor; kapsama dışı karo ise "Karo yok (kapsama dışı)" diye 404 dönmeye devam ediyor (harita onu boş bırakır, doğru davranış). Üç durum da doğrulandı: sağlam adres + kapsam içi karo → **200** (24.990 bayt), sağlam adres + kapsam dışı karo → **404**, çiftlenmiş adres → **422**. Bu kontrol olsaydı J-90 ilk istekte yakalanırdı. |
 | 26 Eylül 2026 | **J-91 (🟠) bulundu ve kapandı: backend yeniden başlayınca konsol ölü tatbikatla asılı kalıyordu.** Koşu kimliği sekmenin sessionStorage'ında tutuluyor (J-74, bilerek — sayfa yenilemeyi aşsın diye). Ama backend yeniden başladığında iş kaydı bellekte olduğu için kayboluyor; uç `404 "Bilinmeyen ya da süresi dolmuş iş kimliği"` dönüyor, konsol ise bunu sıradan bir hata sayıp **"%0 · sonuç bekleniyor" diye sonsuza kadar asılı kalıyordu** — tatbikat şeridi de üstte duruyor, kullanıcı ne başlatabiliyor ne de anlıyor. Üç kez üst üste görüldü (sunucu her yeniden başlatıldığında). `useSimSonuc` artık 404'ü **tekrar denemiyor** ve tatbikat modunu temizliyor; kullanıcı doğrudan "Tatbikatı başlat"a dönüyor. Doğrulandı: sunucu yeniden başlatıldı, sayfa açıldı, ölü koşu kendiliğinden temizlendi ve yeni tatbikat sorunsuz koştu (4/4 katman, 26 kapalı kenar, drone görüntüsü zeminde). |
 | 27 Eylül 2026 | **J-92 (🟠) bulundu ve kapandı: kapsama dışı karolar konsolu boğuyordu, gerçek hata görünmüyordu.** Tatbikat görüntü katmanı tek koşuda **342 karo isteği** yapıyor, çoğu drone uçuş izinin dışına düştüğü için 404 dönüyor ve deck.gl her birini yığın izli bir hata olarak konsola basıyordu. Sonuç: gerçek hata bu gürültünün içinde görünmez oluyordu — **J-90 tam da böyle gözden kaçtı**. İki düzeltme: **(1)** Katman artık kendi `getTileData`'sını kullanıyor; kapsama dışı karo (404) sessizce `null` döner, başka her durum gerçek hata olarak yükselir. Doğrulandı: sahte yığın izleri gitti, yerine gerçek bir aksama göründü ("Karo alınamadı: HTTP 502", OAM'de geçici). **(2)** Katmana sahnenin kutusu `extent` olarak verildi; dışında karo **hiç istenmiyor**. İstek sayısı **342 → 92** (%73 az), çoğu 200. Kalan 404'ler kutunun köşeleri: uçuş izi dikdörtgen değil, bunun için sahne çokgeni gerekir (yapılmadı). |
@@ -4750,7 +5332,7 @@ hasar %0,58 (geçerli alanda %1,49) · açık yol 333 / **kapalı 30** · önces
 | 27 Eylül 2026 | **J-115 (🟡) bulundu, AÇIK: kamera eşiği kodda 0,20 ama fiilen 0,25.** `uclar/kamera.py:83,107` model çağrısına `conf` vermiyor; ultralytics varsayılanı 0,25 önce uygulanıyor, `>= 0.20` filtresi hiç devreye girmiyor. Makale Tablo 7 fiilî değerle düzeltildi. |
 | 27 Eylül 2026 | **J-116 (🔴) J-111'e ek bulgular (AÇIK).** (1) Tatbikat metin ölçümünde 18 çıktının **12'sine anahtar sözcük karar vermiş**; Acil Yardım'a kayan 8 metnin 5'i kurtarmadan (2'si "araç" içindeki "aç"), 3'ü Su/Elektrik/Isınma → Acil Yardım eşlemesinden. (2) Anahtar sözcük kurtarması dört kategoriyi kapsıyor, beşi değil; sağlık listesinde "kan", "insülin" yok, enkazda "mahsur" yok. (3) Etiket başına 0,50 eşiği yok; en yüksek etiket alınıyor. (4) Model "Lojistik" dediğinde dal hep aciliyet 2'ye düşüyor (ulaşım sözcüğü kurtarmada önce yakalanıyor); aciliyet 3 yalnız anahtar sözcükle geliyor. (5) "Alakasız" kayıt `None` dönüp zincirden düşüyor (Tablo 9'daki aciliyet 1 yazılı değil). (6) `text.lower()` Türkçeye duyarlı değil: "I" → "i" (`classification.py:159`). (7) Zemberek çağrısı kaldırılmış ama arayüz metinleri hâlâ "Zeyrek" diyor. Makale §3.6, §4.5, §5.3(c) koda göre yeniden yazıldı. |
 | 27 Eylül 2026 | **J-117 (🟠) bulundu, AÇIK: tatbikat sonuçlarının ham dosyası ve birleştiricisi depoda yok.** `araclar_tatbikat_kos.py` yalnız ilk tohumu `kollar` alanına yazıyor, 5 tohumun ortalama ± s.s.'sini üreten betik yok; §8.2'deki "Keşif" sütununun hangi kola ait olduğu kayıtlı değil. Ayrıca `araclar_tatbikat_kos.py:142` `elenen = []` satırı değeri eziyor, `elenenAfetzede` hep 0. Kıyas ortalamaları 0,1 dk'ya yuvarlanıyor (`tatbikat.py:586`); İslahiye gibi küçük farklarda kazanç ±5 puan belirsiz. Bu makinede tatbikat belgelenen kurulumla koşmuyor (eski `roads.gpkg`, P2 ağırlıkları yok; yerel çizge boş dönünce kod sessizce Overpass'a ve düz 15/30 km/sa'ya düşüyor). |
-| 27 Eylül 2026 | **J-118 (🟡) bulundu, AÇIK: yan bulgular.** (1) `benchmark/data/model_masks_unet_mitb4/*/meta.json` modeli "dispath…dice30 / Segformer mit_b4" diye etiketliyor ama SHA-256 `unet_mitb4_p2_t42`'ninki. (2) `tile_quality_score` tanımlı ama hiçbir yerden çağrılmıyor. (3) `zoom_for_radius` analiz yolunda artık kullanılmıyor (`zoom_for_gsd`, z18). (4) Makale Tablo 12'deki yerel sürümler (Python 3.12.6, PyTorch 2.13.0, Ultralytics 8.4.116 …) ne `QuakeMindBackend/venv` (3.12.10 / 2.11.0 / 8.4.57) ne ölçüm kaydı (PyTorch 2.10) ile tutuyor; ölçümün yapıldığı i7-12700H makinesinde `pip freeze` ile doğrulanmalı. (5) `araclar_makale_haritalari.py` künye satırını sarmalamıyor, taşan kısım kesiliyor (makaleye kırpılmış sürüm kondu). |
+| 27 Eylül 2026 | **J-118 (🟡) bulundu, AÇIK: yan bulgular.** (1) `benchmark/data/model_masks_unet_mitb4/*/meta.json` modeli "dispath…dice30 / Segformer mit_b4" diye etiketliyor ama SHA-256 `unet_mitb4_p2_t42`'ninki. (2) `tile_quality_score` tanımlı ama hiçbir yerden çağrılmıyor. (3) `zoom_for_radius` analiz yolunda artık kullanılmıyor (`zoom_for_gsd`, z18). (4) Makale Tablo 12'deki yerel sürümler (Python 3.12.6, PyTorch 2.13.0, Ultralytics 8.4.116 …) ne `backend/venv` (3.12.10 / 2.11.0 / 8.4.57) ne ölçüm kaydı (PyTorch 2.10) ile tutuyor; ölçümün yapıldığı i7-12700H makinesinde `pip freeze` ile doğrulanmalı. (5) `araclar_makale_haritalari.py` künye satırını sarmalamıyor, taşan kısım kesiliyor (makaleye kırpılmış sürüm kondu). |
 | 27 Eylül 2026 | **J-119 (🔴) bulundu, AÇIK (güvenlik, CLAUDE.md kural 5): eski `/api/auth/register` hâlâ bağlı ve istemciden `role` alıyor** (`uclar/eski_kimlik.py:40`, `cekirdek.py:1227`); `POST /api/team/claim` (HTTP 409 kilidi) yetki bağımlılığı olmadan çalışıyor (`uclar/ekip.py:41-60`). Rol şeması üç değil dört rollü (afetzede, saha, koordinatör, yönetici; `kimlik.py:33`) — makale düzeltildi. |
 | 27 Eylül 2026 | **J-120 (🔴) bulundu ve KAPANDI: risk karşılaştırmasındaki "yalnız sismisite yoğunluğu" naif tabanı (R0b) sabit bir öznitelikle koşulmuştu.** `naive_baselines.py` `event_count_7d` kullanıyordu; bu `rolling(window=7).count()` olduğundan 13 609 kaydın hepsinde 7 — taban tanım gereği ROC-AUC 0,5000 veriyordu ve makale bunu "sismisite yoğunluğu bilgisiz" diye yorumluyordu. Makalenin tanımladığı öznitelik (`rolling_mean_7d`, son 7 olayın ortalama büyüklüğü) ile aynı 5 katlı ileri yürüyen bölmede yeniden ölçüldü (`model_benchmarks/05_risk_skoru/local_run/naive_r0b_duzeltme.py`, katalog 2 Ağustos 2026'ya süzülerek n = 13 609; düzenek R0a'yı Tablo 21'deki değerlerle birebir üretti). **Sonuç: ROC-AUC 0,6143 ± 0,0520, PR-AUC 0,4021, MCC 0,1616** — MCC'de bütün öğrenilmiş modelleri, ROC/PR-AUC'de üretimdeki CatBoost'u geçiyor. Makale §3.7, §4.11 (5. gözlem), Tablo 21, Tablo 22 ve §6 güncellendi. Ayrıca `_7d` öznitelikleri 7 günlük değil 7 olaylık; Şekil 20 etiketleri düzeltilip yeniden üretildi (`shap_figure.py --son-tarih 2026-08-02T23:59:59`, öznitelik önemi eskisiyle birebir). Tablo 21'deki kalın işaretler yanlış hücrelerdeydi (PR-AUC, F₁, Brier); ölçülen en iyi değerlere göre düzeltildi. |
 | 27 Eylül 2026 | **J-121 (🟠) bulundu ve KAPANDI: kaynakçada dört hatalı DOI.** doi.org + Crossref ile 53 DOI tek tek sınandı: [9] xBD'nin DOI'si (10.1109/CVPRW.2019.00332) bambaşka bir makaleyi (melanom doku bölütlemesi) gösteriyordu → CVF açık erişim sayfasıyla değiştirildi (s. 10–17 doğrulandı); [10] 10.1109/TGRS.2024.3437470 yok → doğrusu 10.1109/TGRS.2024.3438290 (başlık, cilt, sayfa tutuyor); [48] ve [55] doi.org'da kayıtsız 10.5555 (ACM) DOI'leri → CatBoost arXiv DOI'si, LightGBM NeurIPS bildiri adresi. Erişimi bugün doğrulanan 13 URL'nin erişim tarihi 27.09.2026 yapıldı. |
@@ -4789,3 +5371,15 @@ hasar %0,58 (geçerli alanda %1,49) · açık yol 333 / **kapalı 30** · önces
 | 11 Ekim 2026 | **J-138 (🟠) bulundu, AÇIK: makale §4'teki TE23D sızıntı sayısı (99/118) kaynaksız ve kendi ölçümümüzle çelişiyor.** Kullanıcı TE23D incelemesini sorunca denetlendi. Makale *"sınama karolarının 99/118'inin eğitimde coğrafi komşusu vardır"* diyor; bizim kendi ölçümümüz (`Furkan--Utku--Model_ve_veriseti_aktarımı/AKTARIM_BELGESI.md` §Ç-03) **112/118** veriyor ve ölçütü farklı tanımlıyor: *"en az bir eğitim karosuyla aynı 1024'lük üst karodan geliyor"* (TE23D dosya adı deseni `sahne_satır_sütun_altkaro`'dan çıkarıldı). **99 sayısının kaynağı hiçbir yerde yok:** aktarım belgesi, `RAPOR_BILGILERI.md`, `araclar_makale_yazin_konumu.py` ve depodaki betiklerde geçmiyor. `makale/arsiv/` içindeki **bütün** docx sürümlerinde (pre-revize18'e kadar, 29 Eylül) 99 yazıyor → revize18/19/20'den önce girmiş. **Mantıksal tutarsızlık:** "coğrafi komşu" ölçütü "aynı üst karo"dan daha geniştir, o hâlde sayı 112'den **büyük** çıkmalı, küçük değil. **Neden önemli:** bu, başka bir grubun yayımlanmış kümesine yönelik nicel bir metodoloji eleştirisi; yanlışsa hem hatalı hem de TE23D yazarlarına haksızlık. **Yeniden ölçülemiyor:** TE23D verisi yerelde yok, yalnız `Makale - Kaynaklar/TE23D_…pdf` (3,3 MB) var; karo listesi Google Drive klasöründen yeniden alınmalı. **ÇÖZÜM YOLU BULUNDU (11 Ekim 2026):** sayıya hiç gerek yok — iddia TE23D makalesinin **kendi yöntem cümleleriyle** kurulabilir ve okuyucu doğrulayabilir: *"We divided 15 GeoTIFF images into 1024 × 1024 px patches"* (§III-B) · *"the images were divided into smaller, more manageable 256 × 256 pixel patches"* (§III-C) · *"The dataset was split into three sets: train, validation, and test, with a ratio of 80:10:10, as shown in Table III"*. Her 1024'lük yama en çok 16 komşu 256'lık karo veriyor; bölme 1 183 karo üzerinden oran bazlı yapılmış ve **kardeş karoları birlikte tutan bir kısıt belirtilmemiş** → komşu karoların eğitim ile sınama arasına dağılması yöntemin doğal sonucu. **Öneri:** "99/118" kaldırılsın, yerine bu argüman konsun (sayısız, alıntıyla desteklenen, site kapanmasından etkilenmeyen). **Neden sayı kurtarılamıyor:** 112/118 ölçümü Drive'daki dosya adı listesinden türetilmişti; kullanıcı sayfaya ~Eylül 2026'da erişebildiğini söylüyor ama site artık kapalı → liste yeniden alınamaz, 99 ile 112 arasındaki fark yerelden çözülemez. CLAUDE.md §8 gereği ölçülemeyen sayı iddia edilmez. **Makaleye dokunulmadı**, karar kullanıcıda. İlgili: Ç-03'ün 5. dersi (blok bootstrap güven aralığı) de makaleye girmemiş — yerine üç tohumun ortalama ± SS'si var, o mekânsal değil tohum belirsizliğini ölçer; bilinçli tercih olabilir ama kayıtlı değil. |
 | 11 Ekim 2026 | **J-139 (🟠) bulundu ve kapandı: TE23D lisans kaydımız iki kaynağı karıştırmıştı; yazarlara gidecek e-posta taslağı yanlış bir iddia taşıyordu.** Kullanıcı *"makalede '© 2025 TE23D all rights reserved' nerede geçiyor"* diye sorunca denetlendi. **Ölçüm:** TE23D PDF'inin 12 sayfasının tam metni çıkarıldı (`pymupdf`); **"rights reserved" ifadesi makalede hiç geçmiyor.** Makaledeki tek lisans ifadesi 1. sayfa dipnotu: *"© 2025 The Authors. This work is licensed under a Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 License"* → bu IEEE'nin **makale** lisansı (JSTARS açık erişim dipnotu), **veri kümesinin lisansı değil.** Veri kümesi için makalede tek cümle var: *"The dataset can be reached at https://isl.ce.yildiz.edu.tr/datasets/te23d."* — kullanım koşulu, lisans ya da "upon request" kaydı yok. **Hatalı kayıtlar düzeltildi:** (a) `AKTARIM_BELGESI.md` §Ç-03'teki *"Lisans: belirsiz — sayfada hem CC BY-NC-ND 4.0 hem 'tüm hakları saklıdır' yazıyor"* satırı — CC BY-NC-ND **makaleden**, "all rights reserved" **veri sayfasından**; tek sayfadaki çelişki değil. (b) `makale/lisans_epostalari_taslak.md` §1: gerekçesi *"Makalede TE23D 'CC BY-NC-ND' olarak anılıyor"* diyordu — **bizim makalemiz TE23D'nin lisansını hiç belirtmiyor** (denetlendi: docx'teki bütün lisans ifadeleri kendi veri kaynaklarımıza ait), ve e-posta gövdesi yazarlara *"the distribution page states a CC BY-NC-ND license, while another part of the same page states 'all rights reserved'"* diyordu — **gönderilse yazarlara kendi sayfaları hakkında doğru olmayan bir şey söylenecekti.** Gövde yeniden yazıldı: lisans sorusu doğru kurgulandı, erişim sorusu ve karo koordinatları talebi eklendi. **Doğru durum:** veri kümesinin açık lisansı yok, sayfa tüm hakları saklı tutuyor → "ana eğitime katılmaz" kararı (Ç-03) bu bilgiyle daha da güçlü. **Doğrulanamayan:** veri sayfasının tam metni — site 11 Ekim 2026'da erişilemiyor (80 zaman aşımı, 443 bağlantı reddi, DNS 95.183.138.64), Wayback'te `/datasets/te23d` için **hiç** anlık görüntü yok (yalnız 2010–2018 eski site kayıtları), arama da sayfayı indekslememiş. "All rights reserved" ifadesi **kullanıcının birinci elden gözlemine** dayanıyor: sayfaya ~Eylül 2026'da erişmiş ve alt bilgide bu ifadeyi görmüş; site o tarihten sonra kapanmış. Kayıtlarda tarihli birinci el gözlem olarak etiketlendi — bağımsız doğrulama artık mümkün değil (arşiv kaydı yok). **Makalemize etkisi yok** — makale TE23D'yi yalnız yazın kıyası olarak anıyor, verisini kullanmıyor ve lisansı hakkında bir şey söylemiyor. |
 | 11 Ekim 2026 | **J-140 (🟢) TE23D lisansı yazarlardan teyit edildi; "eğitime katılmaz" kararının gerekçesi ortadan kalktı.** Can Ekkazan (TE23D birinci yazarı) ilk e-postamıza ayrıntılı yanıt verdi. **İki bileşen, iki koşul:** uydu görüntüleri **Planet Labs PBC** telifli, Planet'in yazılı izniyle ve yalnız ticari olmayan bilimsel araştırma için paylaşılıyor; **etiketler CC BY-NC-ND 4.0**, TE23D yazarlarınca lisanslı. **İzin verilenler (açık yazılı):** ticari olmayan akademik çalışmada model **eğitimi, doğrulama ve test**; görüntüleri yeniden boyutlandırma; **kendi bölmemize göre yeniden ayırma**; sonuçları (metrik, kıyas, örnek çıktı) akademik yayında paylaşma. **Yasaklar:** veri kümesi/görüntüler/türevleri **yeniden dağıtılamaz**; Planet görüntülerini yeniden üretmeye yönelik modellerde (süper çözünürlük, görüntü üretimi) kullanılamaz — **bölütleme bu kapsamda değil**; ve **TE23D ile eğitilmiş ağırlıklar kamuya açık paylaşılacaksa Planet'ten yazılı onay şart.** **Bu son madde bizi doğrudan bağlıyor:** bölütleme ağırlıklarımız `huggingface.co/Utbird/dispath_optimized_mitb4_focal_dice30` adresinde **açık** yayımlanıyor. Çıkış yolu: TE23D yalnız **dış sınama** olarak kullanılırsa (mevcut KATE ağırlıklarıyla çıkarım) TE23D ile eğitilmiş ağırlık doğmaz ve Planet onayı gerekmez; protokol reprodüksiyonu yapılırsa yalnız metrik yayımlanır, o ağırlıklar paylaşılmaz. Teyit için cevaba yazıldı. **Sahne konum kodları alındı** (dosya adının ilk üç hanesi) — Ç-03'teki *"konum yok"* engeli kalktı: 001–002 Adıyaman-Merkez · 003 Gaziantep-İslahiye · 004 Gaziantep-Nurdağı · 005 Hatay-İskenderun · 006–008 Hatay-Antakya · 010 Hatay-Payas · 011 Hatay-Dörtyol · 013 Hatay-İskenderun · 014–015 Kahramanmaraş-Merkez. **Örtüşme uyarısı:** 003, 004 ve 006–008 bizim üç değerlendirme sahnemizle (İslahiye, Nurdağı, Antakya/Defne) örtüşüyor; KATE-PD/CD de aynı yedi ili kapsadığından TE23D **temiz bir "görülmemiş bölge" sınaması olmaz** — ayak izi paylaşılmazsa en iyi hâlde ilçe düzeyinde ayıklanabilir ve sonuç "aynı bölge, farklı etiketleyici ve sensör" çapraz-küme sınaması olarak raporlanmalıdır. **Eksik:** gönderilen tabloda 13 kod var, makale 15 GeoTIFF diyor → **009 ve 012 sorulacak**. **Can'ın bize sorduğu düzeltme:** *"© 2025 TE23D, All rights reserved" makalede nerede?* → J-139'un sonucu: **makalede değil**, veri sayfasının alt bilgisindeydi; ilk e-postamız iki kaynağı karıştırmıştı. Cevabın ilk maddesi bu oldu, yoksa yazar makalesinde olmayan bir şeyi düzeltmeye çalışacaktı. Cevap taslağı: `makale/lisans_epostalari_taslak.md` §1. **J-138 ile bağ:** cevapta bölme yönteminin (256'lık karo düzeyinde mi, yamaya/sahneye göre gruplanmış mı) doğrudan sorulması J-138'i birincil kaynakla kapatabilir — kendi çıkarımımız yerine yazarın tarifi yazılır. |
+| 12 Kasım 2026 | **PR #5 (Deha, Android uygulaması) incelendi ve çalıştırıldı; J-141…J-148 eklendi.** PR dalı ayrı çalışma ağacında derlendi (`:app:assembleDebug` temiz), backend ayrı SQLite ile ayağa kaldırıldı, uygulama Android 36 emülatöründe gerçek uçlara karşı denendi; `test_mobile_*.py` 12/12. **En ağırı J-141 (🔴):** sunucu yokken eşitleme worker'ı ~150 bağlantı/sn ve %112 CPU ile sonsuz döngüde (80 sn'de ~12 000 bağlantı). J-142 (form alanları sunucuya gitmiyor), J-143 (ihbar formunda GPS yok, harf klavyesi), J-144 (risk etkenleri atılıyor, ekran yanlış bilgi veriyor), J-145 (misafir ucu sınırsız → kişi başı sınır aşılıyor) 🟠; J-146 karar bekliyor (birleştirme sırası, `backend/` yeniden adlandırma, mobil kapsamı); J-147/J-148 küçükler. Bulgular PR'a genel yorum ve satır yorumları olarak yazıldı; düzeltme PR sahibinde. |
+| 12 Kasım 2026 | Utku (`07e3bfb`, PR #4) ve Deha (PR #5) değişiklikleri teslim hazırlığı için tarandı. **J-149** (yeni): üründeki risk modeli GEM fay mesafesiyle yeniden eğitildi, makaledeki risk tablosu bu koşuyla uyuşmuyor. |
+| 12 Kasım 2026 | Teslim hazırlığı: proje `teslim-toparlama` dalında (main + `07e3bfb`) ayağa kaldırıldı. API, konsol, giriş, risk (81 il) ve tatbikat uçtan uca denendi. **J-150** ve **J-154** kapatıldı (tatbikat paneli null çökmesi; kıyas kollarının dakikaya yuvarlanması). Yeni: **J-151** (il merkezleri yerel üretim, 4 dk), **J-152** (risk uçlarında yetki yok), **J-153** (deprem kataloğu 3 ay bayattı; elle tazelendi, model yeniden eğitildi). |
+| 12 Kasım 2026 | **J-155** (yeni): saha ekibi ekranına girilemiyordu. Saha test hesabı açıldı, ekibe bağlandı, `DEMO_CALISTIRMA.md`'ye yazıldı; rol verme ekranı eksik. |
+| 12 Kasım 2026 | **J-155**: konsola Kullanıcılar (rol yönetimi) modu eklendi. Koordinatör afetzede ↔ saha, yönetici her rol; kimse kendi rolünü değiştiremez. `tests/test_oturum_rol.py` 7/7 geçti. |
+| 12 Kasım 2026 | **J-156**: giriş üç kapıya ayrıldı (kapı rol vermez, sunucu denetler). Ekip ve koordinasyon hesaplarını konsoldan koordinasyon açıyor; tek seferlik şifre ve şifre yenileme eklendi. Testler 12/12. |
+| 13 Kasım 2026 | **J-157**: Hesaplar tam sayfa oldu (tablo, düzenle-kaydet çekmecesi, kayıt defteri). Askıya alma, ilk girişte zorunlu şifre değiştirme (sunucuda 403) ve hesap işlemleri kayıt defteri eklendi. İstemcide hesap uçlarında jeton yenilemesi düzeldi. Testler 16/16. |
+| 13 Kasım 2026 | Belgeler SQLite gerçeğine göre düzeltildi (CLAUDE.md, MIMARI.md, PROJE_DOSYASI.md: bugün SQLite, PostGIS hedef). **J-158**: SQLite yük ölçümü; ham yazma ~4 000/sn ama karışık yükte yazma p95 1–2,8 sn (tek bağlantı + olay başına tam liste). **J-159** kapatıldı: SOS ve ihbar kimlikleri 32 bitten 64 bite. |
+| 13 Kasım 2026 | **J-158** iyileştirildi: okuma bağlantıları, `/api/ozet` SQL'de sayıyor (100 bin üstünde eksik sayma hatası da kapandı), kapsayıcı indeksler (afetzedenin kendi çağrıları 1 milyon satırda 10 sn → < 1 ms), konsolda 1 sn tazeleme birleştirme. Afet senaryosu (50 SOS/sn, 5 konsol, 100 bin satır): yazma p95 723 → 0,8 ms, güncellik p95 6,1 → 1,07 sn, kaybolan mesaj 103 → 0. Artımlı tazeleme açık. |
+| 13 Kasım 2026 | **J-160** (kullanıcı bildirdi, kapatıldı): hasar analizi Defne/Elektrik drone görüntüsünde 0 kapalı yol buluyordu. Alan görüntüye taşınmıyordu ve sunucu sessizce z17'ye iniyordu. Görüntü seçimi alanı taşıyor, düşük kapsamada başlatma kapalı, sunucu açıklamalı hatayla duruyor. Aynı görüntüde z18'de 8 kapalı yol. |
+| 13 Kasım 2026 | **J-161** (kullanıcı istedi, kapatıldı): hasar analizi ekranı yeniden düzenlendi. Görüntü → alan → başlat adımları, aşamalı ilerleme ve büyük sayılı sonuç. Panel genişlik sıçraması giderildi. Yanıltıcı 2,5 / 4 km hazır ayarları kaldırıldı (tek koşu ~1 km²). İsteğe bağlı yakın çekim (z19) eklendi; Defne'de 8 → 19 kapalı yol, doğruluk ölçülmedi. |
+| 13 Kasım 2026 | **J-152** kapatıldı: risk tahmini giriş istiyor; canlı veri tazeleme ve `refreshData` yalnız koordinasyonda. Eski web ve Flutter'ın risk ekranları 401 alır. |

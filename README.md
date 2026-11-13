@@ -7,10 +7,10 @@ Proje üç ana bileşenden oluşur:
 | Bileşen | Klasör | Teknoloji | Açıklama |
 |---|---|---|---|
 | **Web Platformu** | `quakemind-web/` | Next.js 14/15 (App Router, TypeScript) | Vatandaş ve komuta merkezi için çift portallı modern arayüz |
-| **AI Backend** | `QuakeMindBackend/` | FastAPI (Python) | NLP, risk skorlama, uydu analizi ve kamera tespiti servisleri |
-| **Mobil Uygulama** | `quakemind/` | Flutter (Dart) | Sahada/hotspot üzerinden çalışan Android istemcisi |
+| **AI Backend** | `backend/` | FastAPI (Python) | NLP, risk skorlama, uydu analizi ve kamera tespiti servisleri |
+| **Mobil Uygulama** | `mobile/` | Kotlin + Jetpack Compose | Room/WorkManager kullanan Android istemcisi |
 
-Ayrıca `QuakeMindBackend/main.py` ve `apps/` altında, backend modüllerinin tek tek Streamlit arayüzleriyle de çalıştırılabildiği bağımsız bir sürüm bulunur (geliştirme/deneme amaçlı).
+Ayrıca `backend/main.py` ve `apps/` altında, backend modüllerinin tek tek Streamlit arayüzleriyle de çalıştırılabildiği bağımsız bir sürüm bulunur (geliştirme/deneme amaçlı).
 
 ---
 
@@ -45,7 +45,7 @@ Ayrıca `QuakeMindBackend/main.py` ve `apps/` altında, backend modüllerinin te
                  ┌───────────────────────┼───────────────────────┐
                  │                                                │
      ┌───────────▼────────────┐                     ┌────────────▼────────────┐
-     │  Next.js Web Platformu │                     │  Flutter Mobil Uygulama  │
+     │  Next.js Web Platformu │                     │  Kotlin Android Uygulama │
      │  (http://localhost:3000)│                     │  (WiFi Hotspot üzerinden)│
      │  - /survivor portalı   │                     │  - Risk / Uydu / NLP     │
      │  - /command portalı    │                     │  - Kamera (yerel)        │
@@ -109,7 +109,7 @@ QuakeMind/
 │   ├── package.json
 │   └── tailwind.config.js
 │
-├── QuakeMindBackend/               # FastAPI AI backend
+├── backend/               # FastAPI AI backend
 │   ├── fastapi_app.py             # Ana API sunucusu (tüm endpoint'ler burada)
 │   ├── main.py                    # Bağımsız Streamlit giriş noktası
 │   ├── requirements.txt
@@ -119,15 +119,14 @@ QuakeMind/
 │       ├── road_damage/           # Segformer uydu segmentasyonu
 │       └── camera_detection/      # YOLO (catlak.pt, bina.pt) kamera tespiti
 │
-└── quakemind/                      # Flutter mobil uygulama
-    ├── lib/
-    │   ├── main.dart
-    │   ├── screens/home_shell.dart # Ana ekran (5 sekme)
-    │   ├── services/               # Backend API servisleri
-    │   ├── models/                 # Veri modelleri
-    │   ├── widgets/                # UI bileşenleri
-    │   └── data/mock_data.dart     # Şehir ve örnek veriler
-    └── pubspec.yaml
+└── mobile/                      # Kotlin/Jetpack Compose Android uygulaması
+    ├── app/                        # Android Activity, Compose ekranları ve ViewModel'ler
+    ├── core/network/               # FastAPI istemcisi ve servis sözleşmeleri
+    ├── core/data/                  # Repository'ler ve veri kaynakları
+    ├── core/database/              # Room yerel veri deposu
+    ├── sync/                       # WorkManager eşitleme
+    ├── gradlew.bat                  # Windows Gradle wrapper
+    └── settings.gradle.kts
 ```
 
 ---
@@ -144,12 +143,12 @@ QuakeMind/
 | **RAM** | Minimum 8 GB (16 GB önerilir) |
 | **Disk** | ~5 GB (modeller + bağımlılıklar) |
 | **GPU** | Opsiyonel (CUDA destekli — uydu/kamera modülünü hızlandırır) |
-| **Flutter** | 3.41+ (yalnızca mobil geliştirme için) |
+| **Android** | Android Studio, JDK 17+, Android SDK 37 (mobil geliştirme) |
 
 ### 1. Backend Kurulumu
 
 ```bash
-cd QuakeMindBackend
+cd backend
 python3 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
@@ -169,10 +168,20 @@ npm install
 
 ### 3. Mobil Uygulama Kurulumu (opsiyonel)
 
-```bash
-cd quakemind
-flutter pub get
+Android Studio ile `mobile/` klasörünü açın. Windows'ta debug APK oluşturmak için:
+
+```powershell
+cd mobile
+.\gradlew.bat :app:assembleDebug
 ```
+
+Emülatörde varsayılan debug backend adresi `http://10.0.2.2:8000/`'dir. Fiziksel cihazda bilgisayarın LAN/hotspot IP'sini debug derlemesine verin:
+
+```powershell
+.\gradlew.bat -PquakemindApiBaseUrl=http://192.168.137.1:8000/ :app:assembleDebug
+```
+
+Buradaki IP örnektir; bilgisayarın gerçek IP adresini kullanın. Android istemci ağ ayarları ve bağlantı sözleşmeleri `mobile/docs/` altındadır. Release derlemesi için gerçek HTTPS backend URL'si ayrıca yapılandırılmalıdır.
 
 ---
 
@@ -198,7 +207,7 @@ Durdurmak icin: Ctrl+C
 
 **Backend (FastAPI):**
 ```bash
-cd QuakeMindBackend
+cd backend
 source venv/bin/activate
 python3 fastapi_app.py
 ```
@@ -212,23 +221,19 @@ npm run dev
 ```
 - Arayüz: `http://localhost:3000`
 
-**Mobil Uygulama (Flutter):**
-```bash
-cd quakemind
-flutter run
+**Mobil Uygulama (Kotlin / Android):**
+```powershell
+cd mobile
+.\gradlew.bat :app:installDebug
 ```
-APK üretmek için:
-```bash
-flutter build apk --release
-```
-APK konumu: `quakemind/build/app/outputs/flutter-apk/app-release.apk`
+Debug APK üretmek için `:app:assembleDebug`, release APK üretmek için `:app:assembleRelease` kullanın. APK konumu: `mobile/app/build/outputs/apk/debug/app-debug.apk`. Release dağıtımı için ayrıca geçerli imzalama yapılandırması gerekir.
 
 ### Yöntem C — Bağımsız Streamlit Modülleri
 
 Backend'in her AI modülü ayrıca kendi Streamlit arayüzüyle bağımsız çalıştırılabilir:
 
 ```bash
-cd QuakeMindBackend
+cd backend
 streamlit run main.py          # Birleşik arayüz (tüm modüller sidebar'dan seçilir)
 
 # veya tek tek:
@@ -353,8 +358,8 @@ QuakeMind'in en kritik özelliği, **internet olmadan** da çalışabilmesidir:
    - Linux: `nmcli device wifi hotspot ifname <arayüz> ssid QuakeMindNet password quakemind123` → IP genelde `10.42.0.1`
    - Windows: Ayarlar > Ağ ve İnternet > Mobil Etkin Nokta → IP genelde `192.168.137.1`
 2. Telefonu bu ağa bağlayın (internet gerekmez, sadece yerel ağ üzerinden iletişim).
-3. Backend'i `python3 fastapi_app.py` ile başlatın (`0.0.0.0:8000` üzerinden tüm ağ arayüzlerinden erişilebilir).
-4. Mobil uygulamada "Sunucu Ayarı"na girip hotspot IP'sini (`10.42.0.1:8000` veya `192.168.137.1:8000`) girin ve "Bağlantıyı Test Et".
+3. Fiziksel telefon için repo kökünde `./start.sh --telefon` çalıştırın veya `QUAKEMIND_HOST=0.0.0.0` ayarıyla `fastapi_app.py` dosyasını başlatın.
+4. Android istemcisinin backend adresini bilgisayarın gerçek LAN/hotspot IP'sine (`10.42.0.1:8000` veya `192.168.137.1:8000` yaygın örneklerdir) ayarlayın.
 5. Aynı hotspot'a birden fazla telefon bağlanabilir; hepsi aynı backend'e erişir.
 
 > Yalnızca uydu görüntüsü indirme ve canlı deprem verisi güncelleme gibi işlemler internet gerektirir; NLP, risk hesaplama ve kamera tespiti tamamen yerel ağda çalışır.
@@ -376,7 +381,7 @@ Bazı büyük model dosyaları repo dışında (Hugging Face) barındırılır v
 | YOLO `bina.pt` | Bina hasarı tespiti | Repo içinde (`apps/camera_detection/models/`) | — |
 | CatBoost risk modeli | Deprem risk skorlama | Repo içinde (`apps/earthquake_risk/models/`) | — |
 
-Deprem risk modülü için tarihsel veri `QuakeMindBackend/apps/earthquake_risk/data/query.csv` içinde hazır bulunur; güncel veri "Veriyi Güncelle" ile çekilebilir (internet gerektirir).
+Deprem risk modülü için tarihsel veri `backend/apps/earthquake_risk/data/query.csv` içinde hazır bulunur; güncel veri "Veriyi Güncelle" ile çekilebilir (internet gerektirir).
 
 ---
 
@@ -391,7 +396,7 @@ Deprem risk modülü için tarihsel veri `QuakeMindBackend/apps/earthquake_risk/
 | `nlp`/`risk` modülü `false` dönüyor | `curl http://127.0.0.1:8000/api/status` ile kontrol edin; eksik bağımlılık için `pip install -r requirements.txt` |
 | Uydu analizi çok yavaş/başarısız | GPU + CUDA destekli PyTorch kurun; internet bağlantısını kontrol edin; daha küçük bir alan seçin |
 | Web arayüzü açılmıyor | `cd quakemind-web && rm -rf node_modules .next && npm install && npm run dev` |
-| Mobil uygulama crash oluyor | `cd quakemind && flutter clean && flutter pub get && flutter run` |
+| Mobil uygulama derlenmiyor | `cd mobile && .\gradlew.bat :app:assembleDebug --stacktrace` (Windows); Android SDK/JDK sürümünü doğrulayın |
 
 ---
 
@@ -413,8 +418,8 @@ Detaylar için `PROJE_YOL_HARITASI.md` ve `HANDOFF.md` dosyalarına bakın. Öne
 - `HANDOFF.md` — Proje bağlam ve devir dokümanı
 - `KULLANIM_KILAVUZU.md` — Hotspot/mobil odaklı ayrıntılı kullanım kılavuzu
 - `PROJE_YOL_HARITASI.md` — Phase 2 mimari planlama
-- `QuakeMindBackend/README.md` — Bağımsız Streamlit modülleri için İngilizce teknik doküman
-- `QuakeMindBackend/OPTIMIZASYON_ANALIZI.md` — Backend performans analizi notları
+- `backend/README.md` — Bağımsız Streamlit modülleri için İngilizce teknik doküman
+- `backend/OPTIMIZASYON_ANALIZI.md` — Backend performans analizi notları
 
 ---
 

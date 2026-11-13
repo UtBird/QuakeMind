@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate, useParams } from 'react-router-dom'
 import { CaretDown } from '@phosphor-icons/react'
 import { useOturum } from '@/kimlik/oturum'
 import { ROL_ADI } from '@/kimlik/roller'
-import { MODLAR } from '@/modlar/modlar'
+import { MODLAR, modGorunur } from '@/modlar/modlar'
 import { useZaman } from '@/durum/zamanDurumu'
 import { useCanliAkisDurumu } from '@/canli/canliAkis'
 import { useKonsol } from '@/durum/konsolDurumu'
@@ -37,7 +37,7 @@ export function UstCubuk() {
       {/* Ana modlar sekme, analiz modları tek menüde (J-56): on sekme sığmıyor,
           1366 px'te iki satıra kırılıyordu. */}
       <nav className="flex items-center gap-0.5" aria-label="Çalışma modu">
-        {MODLAR.filter((m) => m.grup === 'ana').map((m) => (
+        {MODLAR.filter((m) => m.grup === 'ana' && modGorunur(m, oturum?.rol)).map((m) => (
           <NavLink
             key={m.id}
             to={`/konsol/${m.id}`}

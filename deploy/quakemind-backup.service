@@ -1,0 +1,7 @@
+[Unit]
+Description=Consistent QuakeMind SQLite backup
+
+[Service]
+Type=oneshot
+ExecStart=%h/opt/quakemind/backup.sh
+UMask=0077

@@ -6,7 +6,7 @@
 # Kullanim: CKPT_DIR=~/Downloads LOG_DIR=/tmp/t14 ./run_table14_all.sh
 set -u
 cd "$(dirname "$0")"
-PY=${PY:-../../../QuakeMindBackend/venv/bin/python}
+PY=${PY:-../../../backend/venv/bin/python}
 D=${CKPT_DIR:-$HOME/Downloads}
 L=${LOG_DIR:-/tmp/t14_logs}; mkdir -p "$L"
 $PY table14_segformer_closure.py --prefetch > "$L/prefetch.log" 2>&1

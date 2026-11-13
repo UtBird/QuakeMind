@@ -54,7 +54,16 @@ export function apiPut<T>(yol: string, govde: unknown): Promise<T> {
   return apiGonder<T>('PUT', yol, govde)
 }
 
-async function apiGonder<T>(yontem: 'POST' | 'PUT', yol: string, govde: unknown): Promise<T> {
+export function apiPatch<T>(yol: string, govde: unknown): Promise<T> {
+  return apiGonder<T>('PATCH', yol, govde)
+}
+
+/** Jeton yenilemesi DENENMEYEN kimlik uçları (J-49). Hesap yönetimi uçları da
+    /api/oturum/ altında ama onlar sıradan korunan uçtur: 15 dakika açık kalan
+    Kullanıcılar ekranı jeton dolunca yenilenip devam etmeli (J-157). */
+const KIMLIK_UCLARI = ['/api/oturum/giris', '/api/oturum/kayit', '/api/oturum/yenile', '/api/oturum/cikis']
+
+async function apiGonder<T>(yontem: 'POST' | 'PUT' | 'PATCH', yol: string, govde: unknown): Promise<T> {
   const gonder = () =>
     fetch(yol, {
       method: yontem,
@@ -70,7 +79,7 @@ async function apiGonder<T>(yontem: 'POST' | 'PUT', yol: string, govde: unknown)
   // Kimlik uçlarında (giriş, kayıt, yenileme, çıkış) DENENMEZ: yenileme isteği
   // 401 alınca kendi kendini beklerdi ve oturumsuz açılış "Yükleniyor…"da
   // takılı kalırdı; yanlış şifreyle giriş de hiç bitmezdi (J-49).
-  if (y.status === 401 && jetonYenile && !yol.startsWith('/api/oturum/')) {
+  if (y.status === 401 && jetonYenile && !KIMLIK_UCLARI.includes(yol)) {
     await jetonYenile()
     y = await gonder()
   }
@@ -103,7 +112,17 @@ export async function apiGet<T>(
     y = await fetch(url, { credentials: 'same-origin', headers: basliklar() })
   }
 
-  if (!y.ok) throw new ApiHatasi(`${yol} → HTTP ${y.status}`, y.status)
+  if (!y.ok) {
+    // Sunucunun açıklaması varsa o gösterilir (ör. "Hesabın askıya alınmış").
+    let ayrinti = `${yol} → HTTP ${y.status}`
+    try {
+      const hata = (await y.json()) as { detail?: string }
+      if (typeof hata?.detail === 'string') ayrinti = hata.detail
+    } catch {
+      /* gövdesi JSON değilse durum kodu yeter */
+    }
+    throw new ApiHatasi(ayrinti, y.status)
+  }
   return (await y.json()) as T
 }
 

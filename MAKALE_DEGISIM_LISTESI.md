@@ -124,7 +124,7 @@ R0–R3 148, "8 bölge / 48 çift" 157, t_u / 20 dk 79, sentetik 41,
 
 ## E. Şekil altyazılarında düzeltilmesi gereken iki şey
 
-27 Eylül 2026'da `QuakeMindBackend/capture_app_screenshots.py` incelenirken bulundu.
+27 Eylül 2026'da `backend/capture_app_screenshots.py` incelenirken bulundu.
 Kod hatası değil, makale altyazısı eksiği — ama kural 1 gereği zorunlu.
 
 1. **Şekil 4 (`4_isi_haritasi_guzergah.png`) demo modunda çekilmiş.** Betik

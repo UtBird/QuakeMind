@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useKonsol } from '@/durum/konsolDurumu'
 import { useZaman } from '@/durum/zamanDurumu'
-import { MODLAR } from '@/modlar/modlar'
+import { MODLAR, modGorunur } from '@/modlar/modlar'
+import { useOturum } from '@/kimlik/oturum'
 import { Micro } from './parcalar'
 import { sn } from '@/lib/sinif'
 
@@ -12,12 +13,13 @@ export function KomutPaleti() {
   const acik = useKonsol((d) => d.komutPaletiAcik)
   const komutPaleti = useKonsol((d) => d.komutPaleti)
   const git = useNavigate()
+  const rol = useOturum().oturum?.rol
   const [arama, setArama] = useState('')
   const [secili, setSecili] = useState(0)
 
   const komutlar = useMemo(() => {
     const hepsi = [
-      ...MODLAR.map((m) => ({
+      ...MODLAR.filter((m) => modGorunur(m, rol)).map((m) => ({
         grup: 'Mod',
         etiket: m.ad,
         ipucu: m.ozet,
@@ -38,7 +40,7 @@ export function KomutPaleti() {
     ]
     const q = arama.trim().toLocaleLowerCase('tr')
     return q ? hepsi.filter((k) => k.etiket.toLocaleLowerCase('tr').includes(q)) : hepsi
-  }, [arama, git])
+  }, [arama, git, rol])
 
   useEffect(() => {
     function tus(e: KeyboardEvent) {

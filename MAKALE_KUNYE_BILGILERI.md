@@ -95,7 +95,7 @@ Tüm düzenlemeler **geçerli sürüm** üzerinde yapılmalıdır.
 
 ---
 
-## Yazılım sürümleri (arka uç `QuakeMindBackend/venv`, 16 Eylül 2026'da okundu)
+## Yazılım sürümleri (arka uç `backend/venv`, 16 Eylül 2026'da okundu)
 
 Python 3.12.6 · PyTorch 2.13.0 (yalnız CPU, CUDA yok) · Ultralytics 8.4.116 · Transformers 5.14.1 ·
 NetworkX 3.6.1 · OSMnx 2.1.1 · pyrosm 0.13.1 · FastAPI 0.141.1 · uvicorn 0.52.1 ·

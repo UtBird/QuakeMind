@@ -1,0 +1,8 @@
+# Copy to a private, ignored tunnel.yml on the server and set its tunnel ID.
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /etc/cloudflared/credentials.json
+metrics: 127.0.0.1:20242
+ingress:
+  - hostname: quakemind-api.dehaozcan.online
+    service: http://127.0.0.1:8086
+  - service: http_status:404

@@ -1,0 +1,4 @@
+interface:
+  display_name: "QuakeMind Backend Deploy"
+  short_description: "SSH checks, backend tests, and approved deployment"
+  default_prompt: "Use $quakemind-backend-deploy to check SSH access, test the backend, and prepare a deployment for my approval."

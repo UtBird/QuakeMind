@@ -12,11 +12,11 @@ import { MetinSag } from '@/modlar/metin'
 import { RiskSag } from '@/modlar/risk'
 import { YolSag } from '@/modlar/yol'
 import { SimulasyonSag } from '@/modlar/simulasyon'
-import type { ModId } from '@/modlar/modlar'
+import type { PanelModu } from '@/modlar/modlar'
 import { useAralik } from '@/durum/zamanDurumu'
 import { tarih } from '@/lib/bicim'
 
-const MOD_PANELI: Record<ModId, () => React.JSX.Element> = {
+const MOD_PANELI: Record<PanelModu, () => React.JSX.Element> = {
   genel: GenelSag,
   sos: SosSag,
   ekipler: EkiplerSag,
@@ -30,7 +30,7 @@ const MOD_PANELI: Record<ModId, () => React.JSX.Element> = {
   simulasyon: SimulasyonSag,
 }
 
-export function SagPanel({ mod }: { mod: ModId }) {
+export function SagPanel({ mod }: { mod: PanelModu }) {
   const ModPaneli = MOD_PANELI[mod]
   const [t0, t1] = useAralik()
 

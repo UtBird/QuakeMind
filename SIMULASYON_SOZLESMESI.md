@@ -5,7 +5,7 @@ Bu belge **konsol arayüzü ile backend arasındaki sınırı** sabitler. İki i
 | Taraf | Kim | Nerede |
 |---|---|---|
 | Konsol arayüzü (yeni, sıfırdan) | "Konsol arayüzü iskeletini kur" oturumu | `konsol/` |
-| Backend: kuyruk, çıkarım işçisi, simülasyon uçları | bu oturum | `QuakeMindBackend/` |
+| Backend: kuyruk, çıkarım işçisi, simülasyon uçları | bu oturum | `backend/` |
 
 Kural: **arayüz modele değil bu sözleşmeye bağlanır** (CLAUDE.md md.2). Uçlar hazır olmadan
 arayüz yazılabilir; alanlar bu belgede sabittir, değişirse burası önce güncellenir.

@@ -1,4 +1,5 @@
 import type { KatmanId } from '@/durum/konsolDurumu'
+import type { Rol } from '@/kimlik/roller'
 
 /* ---------------------------------------------------------------------------
    Sayfa yok, MOD var (MIMARI §7 · ARAYUZ §8).
@@ -44,6 +45,18 @@ export const MODLAR = [
     ad: 'Acil bildirim',
     ozet: 'Afetzede ekranlarına acil durum bildirimi yayınla, yanlış olanı geri çek.',
     katmanlar: ['yollar', 'isi', 'ekipler'],
+  },
+  {
+    id: 'kullanicilar',
+    grup: 'ana',
+    ad: 'Kullanıcılar',
+    ozet: 'Bütün hesaplar: ekip hesabı aç, rol ve ekip ata, askıya al, işlem geçmişi.',
+    katmanlar: ['ekipler'],
+    // Listeyi sunucu yalnız bu rollere verir; sekme de yalnız onlara görünür.
+    roller: ['koordinator', 'yonetici'],
+    // Tablo ve düzenleme çekmecesi haritaya sığmaz: harita kurulu kalır,
+    // üstünü tam sayfa kaplar (J-157).
+    sayfa: true,
   },
   {
     id: 'hasar',
@@ -93,9 +106,29 @@ export const MODLAR = [
   ad: string
   ozet: string
   katmanlar: readonly KatmanId[]
+  /** Yalnız bu rollere görünür (yoksa bütün konsol rollerine). Görünüm
+      kilididir; yetkiyi sunucu denetler (CLAUDE.md kural 5). */
+  roller?: readonly Rol[]
+  /** Sol/sağ panel yerine haritanın üstünü kaplayan tam sayfa. Harita yeniden
+      kurulmaz (CLAUDE.md §6), yalnız örtülür. */
+  sayfa?: true
 }>
 
 export type ModId = (typeof MODLAR)[number]['id']
+/** Tam sayfa modlar; sol/sağ panelleri yoktur. */
+export type SayfaModu = Extract<(typeof MODLAR)[number], { sayfa: true }>['id']
+/** Haritanın iki yanında panel gösteren modlar. */
+export type PanelModu = Exclude<ModId, SayfaModu>
+
+export function sayfaModuMu(id: ModId): id is SayfaModu {
+  const m = MODLAR.find((x) => x.id === id)
+  return !!m && 'sayfa' in m && m.sayfa === true
+}
+
+/** Mod bu role sekmede ve komut paletinde gösterilir mi? */
+export function modGorunur(m: (typeof MODLAR)[number], rol: Rol | undefined): boolean {
+  return !('roller' in m) || (rol !== undefined && (m.roller as readonly Rol[]).includes(rol))
+}
 
 export const VARSAYILAN_MOD: ModId = 'genel'
 

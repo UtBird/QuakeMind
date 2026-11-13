@@ -142,6 +142,34 @@ export function kapsamaOrani(goruntu: Kutu, alan: Kutu): number {
   return alanBoyu > 0 ? (g * y) / alanBoyu : 0
 }
 
+/** Analiz alanını seçilen görüntünün üstüne taşır (J-160).
+
+    Görüntü alandan küçükse (drone sahneleri ~0,5 km) alan görüntünün kendisi
+    olur. Büyükse alanın boyu korunur, merkezi görüntünün içine kaydırılır ve
+    görüntüyle kesiştirilir. Böylece model hiç görüntü olmayan yeri taramaz.
+    Ölçüm: Defne/Elektrik, şehir merkezi + 2,5 km → z17, 0 kapalı yol; görüntü
+    alanı → z18, 8 kapalı yol. */
+export function goruntuyeTasinmisAlan(goruntu: Kutu, alan: Kutu): Kutu {
+  const gAlan = (goruntu[2] - goruntu[0]) * (goruntu[3] - goruntu[1])
+  const aAlan = (alan[2] - alan[0]) * (alan[3] - alan[1])
+  if (gAlan <= aAlan) return goruntu
+  const yG = (alan[2] - alan[0]) / 2
+  const yB = (alan[3] - alan[1]) / 2
+  const sinirla = (x: number, a: number, b: number) => (a > b ? (a + b) / 2 : Math.min(Math.max(x, a), b))
+  const mx = sinirla((alan[0] + alan[2]) / 2, goruntu[0] + yG, goruntu[2] - yG)
+  const my = sinirla((alan[1] + alan[3]) / 2, goruntu[1] + yB, goruntu[3] - yB)
+  return [
+    Math.max(goruntu[0], mx - yG),
+    Math.max(goruntu[1], my - yB),
+    Math.min(goruntu[2], mx + yG),
+    Math.min(goruntu[3], my + yB),
+  ]
+}
+
+/** Bu orandan az kapsayan görüntüyle analiz başlatılmaz (J-160): sonuç büyük
+    ölçüde boş görüntüden çıkar ve "hasar yok" gibi okunur. */
+export const EN_AZ_KAPSAMA = 0.5
+
 /* ---- OpenAerialMap: tarih aralığıyla görüntü arama ---------------------- */
 
 export type OamGoruntu = {
@@ -276,6 +304,8 @@ export type AnalizIstegi = {
   modelAdi?: string
   /** source === 'oam' ise seçilen görüntünün karo adresi. */
   oamTileUrl?: string
+  /** J-161: eğitim ölçeğinden bir kademe yakın (deneysel, varsayılan kapalı). */
+  yakinCekim?: boolean
   /** Haritada alan seçildiyse merkez+yarıçap yerine bu kutu analiz edilir. */
   bboxWest?: number
   bboxSouth?: number
@@ -295,10 +325,15 @@ export type AnalizSonucu = {
   /** Fiilen kullanılan yakınlaştırma; istenende karo yoksa sunucu aşağı iner. */
   imageryZoom?: number
   imageryRequestedZoom?: number
+  /** Bu koşu eğitim ölçeğinden bir kademe yakın mı yapıldı (J-161, deneysel). */
+  yakinCekim?: boolean
   /** Wayback'te alanın çekimleri (sürümün metadata katmanından); öbür kaynaklarda boş. */
   imageryCaptures?: { cekimTarihi: string | null; kaynak: string | null; cozunurlukM: number | null }[]
   imageryEventTiming?: 'pre' | 'post' | 'mixed' | 'unknown'
   damageRate?: number
+  /** Görüntünün BOŞ olmayan piksel oranı (0–1). Düşükse model çoğunlukla boşluk
+      taramıştır; "0 kapalı yol" o zaman "hasar yok" demek değildir (J-160). */
+  validPixelRatio?: number
   openRoads?: number
   blockedRoads?: number
   openRoadPct?: number
