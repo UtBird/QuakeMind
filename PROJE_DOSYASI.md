@@ -57,11 +57,13 @@ VERİ EDİNME            ÇIKARIM                    KARAR
 ─────────────          ─────────                  ─────
 uydu görüntüsü    →    anlamsal bölütleme    ┐
 yer seviyesi      →    nesne tespiti         │
-Türkçe metin      →    sınıflandırma + NER   ├→  ortak nesne   →  PostGIS  →  güzergâh
+Türkçe metin      →    sınıflandırma + NER   ├→  ortak nesne   →  SQLite*  →  güzergâh
 acil çağrı        →    (kural tabanlı)       │   (konum, skor,              →  toplanma alanı
 sismik katalog    →    gradyan artırma       ┘    güven, zaman)             →  ısı haritası
                                                                             →  ekip sevki
 ```
+
+\* Çalışan sistemde SQLite; PostGIS hedef mimaridir (bkz. §3.2).
 
 Çıkarım katmanının tüm çıktıları **tek bir ortak biçime** indirgenir:
 `(konum, hasar/aciliyet skoru, güven, zaman damgası)`. Bu, farklı modalitelerin
@@ -129,8 +131,17 @@ seçiminde kullanılır. `[K]`
 
 ### 3.2. Mekânsal depo
 
-PostGIS üzerinde altı tablo, GIST mekânsal indeksleriyle: `[K]` —
-`utils/postgis_manager.py`
+**Çalışan sistem (13 Kasım 2026): SQLite.** `[K]` — `QuakeMindBackend/depo/sqlite_surucu.py`.
+Tek dosya (`veri/quakemind.sqlite3`), WAL kipi. Ortak sözleşmenin tablosu `hasar_noktalari`;
+SOS çağrıları, ihbarlar, ekipler, görevler, kullanıcılar ve kayıt defteri aynı dosyadadır.
+Mekânsal indeks yoktur: konum `(lon, lat)` b-tree indeksi ve kutu sorgusuyla süzülür.
+Uç noktalar yalnız depo yöntemlerini çağırır; ORM kullanılmaz, SQL parametrelidir. Ölçülen
+başarım: `EKSIKLER_VE_SORUNLAR.md` J-158.
+
+**Hedef mimari: PostGIS.** Aşağıdaki altı tablo GIST mekânsal indeksleriyle
+`utils/postgis_manager.py`'de tanımlıdır `[K]`. Çalışan sistemde kullanılmaz `[Y]`:
+makinede PostgreSQL yok, yeni depo katmanının PostGIS sürücüsü yazılmadı. Makalede ve
+sunumda "sistem PostGIS kullanıyor" denmemeli.
 
 | Tablo | İçerik |
 |---|---|
@@ -141,14 +152,16 @@ PostGIS üzerinde altı tablo, GIST mekânsal indeksleriyle: `[K]` —
 | `osm_safety_polygons` | OSM kaynaklı güvenli alan poligonları |
 | `users` | Rol tabanlı kimlik (afetzede / saha ekibi / yönetici) |
 
-`damage_points` tablosunun tasarımı önemlidir: kamera, bölütleme ve acil çağrı
-kaynaklı noktalar **aynı tabloda** toplanır ve `source_type` ile ayrılır. Ekiplere
-en yakın enkaz sorgusu ve yoğunluk ısı haritası bu ortak havuz üzerinden çalışır. `[K]`
+Ortak havuz tasarımı iki depoda da aynıdır `[K]`: kamera, bölütleme, metin ve acil çağrı
+kaynaklı noktalar **aynı tabloda** toplanır ve kaynak tipiyle ayrılır. Bugün bu tablo SQLite
+`hasar_noktalari` (`kaynak` sütunu), hedefte PostGIS `damage_points` (`source_type`). Ekiplere
+en yakın enkaz sorgusu ve yoğunluk ısı haritası bu ortak havuz üzerinden çalışır.
 
 ### 3.3. Türetilen operasyonel ürünler
 
 - **Kapanma-farkında güzergâh** — dört ayrı uç nokta (oturum tabanlı, PostGIS
-  tabanlı oturumsuz, OSRM tabanlı, ekip hedefine) `[K]`
+  tabanlı oturumsuz, OSRM tabanlı, ekip hedefine) `[K]`. PostGIS tabanlı olan, PostgreSQL
+  olmadığı için bugün yedek kipte çalışır.
 - **En yakın toplanma alanı + yürüyüş güzergâhı** — OSM `emergency=assembly_point`,
   resmî/aday ayrımıyla `[K]`
 - **Gauss çekirdekli yoğunluk ısı haritası** — ızgara 100 × 100, bant genişliği
@@ -467,7 +480,8 @@ YOLOv8 mAP 0,952 `[A]`. Bizim iddiamız **zinciri kapatmak ve ölçmek** olmalı
 | EMSR648 hasar dağılımı | `[Ö]` | `benchmark/data/*_ground_truth.json` |
 | Çizge ölçeği (~20 000 düğüm / 3 km) | `[Ö]` | ön inceleme |
 | Kapanma-farkında güzergâh | `[K]` | `network.py` |
-| PostGIS altı tablo | `[K]` | `postgis_manager.py` |
+| Depo: SQLite, ortak hasar tablosu | `[K]` | `depo/sqlite_surucu.py` |
+| PostGIS altı tablo (hedef; çalışan sistemde yok) | `[Y]` | `postgis_manager.py` tanımlı, kullanılmıyor |
 | **SegFormer'ın diğer mimarilere üstünlüğü** | `[Y]` | **karşılaştırılabilir değil — A-01** |
 | Yol hasarı bölütleme başarımı | `[Y]` | veri kümesi yok — B-02 |
 | YOLO mAP | `[Y]` | defterler hazır, koşulmadı — B-03 |

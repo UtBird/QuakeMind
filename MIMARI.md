@@ -4,7 +4,7 @@ Bu belge sistemin nasıl kurulacağını anlatır: katmanlar, veri sözleşmesi,
 yapıldığı, ölçek eşikleri ve ölçüm bütçeleri. Kurallar `CLAUDE.md`'de, tasarım sistemi
 `ARAYUZ_KARARLARI.md`'de.
 
-Son güncelleme: 20 Eylül 2026 · Kapsam: web + backend (Pi/offline ve mobil ertelendi)
+Son güncelleme: 13 Kasım 2026 (depo: bugün SQLite, PostGIS hedef — §1, §3, §4, §6) · Kapsam: web + backend (Pi/offline ve mobil ertelendi)
 
 ---
 
@@ -18,7 +18,8 @@ Son güncelleme: 20 Eylül 2026 · Kapsam: web + backend (Pi/offline ve mobil er
 | Deprem riski (CatBoost) | `apps/earthquake_risk/` | İstek yolunda eğitiliyor — düzeltilecek |
 | Kamera tespiti (YOLO ×2) | `apps/camera_detection/` | Çalışıyor |
 | Yol ağı ve rota (OSM + A\*) | `apps/road_damage/utils/network.py` | Bölge bazlı çizge, önbellekli |
-| Mekânsal depo (PostGIS, 6 tablo) | `utils/postgis_manager.py` | Çalışıyor |
+| Depo (SQLite, 15 tablo, WAL) | `depo/sqlite_surucu.py` | Çalışıyor; bütün yeni uçlar burada (13 Kas) |
+| Mekânsal depo (PostGIS, 6 tablo) | `utils/postgis_manager.py` | **Çalışmıyor**: makinede PostgreSQL yok, eski yol hasarı uçları yedek kipte. Hedef mimari (§3) |
 | Web (Next.js 14 + Leaflet) | `quakemind-web/` | Yerini yeni konsol alacak |
 | Tanıtım sitesi (Astro) | `tanitim/` | İskelet kuruldu (20 Eyl): tek sayfa, sıfır istemci JS, ekran görüntüleri eklenecek |
 | Yeni konsol (Vite + React) | `konsol/` | İskelet kuruldu (20 Eyl): token'lar, giriş, kalıcı harita kabuğu, modlar, tek SSE istemcisi. Uçlar bağlı değil |
@@ -35,7 +36,7 @@ Performansı belirleyen şey kütüphane değil, işin yapıldığı yerdir.
 ```
 ÖNCEDEN (ağır iş, bir kez)        SUNUCU (her istek, hafif)      TARAYICI (GPU)
 ────────────────────────────      ─────────────────────────      ──────────────
-model işçileri (ONNX, kuyruk)  →  FastAPI + PostGIS           →  olay katmanları (ikili veri)
+model işçileri (ONNX, kuyruk)  →  FastAPI + SQLite (hedef PostGIS) →  olay katmanları (ikili veri)
 yoğunluk ızgarası (veri değişince) → ızgara dosyası (4 kanal) →  birleşik ısı (ağırlık GPU'da)
 karo üretimi (tek seferlik)    →  statik karo (CPU harcamaz)  →  altlık + uydu (MapLibre)
 ```
@@ -56,8 +57,24 @@ Bütün çıkarım çıktıları tek biçime iner:
 (konum, hasar/aciliyet skoru, güven, zaman damgası, kaynak tipi)
 ```
 
-PostGIS tabloları (GIST mekânsal indeksli): `damage_points`, `road_blockages`,
-`sos_alerts`, `afad_assembly_points`, `osm_safety_polygons`, `users`.
+**Bugün (13 Kasım 2026): SQLite.** Çalışan sistemin deposu `QuakeMindBackend/veri/quakemind.sqlite3`.
+Sürücü `depo/sqlite_surucu.py`: WAL kipi, `synchronous=NORMAL`; tek yazma bağlantısı (kilitli)
+ve iş parçacığı başına salt-okunur okuma bağlantısı. Okumalar yazmayı beklemez, yazmalar
+okumayı beklemez (J-158). Uç noktalar SQL görmez, yalnız depo yöntemlerini çağırır (depo deseni). ORM yok;
+parametreli SQL kullanılır. Tablolar: `kullanicilar`, `oturumlar`, `hesap_kayitlari`,
+`hasar_noktalari` (ortak sözleşme), `sos_cagrilari`, `ekipler`, `gorevler`, `gorev_adimlari`,
+`yol_kapanmalari`, `bildirimler`, `ihbarlar`, `ihbar_fotograflari` ve yardımcıları. Mekânsal
+indeks yok: konum `(lon, lat)` b-tree indeksiyle, kutu sorgusuyla süzülür. Zaman pencereli
+sorgular kapsayıcı indekslerden okunur: `ix_sos_zaman_kapsar (zaman, lon, lat, durum)`,
+`ix_hasar_zaman_kapsar (zaman, kaynak, skor)`, `ix_sos_kullanici_zaman`. Gruplamada `+durum`
+yazılır, yoksa planlayıcı durum indeksini seçip tabloyu tarar. Ölçülen başarım J-158'de
+(50 SOS/sn, 5 konsol, 1 milyon satır: yazma p95 1,2 ms, güncellik gecikmesi p95 1,45 sn).
+
+**Hedef: PostGIS.** `depo/__init__.py` önce PostGIS'i deneyecek biçimde yazıldı ama
+`postgis_surucu.py` henüz yok. Aynı depo yöntemleri yazılınca uçlar değişmeden geçilir.
+Hedef tablolar (GIST mekânsal indeksli): `damage_points`, `road_blockages`, `sos_alerts`,
+`afad_assembly_points`, `osm_safety_polygons`, `users`. Bu altı tablo bugün yalnız eski
+`utils/postgis_manager.py`'de tanımlı ve makinede PostgreSQL olmadığı için kullanılmıyor.
 
 Afetzede ihbarları (22 Eylül 2026, J-51) ayrı tabloda durur: `ihbarlar` ve
 `ihbar_fotograflari`. Afetzede önce fotoğrafını ya da metnini modele inceletir; bu adım kayıt
@@ -119,8 +136,10 @@ Arayüz modellere değil bu sözleşmeye bağlanır.
 
 ## 4. Çıkarım mimarisi
 
-**Kuyruk.** İş kuyruğu için ek servis kurulmaz; Postgres tablosu + `FOR UPDATE SKIP LOCKED`
-yeterlidir. İş kaydı: `(id, tip, parametreler, durum, ilerleme, sonuç, hata, zaman)`.
+**Kuyruk.** Bugün: süreç içi `ProcessPoolExecutor` (`cekirdek.py` `road_damage_pool`) ve
+bellekteki iş kaydı (`road_damage_jobs`, sınırlı sayıda iş tutar). Sunucu yeniden başlarsa
+koşan ve biten işlerin kaydı kaybolur. Hedef: ek servis kurulmadan Postgres tablosu +
+`FOR UPDATE SKIP LOCKED`. İş kaydı: `(id, tip, parametreler, durum, ilerleme, sonuç, hata, zaman)`.
 
 **İşçi süreç.** Modeller tek bir çıkarım işçisinde yüklenir. Bugün modeller
 `fastapi_app.py:123-145` içinde, import sırasında yükleniyor; uvicorn birden çok worker ile
@@ -179,9 +198,13 @@ mesaj tipleri: yeni SOS, iş durumu, yeni analiz, ısı sürümü, ekip konumu.
 yeni analiz ve yeni SOS. Tek uvicorn worker'ı varsayar; çok worker'a geçilince
 `yayinla` gövdesi Postgres `LISTEN/NOTIFY`'a bağlanacak, abonelik ve uç aynı kalacak.
 
-Çoklu worker'da yayın için Postgres `LISTEN/NOTIFY` kullanılır; Redis gerekmez.
+Çoklu worker'da yayın için Postgres `LISTEN/NOTIFY` kullanılır; Redis gerekmez. **13 Kasım
+2026 itibarıyla PostgreSQL yok;** sistem tek worker'la çalışır ve yayın süreç içidir.
 
 İstemci tarafında SSE mesajı ilgili sorguyu tazeler (TanStack Query). Yoklama yapılmaz.
+Aynı sorgu anahtarına gelen mesajlar 1 sn'lik pencerede birleşir (`canliAkis.ts`
+`birlestirici`, J-158). İlk mesaj hemen tazeler, yoğunlukta en çok 1 sn gecikme olur. Afette
+her SOS her konsolda tam listeyi istetmesin diye.
 
 **Durum (22 Eyl):**
 - Mesaj tiplerine `bildirim` (J-45) ve `ihbar` (J-51: afetzede fotoğraf, yazılı ve ihtiyaç

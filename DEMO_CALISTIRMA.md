@@ -25,6 +25,33 @@ Sunum hesabı: `demo@quakemind.local`, rol **koordinatör**. Şifre
 QuakeMindBackend/../venv/Scripts/python.exe QuakeMindBackend/araclar_kullanici.py ekle demo@quakemind.local "Demo Sunum" koordinator
 ```
 
+**Saha ekibi ekranı (`/ekip`)** için ayrı hesap: `saha-demo@quakemind.local`, rol **saha**,
+şifre yine `araclar_kullanici.py` varsayılanı. Hesap **AKUT 1** (`EKP-01`) ekibine bağlı; ekibe
+bağlı olmayan saha hesabı görev göremez. Hesap yoksa:
+
+```bash
+venv/Scripts/python.exe QuakeMindBackend/araclar_kullanici.py ekle saha-demo@quakemind.local "Demo Saha Ekibi" saha
+```
+
+Sonra koordinatör hesabıyla **Ekipler** ekranından hesabı bir ekibe bağla.
+
+**Giriş ekranının üç kapısı var (J-156):** Afetzede · Saha ekibi · Koordinasyon. Önce kapıyı seç;
+hesabın rolü kapıya uymazsa sunucu girişi reddeder ve doğru kapıyı söyler. Demo hesabı
+**Koordinasyon**, `saha-demo` **Saha ekibi** kapısından girer.
+
+Hesap açma yalnız Afetzede kapısında. Ekip hesaplarını koordinatör konsoldaki **Kullanıcılar**
+sekmesinden yönetir (tam sayfa, J-157):
+- **Yeni ekip hesabı:** ad, e-posta, ekip → "Hesabı aç ve şifre üret". Tek seferlik şifre bir kez
+  görünür; kişiye ilet. Kişi ilk girişte kendi şifresini koymadan hiçbir ekrana geçemez.
+- **Düzenle:** tablodan bir satıra tıkla. Çekmecede ad, rol, ekip ve durumu (Aktif / Askıda)
+  değiştir, **Kaydet**. Ekipsiz saha hesabı görev göremez; tablonun üstündeki uyarı bunları
+  gösterir.
+- **Şifre unutuldu:** çekmecede "yeni geçici şifre üret".
+- **Kayıt defteri** sekmesi: kim, kime, ne zaman, ne yaptı.
+
+Koordinatör saha hesaplarını yönetir; koordinatör ve yönetici hesabını yalnız yönetici açar ve
+değiştirir. Kimse kendi rolünü ya da durumunu değiştiremez.
+
 ## 3. Tatbikatı koşturma
 
 **Analiz → Simülasyon (tatbikat)** menüsünden gir. Sol panelde sırayla:
