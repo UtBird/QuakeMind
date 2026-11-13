@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -16,7 +17,21 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 import cekirdek as ck  # noqa: E402
-from uclar import risk  # noqa: E402
+import depo  # noqa: E402
+from depo.sqlite_surucu import SqliteDepo  # noqa: E402
+from uclar import oturum, risk  # noqa: E402
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    database = SqliteDepo(str(tmp_path / "risk-test.sqlite3"))
+    monkeypatch.setattr(depo, "_depo", database)
+    api = FastAPI()
+    api.include_router(oturum.yonlendirici)
+    api.include_router(risk.yonlendirici)
+    with TestClient(api) as test_client:
+        yield test_client
+    database.kapat()
 
 
 def test_bridge_yalniz_backend_veri_kokunu_kullanir():
@@ -26,7 +41,7 @@ def test_bridge_yalniz_backend_veri_kokunu_kullanir():
     assert "mobile/tool" not in str(bridge.__file__).replace("\\", "/").lower()
 
 
-def test_manual_coordinates_risk_endpoint_returns_real_contract_shape(monkeypatch):
+def test_manual_coordinates_risk_endpoint_returns_real_contract_shape(monkeypatch, client):
     """Android'in `{city:'Türkiye',manualLatitude,...}` istegi geocoding istemez."""
     bridge = importlib.import_module("risk_bridge")
     monkeypatch.setattr(bridge, "GEOJSON_PATHS", [])
@@ -59,9 +74,11 @@ def test_manual_coordinates_risk_endpoint_returns_real_contract_shape(monkeypatc
             return 0.4
 
     monkeypatch.setattr(ck, "risk_engine", Model())
-    api = FastAPI()
-    api.include_router(risk.yonlendirici)
-    resp = TestClient(api).post("/api/risk/predict", json={
+    guest = client.post("/api/oturum/misafir")
+    assert guest.status_code == 201, guest.text
+    resp = client.post("/api/risk/predict", headers={
+        "Authorization": f"Bearer {guest.json()['erisimJetonu']}",
+    }, json={
         "city": "Türkiye", "manualLatitude": 40.99, "manualLongitude": 29.02,
     })
     assert resp.status_code == 200, resp.text
@@ -71,3 +88,10 @@ def test_manual_coordinates_risk_endpoint_returns_real_contract_shape(monkeypatc
     assert data["source"] == "backend_exact"
     assert data["usedManualCoordinates"] is True
     assert len(data["mapEvents"]) == 2
+
+
+def test_risk_predict_requires_session(client):
+    response = client.post("/api/risk/predict", json={
+        "city": "Test", "manualLatitude": 40.99, "manualLongitude": 29.02,
+    })
+    assert response.status_code == 401

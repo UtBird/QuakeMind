@@ -20,12 +20,26 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 import fastapi_app  # noqa: E402
+import depo  # noqa: E402
+import kimlik  # noqa: E402
+from depo.sqlite_surucu import SqliteDepo  # noqa: E402
 from utils.postgis_manager import postgis_engine  # noqa: E402
 
 
-@pytest.fixture(scope="session")
-def client():
-    return TestClient(fastapi_app.app)
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    database = SqliteDepo(str(tmp_path / "road-damage-test.sqlite3"))
+    monkeypatch.setattr(depo, "_depo", database)
+    test_client = TestClient(fastapi_app.app)
+    account = kimlik.kullanici_kaydet("saha@test.local", "Test saha ekibi", "test-password-123")
+    database.rol_ata(account["id"], "saha")
+    token = kimlik.erisim_jetonu_uret(database.kullanici_id(account["id"]))
+    test_client.headers["Authorization"] = f"Bearer {token}"
+    try:
+        yield test_client
+    finally:
+        test_client.close()
+        database.kapat()
 
 
 @pytest.fixture(autouse=True)
@@ -35,7 +49,7 @@ def postgis_offline(monkeypatch):
     monkeypatch.setattr(postgis_engine, "check_connection", lambda: False)
 
 
-def test_heatmap_offline_fallback_returns_200(client):
+def test_heatmap_uses_local_store_when_postgis_is_offline(client):
     resp = client.get(
         "/api/road_damage/heatmap",
         params={"latitude": 36.20, "longitude": 36.16, "radiusKm": 5.0},
@@ -43,7 +57,7 @@ def test_heatmap_offline_fallback_returns_200(client):
     assert resp.status_code == 200
     body = resp.json()
     assert isinstance(body["points"], list)
-    assert body["generatedFrom"]["source"] == "offline_fallback"
+    assert body["generatedFrom"]["source"] == "yerel_depo"
 
 
 def test_nearest_debris_offline_fallback_returns_200(client):
