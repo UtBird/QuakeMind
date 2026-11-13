@@ -33,11 +33,29 @@ android {
             isShrinkResources = true
             proguardFiles("proguard-rules.pro")
         }
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            applicationIdSuffix = ".performance"
+            matchingFallbacks += "release"
+            isDebuggable = false
+        }
+        create("baseline") {
+            initWith(getByName("benchmark"))
+            isMinifyEnabled = false
+            isShrinkResources = false
+            matchingFallbacks.clear()
+            matchingFallbacks += listOf("benchmark", "release")
+        }
     }
 
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    sourceSets.getByName("baseline") {
+        manifest.srcFile("src/benchmark/AndroidManifest.xml")
+        res.srcDir("src/benchmark/res")
     }
 
     packaging {
@@ -61,7 +79,7 @@ composeCompiler {
 // make the Kotlin bytecode an explicit javac input so Hilt's KSP-generated Java
 // sources can always resolve the app's Kotlin classes during Run/Apply Changes.
 afterEvaluate {
-    listOf("Debug", "Release").forEach { variantName ->
+    listOf("Debug", "Release", "Benchmark", "Baseline").forEach { variantName ->
         val variantDirectory = variantName.replaceFirstChar { it.lowercase() }
         val kotlinClasses = layout.buildDirectory.dir(
             "intermediates/built_in_kotlinc/$variantDirectory/compile${variantName}Kotlin/classes",

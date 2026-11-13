@@ -8,6 +8,8 @@ import com.quakemind.core.model.GeoPoint
 import com.quakemind.feature.location.DeviceLocationProvider
 import com.quakemind.feature.location.distanceMetres
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -55,7 +57,7 @@ class MapViewModel @Inject constructor(
             locationError = location.locationError,
             pointsError = location.pointsError,
         )
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         MapUiState(

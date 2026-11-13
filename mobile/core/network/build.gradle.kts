@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.serialization)
@@ -13,14 +15,41 @@ android {
         minSdk = 26
         consumerProguardFiles("consumer-rules.pro")
     }
+    val productionUrl = "https://quakemind-api.dehaozcan.online/"
     val configuredUrl = providers.gradleProperty("quakemindApiBaseUrl").orNull
         ?: providers.environmentVariable("QUAKEMIND_API_BASE_URL").orNull
+    val debugOverride = providers.gradleProperty("quakemindDebugApiBaseUrl").orNull
+        ?: providers.environmentVariable("QUAKEMIND_DEBUG_API_BASE_URL").orNull
+    fun apiUrl(value: String, allowHttp: Boolean): String {
+        val uri = URI(value.trim())
+        require(uri.host != null && uri.rawUserInfo == null &&
+            uri.rawQuery == null && uri.rawFragment == null) {
+            "API URL must have a hostname and must not contain credentials, query parameters or a fragment."
+        }
+        require(uri.scheme == "https" || (allowHttp && uri.scheme == "http")) {
+            "API URL must use HTTPS. Use quakemindDebugApiBaseUrl for local HTTP development."
+        }
+        return uri.toASCIIString().trimEnd('/') + "/"
+    }
+    val releaseUrl = apiUrl(configuredUrl ?: productionUrl, allowHttp = false)
     buildTypes {
         getByName("debug") {
-            buildConfigField("String", "API_BASE_URL", "\""+ (configuredUrl ?: "http://10.0.2.2:8000/") +"\"")
+            buildConfigField("String", "API_BASE_URL", "\"${apiUrl(debugOverride ?: releaseUrl, allowHttp = true)}\"")
         }
         getByName("release") {
-            buildConfigField("String", "API_BASE_URL", "\""+ (configuredUrl ?: "https://quakemind.invalid/") +"\"")
+            buildConfigField("String", "API_BASE_URL", "\"$releaseUrl\"")
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += "release"
+            val benchmarkUrl = providers.gradleProperty("quakemindBenchmarkApiBaseUrl").orNull
+            val selectedUrl = benchmarkUrl?.let { value ->
+                require(URI(value).host in setOf("127.0.0.1", "localhost", "10.0.2.2")) {
+                    "Benchmark API override must target the local development server."
+                }
+                apiUrl(value, allowHttp = true)
+            } ?: releaseUrl
+            buildConfigField("String", "API_BASE_URL", "\"$selectedUrl\"")
         }
     }
 }

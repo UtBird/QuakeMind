@@ -8,11 +8,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun ProfileRoute(
     onOperations: () -> Unit,
+    onBack: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     ProfileScreen(
         state = state,
         onOperations = onOperations,
+        onBack = onBack,
     )
 }

@@ -177,6 +177,12 @@ def sos_ac(istek: SosIstegi, kul: dict = Depends(kimlik.kullanici)):
     }.items() if v is not None}
 
     depo = aktif_depo()
+    if not depo.istek_hakki_al("sos", kul["id"], 5, 600):
+        raise HTTPException(
+            status_code=429,
+            detail="Son 10 dakikada çok sayıda SOS gönderdiniz. Acil durum için 112'yi arayın.",
+            headers={"Retry-After": "600"},
+        )
     kayit = depo.sos_ekle(
         lon=istek.lon,
         lat=istek.lat,

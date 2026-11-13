@@ -71,6 +71,11 @@ class OfflineFirstIncidentRepository @Inject constructor(
                 version = 1,
                 conflict = false,
                 idempotencyKey = draft.idempotencyKey,
+                urgency = draft.urgency.name,
+                peopleCount = draft.peopleCount,
+                injuredCount = draft.injuredCount,
+                locationSource = draft.locationSource,
+                locationAccuracyMetres = draft.locationAccuracyMetres,
             ),
         )
         return draft.localId

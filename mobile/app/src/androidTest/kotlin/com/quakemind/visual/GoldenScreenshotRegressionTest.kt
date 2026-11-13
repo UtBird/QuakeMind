@@ -1,6 +1,7 @@
 package com.quakemind.visual
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -141,10 +142,10 @@ class GoldenScreenshotRegressionTest {
         }
 
         composeRule.onNodeWithTag("home_lazy_column").assertIsDisplayed()
-        composeRule.onNodeWithText("AFET").assertIsDisplayed()
-        composeRule.onNodeWithText("SON DEPREM BİLGİSİ").assertIsDisplayed()
+        composeRule.onNodeWithText("QuakeMind").assertIsDisplayed()
+        composeRule.onNodeWithText("Son deprem kaydı").assertIsDisplayed()
         composeRule.onNodeWithText("Marmara Denizi - Silivri Açıkları").assertIsDisplayed()
-        composeRule.onNodeWithText("Acil İhbar Bildir").assertIsDisplayed()
+        composeRule.onNodeWithText("İhbar oluştur").assertIsDisplayed()
     }
 
     @Test
@@ -158,9 +159,8 @@ class GoldenScreenshotRegressionTest {
             }
         }
 
-        composeRule.onNodeWithTag("map_canvas").assertIsDisplayed()
-        composeRule.onNodeWithText("Toplanma alanı, hastane veya adres ara...").assertIsDisplayed()
-        composeRule.onNodeWithText("Selami Ali Spor Salonu Açık Alanı").assertIsDisplayed()
+        composeRule.onNodeWithTag("osm_map").assertIsDisplayed()
+        composeRule.onNodeWithText("Yer, adres veya deprem ara").assertIsDisplayed()
     }
 
     @Test
@@ -176,7 +176,7 @@ class GoldenScreenshotRegressionTest {
         }
 
         composeRule.onNodeWithTag("alerts_lazy_column").assertIsDisplayed()
-        composeRule.onNodeWithText("Bölgesel Bildirimler & Uyarılar").assertIsDisplayed()
+        composeRule.onNodeWithText("Uyarılar").assertIsDisplayed()
         composeRule.onNodeWithText("4.4 Marmara Denizi Depremi").assertIsDisplayed()
     }
 
@@ -193,7 +193,7 @@ class GoldenScreenshotRegressionTest {
         }
 
         composeRule.onNodeWithTag("checklist_lazy_column").assertIsDisplayed()
-        composeRule.onNodeWithText("Afet ve Acil Durum Çantası").assertIsDisplayed()
+        composeRule.onNodeWithText("Afet çantası").assertIsDisplayed()
         composeRule.onNodeWithText("Düdük ve Yüksek Sesli Alarm").assertIsDisplayed()
     }
 
@@ -203,16 +203,16 @@ class GoldenScreenshotRegressionTest {
             QuakeMindTheme {
                 ReportScreen(
                     trackingCode = null,
-                    onSubmit = { _, _, _, _, _ -> },
+                    onSubmit = { _, _, _, _, _, _, _ -> },
                     onBack = {},
                 )
             }
         }
 
-        composeRule.onNodeWithText("Acil Durum İhbar Masası").assertIsDisplayed()
-        composeRule.onNodeWithText("İhbar Kategorisi").assertIsDisplayed()
-        composeRule.onNodeWithText("Enkaz / Mahsur").assertIsDisplayed()
-        composeRule.onNodeWithText("İhbarı Resmî Ağa Gönder").assertIsDisplayed()
+        composeRule.onNodeWithText("İhbar oluştur").assertIsDisplayed()
+        composeRule.onNodeWithText("Koordinatları elle gir").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("İhbar Kategorisi").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Enkaz / Mahsur").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -240,22 +240,21 @@ class GoldenScreenshotRegressionTest {
             }
         }
 
-        composeRule.onNodeWithText("Tahliye Güzergâhı Sorgulama").assertIsDisplayed()
-        composeRule.onNodeWithText("En Güvenli Tahliye Rotası (Önerilen)").assertIsDisplayed()
+        composeRule.onNodeWithText("Tahliye rotası").assertIsDisplayed()
+        composeRule.onNodeWithText("En Güvenli Tahliye Rotası (Önerilen)").performScrollTo().assertIsDisplayed()
     }
 
     @Test
     fun verifySosScreenGoldenStructure() {
         composeRule.setContent {
             QuakeMindTheme {
-                SosScreen(onBack = {})
+                SosScreen(onBack = {}, state = com.quakemind.feature.sos.SosUiState(), onRequestLocation = {}, onSend = {})
             }
         }
 
-        composeRule.onNodeWithText("Acil Durum Panik Merkezi").assertIsDisplayed()
-        composeRule.onNodeWithText("SOS").assertIsDisplayed()
-        composeRule.onNodeWithText("Acil Yardım Sinyali Gönder").assertIsDisplayed()
-        composeRule.onNodeWithText("Resmî Acil Numaralar").assertIsDisplayed()
+        composeRule.onNodeWithText("Acil yardım").assertIsDisplayed()
+        composeRule.onNodeWithText("Hayati tehlikede 112'yi arayın").assertIsDisplayed()
+        composeRule.onNodeWithText("SOS Gönder").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -269,9 +268,9 @@ class GoldenScreenshotRegressionTest {
             }
         }
 
-        composeRule.onNodeWithText("Profil & Sistem Ayarları").assertIsDisplayed()
+        composeRule.onNodeWithText("Profil").assertIsDisplayed()
         composeRule.onNodeWithText("Ahmet Yılmaz").assertIsDisplayed()
-        composeRule.onNodeWithText("Saha Operasyon Masası").assertIsDisplayed()
+        composeRule.onNodeWithText("Saha operasyonları").assertIsDisplayed()
     }
 
     @Test
@@ -279,15 +278,15 @@ class GoldenScreenshotRegressionTest {
         composeRule.setContent {
             QuakeMindTheme {
                 SafetyScreen(
-                    confirmation = "SAFE",
+                    state = com.quakemind.feature.safety.SafetyStatusUiState(confirmedStatus = "SAFE"),
                     onBack = {},
                     onSelect = {},
                 )
             }
         }
 
-        composeRule.onNodeWithText("Aile Güvenlik Ağı & Durum Bildirimi").assertIsDisplayed()
+        composeRule.onNodeWithText("Güvenlik durumun").assertIsDisplayed()
         composeRule.onNodeWithText("Güvendeyim").assertIsDisplayed()
-        composeRule.onNodeWithText("Yardım Gerekiyor").assertIsDisplayed()
+        composeRule.onNodeWithText("Yardım Gerekli").assertIsDisplayed()
     }
 }

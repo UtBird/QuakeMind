@@ -7,6 +7,7 @@ import com.quakemind.core.model.GeoPoint
 import com.quakemind.core.model.IncidentDraft
 import com.quakemind.core.model.IncidentType
 import com.quakemind.core.model.Urgency
+import com.quakemind.feature.location.DeviceLocationProvider
 import com.quakemind.sync.scheduler.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,10 +23,32 @@ import javax.inject.Inject
 class ReportViewModel @Inject constructor(
     private val incidentRepository: IncidentRepository,
     private val syncScheduler: SyncScheduler,
+    private val deviceLocationProvider: DeviceLocationProvider,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReportUiState())
     val state: StateFlow<ReportUiState> = _state.asStateFlow()
+
+    fun locate() {
+        if (_state.value.isLocating) return
+        viewModelScope.launch {
+            _state.update { it.copy(isLocating = true, locationError = null, locationFix = null) }
+            try {
+                val fix = deviceLocationProvider.currentFix()
+                _state.update { it.copy(locationFix = fix) }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                _state.update { it.copy(locationError = error.message ?: "Cihaz konumu alınamadı.") }
+            } finally {
+                _state.update { it.copy(isLocating = false) }
+            }
+        }
+    }
+
+    fun locationPermissionDenied() {
+        _state.update { it.copy(locationFix = null, locationError = "Konum izni verilmedi.") }
+    }
 
     fun submitIncident(
         description: String,
@@ -34,6 +57,8 @@ class ReportViewModel @Inject constructor(
         location: GeoPoint? = null,
         peopleCount: Int = 0,
         injuredCount: Int = 0,
+        locationSource: String = "manuel",
+        locationAccuracyMetres: Float? = null,
     ) {
         if (description.isBlank()) {
             _state.update { it.copy(submissionError = "Durumu açıklayan bir metin girin.") }
@@ -54,6 +79,8 @@ class ReportViewModel @Inject constructor(
                         injuredCount = injuredCount,
                         urgency = urgency,
                         idempotencyKey = UUID.randomUUID().toString(),
+                        locationSource = locationSource,
+                        locationAccuracyMetres = locationAccuracyMetres,
                     ),
                 )
                 _state.update { it.copy(isSubmitting = false, lastTrackingCode = savedId) }

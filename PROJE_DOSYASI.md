@@ -70,7 +70,7 @@ sismik katalog    →    gradyan artırma       ┘    güven, zaman)           
 aynı mekânsal katmanda toplanmasını sağlayan tasarım kararıdır. `[T]` `[K]`
 
 **Uygulama yüzeyi:** 38 REST uç noktası (FastAPI), 12 sayfalı web arayüzü
-(Next.js), Flutter mobil istemci, her modülün bağımsız çalıştırılabildiği bir
+(Next.js), Kotlin ve Jetpack Compose Android istemcisi, her modülün bağımsız çalıştırılabildiği bir
 çözümleme arayüzü. `[K]` — `backend/fastapi_app.py` (2 038 satır)
 
 ### 2.2. Bölge (zone) mimarisi — ölçeklenebilirlik kararı

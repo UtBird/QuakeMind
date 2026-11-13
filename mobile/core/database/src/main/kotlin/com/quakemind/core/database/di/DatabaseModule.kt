@@ -20,7 +20,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): QuakeMindDatabase =
         Room.databaseBuilder(context, QuakeMindDatabase::class.java, "quakemind.db")
-            .addMigrations(DatabaseMigrations.MIGRATION_1_2)
+            .addMigrations(DatabaseMigrations.MIGRATION_1_2, DatabaseMigrations.MIGRATION_2_3)
             .fallbackToDestructiveMigration(false)
             .build()
 

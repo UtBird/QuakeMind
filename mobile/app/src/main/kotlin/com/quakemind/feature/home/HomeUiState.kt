@@ -1,12 +1,10 @@
 package com.quakemind.feature.home
 
-import androidx.compose.runtime.Immutable
 import com.quakemind.core.model.Alert
 import com.quakemind.core.model.Earthquake
 import com.quakemind.core.model.GeoPoint
 import com.quakemind.core.model.UserSession
 
-@Immutable
 data class HomeUiState(
     val session: UserSession? = null,
     val earthquakes: List<Earthquake> = emptyList(),

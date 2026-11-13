@@ -43,6 +43,9 @@ data class IncidentDraft(
     val idempotencyKey: String,
     /** "manuel" for a user-entered coordinate; "gps" only for OS location readings. */
     val locationSource: String = "manuel",
+    val locationAccuracyMetres: Float? = null,
+    /** Retain the original request body when retrying a pre-v3 queued report. */
+    val legacyPayload: Boolean = false,
 )
 
 @Serializable

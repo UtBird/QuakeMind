@@ -358,7 +358,7 @@ QuakeMind'in en kritik özelliği, **internet olmadan** da çalışabilmesidir:
    - Linux: `nmcli device wifi hotspot ifname <arayüz> ssid QuakeMindNet password quakemind123` → IP genelde `10.42.0.1`
    - Windows: Ayarlar > Ağ ve İnternet > Mobil Etkin Nokta → IP genelde `192.168.137.1`
 2. Telefonu bu ağa bağlayın (internet gerekmez, sadece yerel ağ üzerinden iletişim).
-3. Backend'i `python3 fastapi_app.py` ile başlatın (`0.0.0.0:8000` üzerinden tüm ağ arayüzlerinden erişilebilir).
+3. Fiziksel telefon için repo kökünde `./start.sh --telefon` çalıştırın veya `QUAKEMIND_HOST=0.0.0.0` ayarıyla `fastapi_app.py` dosyasını başlatın.
 4. Android istemcisinin backend adresini bilgisayarın gerçek LAN/hotspot IP'sine (`10.42.0.1:8000` veya `192.168.137.1:8000` yaygın örneklerdir) ayarlayın.
 5. Aynı hotspot'a birden fazla telefon bağlanabilir; hepsi aynı backend'e erişir.
 

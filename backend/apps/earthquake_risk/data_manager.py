@@ -164,7 +164,8 @@ def fetch_and_update_data():
                     "magType": "ml", # Varsayılan
                     "place": eq.get("title"),
                     "type": "earthquake",
-                    "status": "automatic" # API'den gelenler genelde otomatiktir
+                    "status": "automatic", # API'den gelenler genelde otomatiktir
+                    "source": "Kandilli Rasathanesi",
                 }
                 new_records.append(record)
                 count += 1

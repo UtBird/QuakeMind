@@ -132,6 +132,6 @@ if __name__ == "__main__":
 
     uvicorn.run(
         app,
-        host=os.environ.get("QUAKEMIND_HOST", "0.0.0.0"),
+        host=os.environ.get("QUAKEMIND_HOST", "127.0.0.1"),
         port=int(os.environ.get("QUAKEMIND_PORT", "8000")),
     )

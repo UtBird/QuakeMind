@@ -2,7 +2,6 @@ package com.quakemind.feature.operations
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,33 +12,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.Report
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quakemind.core.designsystem.*
-import com.quakemind.core.model.Urgency
 import com.quakemind.core.model.SyncStatus
 
 @Composable
@@ -50,34 +35,11 @@ fun OperationsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
         // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Geri", tint = Zinc950)
-            }
-            Spacer(Modifier.width(6.dp))
-            Column {
-                Text(
-                    text = "Saha Operasyonları & İhbar Masası",
-                    color = Zinc950,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "Kayıtlı saha ihbarları ve yerel gönderim kuyruğu",
-                    color = Zinc500,
-                    fontSize = 12.sp,
-                )
-            }
-        }
+        ScreenHeader(title = "Saha operasyonları", onBack = onBack, subtitle = "İhbarlar ve yerel gönderim kuyruğu")
 
         LazyColumn(
             modifier = Modifier
@@ -99,8 +61,8 @@ fun OperationsScreen(
                         border = androidx.compose.foundation.BorderStroke(1.dp, Zinc200),
                     ) {
                         Column(Modifier.padding(12.dp)) {
-                            Text("Yerel Gönderim Kuyruğu", fontSize = 11.5.sp, color = Zinc500)
-                            Text("${state.pendingCount}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AfetCrimson)
+                            Text("Yerel Gönderim Kuyruğu", fontSize = 12.sp, color = Zinc500)
+                            Text("${state.pendingCount}", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = AfetCrimson)
                         }
                     }
                     Surface(
@@ -110,8 +72,8 @@ fun OperationsScreen(
                         border = BorderZinc200,
                     ) {
                         Column(Modifier.padding(12.dp)) {
-                            Text("Listelenen İhbar", fontSize = 11.5.sp, color = Zinc500)
-                            Text("${state.incidents.size}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Zinc950)
+                            Text("Listelenen İhbar", fontSize = 12.sp, color = Zinc500)
+                            Text("${state.incidents.size}", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Zinc950)
                         }
                     }
                     Surface(
@@ -121,8 +83,8 @@ fun OperationsScreen(
                         border = BorderZinc200,
                     ) {
                         Column(Modifier.padding(12.dp)) {
-                            Text("Sunucuya Eşitlenen", fontSize = 11.5.sp, color = Zinc500)
-                            Text("${state.incidents.count { it.syncStatus == SyncStatus.SYNCED }}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AfetGreen)
+                            Text("Sunucuya Eşitlenen", fontSize = 12.sp, color = Zinc500)
+                            Text("${state.incidents.count { it.syncStatus == SyncStatus.SYNCED }}", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = AfetGreen)
                         }
                     }
                 }
@@ -130,12 +92,12 @@ fun OperationsScreen(
 
             // Triage Queue Items
             item(key = "operations_queue_header", contentType = "header") {
-                Text("İhbar Kayıtları", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Zinc950)
+                Text("İhbar Kayıtları", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Zinc950)
             }
 
             if (state.incidents.isEmpty()) {
-                item(key = "operations_empty") {
-                    Text("Gösterilecek doğrulanmış ihbar bulunmuyor. Yeni kayıtlar geldiğinde burada listelenecek.", fontSize = 13.sp, color = Zinc600)
+                item(key = "operations_empty", contentType = "operations_empty") {
+                    Text("Gösterilecek doğrulanmış ihbar bulunmuyor. Yeni kayıtlar geldiğinde burada listelenecek.", fontSize = 14.sp, color = Zinc600)
                 }
             }
 
@@ -144,26 +106,26 @@ fun OperationsScreen(
                 key = { it.id },
                 contentType = { "triage_card" },
             ) { incident ->
-                ShadcnCard {
+                QuakeCard {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(incident.id, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AfetCrimson)
+                        Text(incident.id, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = AfetCrimson)
                         UrgencyBadge(incident.urgency)
                     }
 
                     Spacer(Modifier.height(6.dp))
-                    Text(incident.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Zinc950)
+                    Text(incident.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Zinc950)
                     Spacer(Modifier.height(4.dp))
                     Text(incident.locationLabel, fontSize = 12.sp, color = Zinc600)
                     Spacer(Modifier.height(10.dp))
                     Text("Durum: ${incident.status}", fontSize = 12.sp, color = Zinc600)
                     if (incident.syncStatus != SyncStatus.SYNCED) {
-                        Text("Bu ihbar henüz sunucuya iletilmedi.", fontSize = 11.5.sp, color = AfetCrimson)
+                        Text("Bu ihbar henüz sunucuya iletilmedi.", fontSize = 12.sp, color = AfetCrimson)
                     }
-                    Text("Bu ekrandan ekip sevki veya ihbar doğrulaması yapılamıyor.", fontSize = 11.5.sp, color = Zinc500)
+                    Text("Bu ekrandan ekip sevki veya ihbar doğrulaması yapılamıyor.", fontSize = 12.sp, color = Zinc500)
                 }
             }
 

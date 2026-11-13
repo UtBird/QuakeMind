@@ -27,6 +27,13 @@ import { GorevOzetSatiri, SevkBolumu } from './sevk'
    metin ve ihtiyaç modları aynı parçaları kullanır: aynı ihbar her yerde aynı
    renkle, aynı adla ve aynı düğmelerle görünür. */
 
+const BILDIRILEN_ACILIYET = {
+  LOW: { ad: 'Düşük', ton: 'nötr' },
+  MEDIUM: { ad: 'Orta', ton: 'mid' },
+  HIGH: { ad: 'Yüksek', ton: 'high' },
+  CRITICAL: { ad: 'Kritik', ton: 'crit' },
+} as const
+
 const ACILIYET_TONU = (n: number) => (n >= 5 ? 'crit' : n >= 4 ? 'high' : n >= 3 ? 'mid' : 'ok')
 
 /** Türün renkli simgesi. Renk tek başına anlam taşımaz; yanında ad yazılır. */
@@ -86,8 +93,13 @@ export function IhbarSatiri({
         <span className="flex items-baseline justify-between gap-2">
           <span className="truncate text-small text-ink">
             <span className={t.metin}>{t.kisa}</span>
-            {ihbar.etiket ? ` · ${ihbar.etiket}` : ''}
+            {(ihbar.bildirilenKategoriAdi ?? ihbar.etiket) && ` · ${ihbar.bildirilenKategoriAdi ?? ihbar.etiket}`}
           </span>
+          {ihbar.bildirilenAciliyet && (
+            <Rozet ton={BILDIRILEN_ACILIYET[ihbar.bildirilenAciliyet].ton}>
+              {BILDIRILEN_ACILIYET[ihbar.bildirilenAciliyet].ad}
+            </Rozet>
+          )}
           <Rozet ton={d.ton}>{d.ad}</Rozet>
         </span>
         <GorevOzetSatiri gorevler={ihbar.gorevler} olayZamani={ihbar.zaman} bekleyenYaz={false} />
@@ -144,6 +156,12 @@ export function IhbarDetayi({ ihbar }: { ihbar: Ihbar }) {
               <span className="whitespace-pre-line">{ihbar.metin}</span>
             </Satir>
           )}
+          {ihbar.bildirilenKategoriAdi && <Satir ad="Bildirilen kategori">{ihbar.bildirilenKategoriAdi}</Satir>}
+          {ihbar.bildirilenAciliyet && (
+            <Satir ad="Bildirilen aciliyet">{BILDIRILEN_ACILIYET[ihbar.bildirilenAciliyet].ad}</Satir>
+          )}
+          {ihbar.mahsurSayisi != null && <Satir ad="Bildirilen mahsur">{sayi(ihbar.mahsurSayisi)}</Satir>}
+          {ihbar.yaraliSayisi != null && <Satir ad="Bildirilen yaralı">{sayi(ihbar.yaraliSayisi)}</Satir>}
           <Satir ad="Konum">{ihbarKonumu(ihbar)}</Satir>
           <Satir ad="Zaman">
             <span className="font-mono">{tarihSaat(ihbar.zaman)}</span>

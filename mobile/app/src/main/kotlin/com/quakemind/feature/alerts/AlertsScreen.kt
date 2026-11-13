@@ -3,7 +3,6 @@ package com.quakemind.feature.alerts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,28 +13,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,8 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -94,37 +84,18 @@ fun AlertsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text(
-                    text = "Bölgesel Bildirimler & Uyarılar",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Zinc950,
-                )
-                Text(
-                    text = "$unreadCount okunmamış kritik uyarı",
-                    fontSize = 12.sp,
-                    color = Zinc500,
-                )
-            }
-
-            TextButton(onClick = onMarkAllRead) {
-                Icon(Icons.Outlined.DoneAll, contentDescription = null, modifier = Modifier.size(16.dp), tint = AfetCrimson)
-                Spacer(Modifier.width(4.dp))
-                Text("Okundu Say", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = AfetCrimson)
-            }
-        }
+        ScreenHeader(
+            title = "Uyarılar",
+            subtitle = "$unreadCount okunmamış bildirim",
+            actions = {
+                IconButton(onClick = onMarkAllRead, enabled = unreadCount > 0) {
+                    Icon(Icons.Outlined.DoneAll, contentDescription = "Tümünü okundu işaretle")
+                }
+            },
+        )
 
         // Category Filter Chips
         LazyRow(
@@ -141,10 +112,10 @@ fun AlertsScreen(
                     selected = selectedCategory == cat,
                     onClick = { selectedCategory = cat },
                     label = { Text(cat, fontSize = 12.sp, fontWeight = FontWeight.Medium) },
-                    shape = RoundedCornerShape(6.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AfetCrimson,
-                        selectedLabelColor = Color.White,
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         containerColor = Zinc50,
                         labelColor = Zinc700,
                     ),
@@ -152,7 +123,7 @@ fun AlertsScreen(
                         enabled = true,
                         selected = selectedCategory == cat,
                         borderColor = Zinc200,
-                        selectedBorderColor = AfetCrimson,
+                        selectedBorderColor = MaterialTheme.colorScheme.primary,
                     ),
                 )
             }
@@ -210,7 +181,7 @@ private fun AlertItemCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = Shape12dp,
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         border = if (!alert.isRead && alert.severity == AlertSeverity.CRITICAL) BorderAfetCrimsonBorder else BorderZinc200,
     ) {
         Column(
@@ -233,9 +204,9 @@ private fun AlertItemCard(
                         border = androidx.compose.foundation.BorderStroke(1.dp, badgeBorder),
                     ) {
                         Text(
-                            text = alert.category.uppercase(),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = alert.category,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
                             color = badgeText,
                             letterSpacing = 0.5.sp,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -250,8 +221,8 @@ private fun AlertItemCard(
                         ) {
                             Text(
                                 text = "YENİ",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
                                 color = AfetCrimson,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                             )
@@ -261,7 +232,7 @@ private fun AlertItemCard(
 
                 Text(
                     text = alert.occurredAt,
-                    fontSize = 11.5.sp,
+                    fontSize = 12.sp,
                     color = Zinc400,
                 )
             }
@@ -270,7 +241,7 @@ private fun AlertItemCard(
             Text(
                 text = alert.title,
                 fontSize = 14.5.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = Zinc950,
                 lineHeight = 20.sp,
             )
@@ -278,7 +249,7 @@ private fun AlertItemCard(
             // Detail description excerpt
             Text(
                 text = alert.detail,
-                fontSize = 12.5.sp,
+                fontSize = 14.sp,
                 color = Zinc600,
                 lineHeight = 18.sp,
                 maxLines = 2,
@@ -306,7 +277,7 @@ private fun AlertItemCard(
                     )
                     Text(
                         text = alert.location,
-                        fontSize = 11.5.sp,
+                        fontSize = 12.sp,
                         color = Zinc500,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,

@@ -10,11 +10,12 @@ import com.quakemind.core.model.IncidentDraft
 import com.quakemind.core.model.IncidentType
 import com.quakemind.core.model.SyncStatus
 import com.quakemind.core.network.api.IncidentService
+import com.quakemind.core.model.Urgency
+import com.quakemind.core.network.real.BackendException
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.io.IOException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
+import kotlinx.coroutines.CancellationException
 
 @HiltWorker
 class IncidentSyncWorker @AssistedInject constructor(
@@ -28,7 +29,6 @@ class IncidentSyncWorker @AssistedInject constructor(
         // 1. Crash recovery: Reset any records stuck in UPLOADING from previous worker kill
         incidentDao.resetStaleUploading()
 
-        var hasRecoverableError = false
         val batchSize = 50
 
         while (true) {
@@ -36,7 +36,7 @@ class IncidentSyncWorker @AssistedInject constructor(
             val batch = incidentDao.claimPendingBatch(limit = batchSize)
             if (batch.isEmpty()) break
 
-            for (item in batch) {
+            for ((index, item) in batch.withIndex()) {
                 try {
                     val draft = IncidentDraft(
                         localId = item.localId,
@@ -52,6 +52,12 @@ class IncidentSyncWorker @AssistedInject constructor(
                             if (lat != null && lng != null) GeoPoint(lat, lng) else null
                         },
                         idempotencyKey = item.idempotencyKey,
+                        urgency = item.urgency?.let(Urgency::valueOf) ?: Urgency.HIGH,
+                        peopleCount = item.peopleCount ?: 0,
+                        injuredCount = item.injuredCount ?: 0,
+                        locationSource = item.locationSource ?: "manuel",
+                        locationAccuracyMetres = item.locationAccuracyMetres,
+                        legacyPayload = item.urgency == null,
                     )
 
                     // 3. Call remote service with unchanging idempotencyKey
@@ -64,6 +70,8 @@ class IncidentSyncWorker @AssistedInject constructor(
                         retryCount = item.retryCount,
                         updatedAt = System.currentTimeMillis(),
                     )
+                } catch (cancel: CancellationException) {
+                    throw cancel
                 } catch (e: Exception) {
                     val isRecoverable = isRecoverableError(e)
                     val newStatus = if (isRecoverable) SyncStatus.FAILED else SyncStatus.CONFLICT
@@ -77,24 +85,24 @@ class IncidentSyncWorker @AssistedInject constructor(
                     )
 
                     if (isRecoverable) {
-                        hasRecoverableError = true
+                        val remaining = batch.drop(index + 1).map { it.localId }
+                        if (remaining.isNotEmpty()) {
+                            incidentDao.updateStatusBatch(remaining, SyncStatus.PENDING, System.currentTimeMillis())
+                        }
+                        return Result.retry()
                     }
                 }
             }
         }
 
-        return if (hasRecoverableError) {
-            Result.retry()
-        } else {
-            Result.success()
-        }
+        return Result.success()
     }
 
     private fun isRecoverableError(e: Exception): Boolean {
         return when (e) {
-            is IOException,
-            is SocketTimeoutException,
-            is UnknownHostException -> true
+            is BackendException -> e.statusCode == 401 || e.statusCode == 408 ||
+                e.statusCode == 429 || e.statusCode in 500..599
+            is IOException -> true
             else -> false
         }
     }

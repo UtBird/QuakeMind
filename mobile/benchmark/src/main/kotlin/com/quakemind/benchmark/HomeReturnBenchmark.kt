@@ -41,12 +41,12 @@ class HomeReturnBenchmark {
 
         // 2. Navigate away to Map tab
         clickBottomTab("Harita")
-        device.wait(Until.hasObject(By.text("Toplanma Alanı")), SHORT_TIMEOUT)
+        device.wait(Until.hasObject(By.desc("Yer, adres veya deprem ara")), SHORT_TIMEOUT)
         device.waitForIdle()
 
         // 3. Return back to Home tab (Instant cached content & scroll position restored)
         clickBottomTab("Ana Sayfa")
-        device.wait(Until.hasObject(By.text("AFET")), SHORT_TIMEOUT)
+        device.wait(Until.hasObject(By.text("Ana Sayfa")), SHORT_TIMEOUT)
         device.waitForIdle()
 
         // 4. Perform rapid fling down and up

@@ -1,6 +1,10 @@
 package com.quakemind.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -40,29 +44,15 @@ fun AppNavHost(
         startDestination = SplashRoute,
         modifier = modifier,
         enterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-            ) + fadeIn(animationSpec = tween(200))
+            if (initialState.destination.isMainDestination() && targetState.destination.isMainDestination()) EnterTransition.None
+            else fadeIn(tween(160)) + slideInHorizontally(tween(180, easing = FastOutSlowInEasing)) { it / 12 }
         },
         exitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-            ) + fadeOut(animationSpec = tween(200))
+            if (initialState.destination.isMainDestination() && targetState.destination.isMainDestination()) ExitTransition.None
+            else fadeOut(tween(100))
         },
-        popEnterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-            ) + fadeIn(animationSpec = tween(200))
-        },
-        popExitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-            ) + fadeOut(animationSpec = tween(200))
-        },
+        popEnterTransition = { fadeIn(tween(120)) },
+        popExitTransition = { fadeOut(tween(100)) },
     ) {
         composable<SplashRoute> {
             SplashRoute(
@@ -133,6 +123,7 @@ fun AppNavHost(
 
         composable<ProfileRoute> {
             ProfileRoute(
+                onBack = { navController.popBackStack() },
                 onOperations = { navController.navigate(OperationsRoute) },
             )
         }
@@ -192,3 +183,7 @@ fun AppNavHost(
         }
     }
 }
+
+private fun NavDestination.isMainDestination(): Boolean =
+    hasRoute<HomeRoute>() || hasRoute<MapRoute>() || hasRoute<AlertsRoute>() ||
+        hasRoute<ChecklistRoute>() || hasRoute<SosRoute>()

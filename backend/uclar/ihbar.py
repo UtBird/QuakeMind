@@ -34,7 +34,7 @@ import threading
 import time
 import uuid
 from collections import OrderedDict
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -199,6 +199,10 @@ def _cikti(k: dict, afetzede: bool = False) -> dict:
         c["ihtiyaclar"] = ek.get("ihtiyaclar", [])
         c["kisiSayisi"] = ek.get("kisiSayisi")
     # Kimin isledigi konsol icindir; afetzedeye gitmez.
+    c.update({alan: ek[alan] for alan in BILDIRILEN_ALANLAR if alan in ek})
+    kategori = ek.get("bildirilenKategori")
+    if kategori in BILDIRILEN_KATEGORILER:
+        c["bildirilenKategoriAdi"] = BILDIRILEN_KATEGORILER[kategori]
     if not afetzede:
         c["isleyenAd"] = k.get("isleyen_ad")
     return c
@@ -326,6 +330,23 @@ def metin_analiz(istek: MetinAnalizIstegi, kul: dict = Depends(kimlik.kullanici)
 
 # --- 2. ihbar --------------------------------------------------------------------
 
+BILDIRILEN_KATEGORILER = {
+    "DEBRIS": "Enkaz / Mahsur",
+    "INJURED": "Yaralı",
+    "MISSING_PERSON": "Kayıp kişi",
+    "FIRE": "Yangın / Gaz kaçağı",
+    "ROAD_CLOSURE": "Yol kapanması",
+    "BUILDING_DAMAGE": "Ağır bina hasarı",
+    "WATER": "Su",
+    "FOOD": "Gıda",
+    "MEDICAL": "Acil tıbbi ihtiyaç",
+    "SHELTER": "Barınma",
+    "COMMUNICATION": "İletişim",
+    "OTHER": "Diğer",
+}
+BILDIRILEN_ALANLAR = ("bildirilenKategori", "bildirilenAciliyet", "mahsurSayisi", "yaraliSayisi")
+
+
 class IhbarIstegi(BaseModel):
     tur: str
     analizId: Optional[str] = None
@@ -338,6 +359,10 @@ class IhbarIstegi(BaseModel):
     mahalle: Optional[str] = Field(None, max_length=120)
     ihtiyaclar: Optional[list[str]] = None
     kisiSayisi: Optional[int] = Field(None, ge=1, le=500)
+    bildirilenKategori: Optional[str] = Field(None, max_length=32)
+    bildirilenAciliyet: Optional[Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]] = None
+    mahsurSayisi: Optional[int] = Field(None, ge=0, le=500)
+    yaraliSayisi: Optional[int] = Field(None, ge=0, le=500)
 
 
 def _tekrar_ihbar(depo, kul: dict, anahtar: str, ozet: str) -> Optional[dict]:
@@ -355,6 +380,8 @@ def ihbar_ac(
     kul: dict = Depends(kimlik.kullanici),
     idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
 ):
+    if istek.bildirilenKategori is not None and istek.bildirilenKategori not in BILDIRILEN_KATEGORILER:
+        raise HTTPException(status_code=422, detail="Bilinmeyen ihbar kategorisi.")
     if istek.tur not in TURLER:
         raise HTTPException(status_code=422, detail="Tür: fotograf | metin | ihtiyac")
     if istek.konumKaynagi not in KONUM_KAYNAKLARI:
@@ -415,6 +442,7 @@ def ihbar_ac(
             lon, lat = float(istek.lon), float(istek.lat)
 
         ek: dict = {"konumKaynagi": istek.konumKaynagi}
+        ek.update(istek.model_dump(include=set(BILDIRILEN_ALANLAR), exclude_none=True))
         if istek.konumKaynagi == "gps" and istek.konumDogrulukM is not None:
             ek["konumDogrulukM"] = round(istek.konumDogrulukM)
         zaman = time.time()
@@ -438,7 +466,7 @@ def ihbar_ac(
             a = analiz["analiz"] if analiz else None
             ek["analiz"] = a
             if a is None:
-                etiket = "Model incelemedi"
+                etiket = BILDIRILEN_KATEGORILER.get(istek.bildirilenKategori, "Model incelemedi")
             elif a["ilgisiz"]:
                 etiket = "Model: afetle ilgisiz"
             else:

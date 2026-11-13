@@ -10,7 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-internal const val TARGET_PACKAGE = "com.quakemind"
+internal const val TARGET_PACKAGE = "com.quakemind.performance"
 
 @RunWith(AndroidJUnit4::class)
 @LargeTest

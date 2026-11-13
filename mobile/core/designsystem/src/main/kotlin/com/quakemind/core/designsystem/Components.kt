@@ -1,7 +1,6 @@
 package com.quakemind.core.designsystem
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,14 +16,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -48,32 +43,40 @@ import com.quakemind.core.model.RouteOption
 import com.quakemind.core.model.Urgency
 
 // ---------------------------------------------------------------------------
-// SHADCN CORE ATOMS
+// SHARED SURFACES AND STATUS
 // ---------------------------------------------------------------------------
 
 @Composable
-fun ShadcnCard(
+fun QuakeCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        shape = Shape12dp,
-        color = Color.White,
-        border = BorderZinc200,
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            content = content,
+    val cardContent: @Composable () -> Unit = {
+        Column(modifier = Modifier.padding(20.dp), content = content)
+    }
+    if (onClick == null) {
+        Surface(
+            modifier = modifier.fillMaxWidth(),
+            shape = Shape16dp,
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderZinc200,
+            content = cardContent,
+        )
+    } else {
+        Surface(
+            onClick = onClick,
+            modifier = modifier.fillMaxWidth(),
+            shape = Shape16dp,
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderZinc200,
+            content = cardContent,
         )
     }
 }
 
 @Composable
-fun ShadcnBadge(
+fun StatusBadge(
     text: String,
     modifier: Modifier = Modifier,
     backgroundColor: Color = Zinc100,
@@ -89,7 +92,7 @@ fun ShadcnBadge(
         Text(
             text = text,
             color = textColor,
-            fontSize = 11.5.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
         )
@@ -104,8 +107,9 @@ fun ShadcnBadge(
 fun AfetLogoMark(
     modifier: Modifier = Modifier,
     size: Dp = 32.dp,
-    color: Color = AfetCrimson,
+    color: Color = AfetAccent,
 ) {
+    val markForeground = androidx.compose.material3.contentColorFor(color)
     Surface(
         modifier = modifier.size(size),
         shape = RoundedCornerShape(size * 0.28f),
@@ -131,7 +135,7 @@ fun AfetLogoMark(
                             close()
                         }
                         onDrawBehind {
-                            drawPath(path = path, color = Color.White)
+                            drawPath(path = path, color = markForeground)
                         }
                     }
             )
@@ -149,72 +153,22 @@ fun AfetLogoHeader(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AfetLogoMark(size = 44.dp, color = AfetCrimson)
+        AfetLogoMark(size = 44.dp, color = AfetAccent)
         Spacer(Modifier.height(10.dp))
         Text(
-            text = "AFET",
+            text = "QuakeMind",
             style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Black,
+            fontWeight = FontWeight.Bold,
             color = textColor,
-            letterSpacing = 3.sp,
+            letterSpacing = (-.5).sp,
         )
         if (showSubtitle) {
             Spacer(Modifier.height(2.dp))
             Text(
                 text = "Deprem & Acil Durum Karar Destek Ağı",
-                fontSize = 12.5.sp,
+                fontSize = 14.sp,
                 color = Zinc500,
                 fontWeight = FontWeight.Normal,
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// E-DEVLET BUTTON
-// ---------------------------------------------------------------------------
-
-@Composable
-fun EDevletButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(44.dp),
-        shape = Shape8dp,
-        border = BorderZinc200,
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = Color.White,
-            contentColor = Zinc950,
-        ),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = AfetCrimson,
-                modifier = Modifier.size(20.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "e",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                    )
-                }
-            }
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = "e-Devlet Kapısı ile Giriş Yap",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.5.sp,
-                color = Zinc950,
             )
         }
     }
@@ -250,8 +204,8 @@ fun SeismicMagnitudeBadge(
         ) {
             Text(
                 text = magnitude.formatMagnitude(),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Black,
+                fontSize = if (size >= 64.dp) 26.sp else 18.sp,
+                fontWeight = FontWeight.Medium,
                 color = textColor,
             )
         }
@@ -264,7 +218,7 @@ fun SeismicMagnitudeBadge(
 
 @Composable
 fun ConnectionStatusChip(online: Boolean, modifier: Modifier = Modifier) {
-    val (dotColor, label) = if (online) Pair(AfetGreen, "Çevrimiçi") else Pair(AfetAmber, "Kuyrukta")
+    val (dotColor, label) = if (online) Pair(AfetGreen, "Çevrimiçi") else Pair(AfetAmber, "Çevrimdışı")
     Surface(
         modifier = modifier,
         shape = Shape6dp,
@@ -279,7 +233,7 @@ fun ConnectionStatusChip(online: Boolean, modifier: Modifier = Modifier) {
             Spacer(Modifier.width(6.dp))
             Text(
                 text = label,
-                fontSize = 11.5.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = Zinc700,
             )
@@ -310,13 +264,13 @@ fun OfflineModeBanner(pendingCount: Int, modifier: Modifier = Modifier) {
                 Text(
                     text = "Çevrimdışı Mod",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     color = Zinc950,
                 )
                 Text(
                     text = if (pendingCount > 0) "$pendingCount ihbar yerel hafızada kayıtlı, bağlantı gelince aktarılacak."
                     else "İnternet bağlantınız kısıtlı. Veriler yerel hafızada güvenle saklanır.",
-                    fontSize = 11.5.sp,
+                    fontSize = 12.sp,
                     color = Zinc600,
                 )
             }
@@ -335,7 +289,7 @@ fun RiskLevelBadge(label: String, level: Int, modifier: Modifier = Modifier) {
         level >= 40 -> Triple(AfetAmber, AfetAmberMuted, AfetAmberBorder)
         else -> Triple(AfetGreen, AfetGreenMuted, AfetGreenBorder)
     }
-    ShadcnBadge(
+    StatusBadge(
         text = "$label · $level/100",
         modifier = modifier,
         backgroundColor = bg,
@@ -348,12 +302,12 @@ fun RiskLevelBadge(label: String, level: Int, modifier: Modifier = Modifier) {
 fun UrgencyBadge(urgency: Urgency, modifier: Modifier = Modifier) {
     val (text, color, bg, border) = when (urgency) {
         Urgency.CRITICAL -> Quadruple("Kritik", AfetCrimson, AfetCrimsonMuted, AfetCrimsonBorder)
-        Urgency.HIGH -> Quadruple("Yüksek", AfetOrange, Color(0xFFFFF7ED), Color(0xFFFED7AA))
+        Urgency.HIGH -> Quadruple("Yüksek", AfetOrange, AfetAmberMuted, AfetAmberBorder)
         Urgency.MEDIUM -> Quadruple("Orta", AfetAmber, AfetAmberMuted, AfetAmberBorder)
         Urgency.LOW -> Quadruple("Düşük", AfetGreen, AfetGreenMuted, AfetGreenBorder)
     }
 
-    ShadcnBadge(
+    StatusBadge(
         text = text,
         modifier = modifier,
         backgroundColor = bg,
@@ -399,7 +353,7 @@ fun AiConfidenceIndicator(confidence: Float, modifier: Modifier = Modifier) {
 
 @Composable
 fun SafeRouteSummaryCard(route: RouteOption, modifier: Modifier = Modifier) {
-    ShadcnCard(modifier = modifier) {
+    QuakeCard(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -410,8 +364,8 @@ fun SafeRouteSummaryCard(route: RouteOption, modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("${route.distanceKm} km", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Zinc900)
-            Text("~${route.durationMinutes} dk", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Zinc500)
+            Text("${route.distanceKm} km", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Zinc900)
+            Text("~${route.durationMinutes} dk", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Zinc500)
             Text(route.reliability, fontSize = 12.sp, color = AfetGreen, fontWeight = FontWeight.Medium)
         }
     }
@@ -425,7 +379,7 @@ fun LoadingSkeleton(modifier: Modifier = Modifier) {
             .height(100.dp),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator(color = AfetCrimson, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+        CircularProgressIndicator(color = AfetAccent, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -445,7 +399,7 @@ fun EmptyState(title: String, detail: String, modifier: Modifier = Modifier) {
             modifier = Modifier.size(24.dp),
         )
         Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Zinc950)
-        Text(detail, fontSize = 12.5.sp, color = Zinc500, textAlign = TextAlign.Center)
+        Text(detail, fontSize = 14.sp, color = Zinc500, textAlign = TextAlign.Center)
     }
 }
 
@@ -459,7 +413,7 @@ fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifi
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(Icons.Outlined.ErrorOutline, contentDescription = null, tint = AfetCrimson, modifier = Modifier.size(28.dp))
-        Text(message, color = Zinc950, fontSize = 13.5.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+        Text(message, color = Zinc950, fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
         OutlinedButton(
             onClick = onRetry,
             shape = Shape8dp,
@@ -467,7 +421,7 @@ fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifi
         ) {
             Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = Zinc900)
             Spacer(Modifier.width(6.dp))
-            Text("Tekrar Dene", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Zinc900)
+            Text("Tekrar Dene", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Zinc900)
         }
     }
 }

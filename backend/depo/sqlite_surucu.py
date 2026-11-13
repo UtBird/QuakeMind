@@ -49,6 +49,13 @@ CREATE TABLE IF NOT EXISTS hesap_kayitlari (
     ayrinti       TEXT
 );
 CREATE INDEX IF NOT EXISTS hesap_kayitlari_hedef ON hesap_kayitlari (hedef_id, zaman);
+CREATE TABLE IF NOT EXISTS istek_siniri (
+    kapsam TEXT NOT NULL,
+    anahtar TEXT NOT NULL,
+    bitis REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_istek_siniri_bitis ON istek_siniri(bitis);
+CREATE INDEX IF NOT EXISTS ix_istek_siniri_anahtar ON istek_siniri(kapsam, anahtar);
 
 CREATE TABLE IF NOT EXISTS oturumlar (
     jeton_ozeti   TEXT PRIMARY KEY,
@@ -382,6 +389,21 @@ class SqliteDepo:
             self._okuma_baglantilari.clear()
         with self._kilit:
             self._baglanti.close()
+
+    def istek_hakki_al(self, kapsam: str, anahtar: str, sinir: int, pencere_sn: int) -> bool:
+        """Hiz sinirini ayni SQLite dosyasini kullanan surecler arasinda uygula."""
+        with self._kilit, self._baglanti:
+            simdi = time.time()
+            # Ilk yazma islemi SQLite yazma kilidini alir. Sayim ve ekleme atomiktir.
+            self._baglanti.execute("DELETE FROM istek_siniri WHERE bitis <= ?", (simdi,))
+            sonuc = self._baglanti.execute(
+                """INSERT INTO istek_siniri (kapsam, anahtar, bitis)
+                   SELECT ?, ?, ?
+                   WHERE (SELECT COUNT(*) FROM istek_siniri
+                          WHERE kapsam = ? AND anahtar = ?) < ?""",
+                (kapsam, anahtar, simdi + pencere_sn, kapsam, anahtar, sinir),
+            )
+            return sonuc.rowcount == 1
 
     # ---- kullanicilar -----------------------------------------------------
 

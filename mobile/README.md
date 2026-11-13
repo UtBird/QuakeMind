@@ -16,7 +16,7 @@
 
 **QuakeMind (AFET)**, afet anında ve sonrasında karar destek sağlayan, **çevrimdışı öncelikli (offline-first)**, Kotlin/Jetpack Compose tabanlı bir Android uygulamasıdır. Yerel ihbar kuyruğu ve WorkManager eşitlemesi bağlantı kesintilerinde tekrar denemeyi destekler; sunucu kabulü olmadan ihbar gönderildi olarak işaretlenmez.
 
-Uygulama; Kandilli & AFAD sismik verileri, vektörel afet haritası, yapay zeka destekli hasar ve metin analizi, güvenli tahliye rotaları, aile güvende takibi ve afet çantası hazırlığı modüllerini tek bir çatı altında birleştirir.
+Uygulama; sunucunun deprem kataloğu, OpenStreetMap tabanlı harita, yapay zekâ destekli hasar ve metin ön incelemesi, yaya rotası, kişisel güvende durumu ve afet çantası hazırlığı modüllerini tek bir çatı altında birleştirir.
 
 ---
 
@@ -26,21 +26,21 @@ Uygulama; Kandilli & AFAD sismik verileri, vektörel afet haritası, yapay zeka 
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                             QUAKEMIND APP                                   │
 ├───────────────────┬───────────────────┬───────────────────┬─────────────────┤
-│ 🚨 Canlı Deprem    │ 🗺️ Vektör Harita  │ 🛡️ Çevrimdışı     │ 🔄 Crash-Proof  │
-│    Sismik Takip   │    Toplanma & Çadır│    İhbar Kuyruğu  │    Batch Sync   │
+│ 🚨 Deprem Kataloğu │ 🗺️ Afet Haritası  │ 🛡️ Çevrimdışı     │ 🔄 Arka Plan    │
+│    Kaynak & Tarih │    Yakın Yerler  │    İhbar Kuyruğu  │    Eşitleme     │
 ├───────────────────┼───────────────────┼───────────────────┼─────────────────┤
-│ 🤖 Yapay Zeka     │ 🧭 Güvenli Tahliye│ 👨‍👩‍👧 Aile Güvendeyim│ 🎒 Afet Çantası  │
+│ 🤖 Yapay Zeka     │ 🧭 Yaya Rotası    │ 👨‍👩‍👧 Güvende Durumu│ 🎒 Afet Çantası  │
 │    Hasar & NLP    │    Rota Motoru    │    & SOS Sinyali  │    Hazırlık Seti│
 └───────────────────┴───────────────────┴───────────────────┴─────────────────┘
 ```
 
-- **🚨 Gerçek Zamanlı Deprem Akışı (Earthquake Monitor):** Kandilli Rasathanesi ve AFAD verilerini anlık büyüklük, derinlik ve konuma göre filtreleme, hissedilme bildirimleri ve sismik şiddet haritası.
-- **🗺️ Yüksek Performanslı Harita (Vector Map Engine):** Toplanma alanları, sahra hastaneleri, çadır kentler ve kapalı yollar. `drawWithCache` optimizasyonu ile 0 per-frame allocation ve 120 FPS akıcı Canvas render'ı.
+- **Deprem kayıtları:** Sunucunun deprem kataloğundan alınan konum, büyüklük, tarih ve kaynak bilgileri.
+- **Harita:** OpenStreetMap üzerinde deprem kayıtları, AFAD toplanma alanları ve yakındaki hizmet noktaları.
 - **🛡️ Çevrimdışı İhbar ve Takip (Offline-First Incident Queue):** Ağ bağlantısı olmasa dahi tekil `idempotencyKey` ile yerel Room DB'ye kaydedilen ve takip kodu üreten güvenli ihbar sistemi.
 - **🔄 Kesintiye Dayanıklı Arka Plan Eşitleme (Batch Sync):** `IncidentSyncWorker` ile 50'lik atomik transaction blokları (`claimPendingBatch`), exponential backoff ve kilit kurtarma (`resetStaleUploading`).
 - **🤖 Backend AI Analizi (NLP & Damage Assessment):** Acil durum metinlerinden ihtiyaç ve aciliyet çıkarımı, fotoğrafta çatlak/bina hasarı ön incelemesi ve bölgesel risk skoru FastAPI backend üzerinden hesaplanır. Sunucu veya model erişilemezse gerçek sonuç üretilmez.
-- **🧭 Güvenli Rota ve Tahliye (Safe Evacuation Routing):** Hasarlı binalardan ve kapalı yollardan arındırılmış, risk skoru hesaplanmış tahliye koridorları.
-- **👨‍👩‍👧 Aile Güvende Ağı & SOS (Family Safety & SOS):** Tek dokunuşla durum paylaşımı, aile fertlerinin pil/konum takibi, yüksek sesli düdük ve flaşör acil durum sinyali.
+- **Yaya rotası:** Sunucu, yol ağı ve bilinen engeller üzerinden rota üretir.
+- **Güvende durumu ve SOS:** Kişisel durum bildirimi, konumlu SOS çağrısı, düdük ve flaşör. Aile üyelerinin konum ve pil takibi geliştirme kapsamındadır.
 - **🎒 Afet Çantası Kontrolü (Emergency Kit Checklist):** Hayati öneme göre sıralanmış, hızlı işaretlenebilir ve izole state ile çalışan kontrol listesi.
 
 ---
@@ -50,9 +50,9 @@ Uygulama; Kandilli & AFAD sismik verileri, vektörel afet haritası, yapay zeka 
 Proje, **Clean Architecture**, **Unidirectional Data Flow (UDF)** ve katı modüler ayrım prensiplerine dayanır:
 
 ```
-QuakeApp/
+mobile/
 ├── app/                                        # Application Shell, Feature Screens, Navigation & ViewModels
-│   └── src/main/kotlin/com/mobile/
+│   └── src/main/kotlin/com/quakemind/
 │       ├── MainActivity.kt                     # Single Activity (Edge-to-edge)
 │       ├── navigation/                         # Type-safe (@Serializable) Navigation Compose
 │       └── feature/                            # Feature-first Scoped UI Modülleri
@@ -67,10 +67,10 @@ QuakeApp/
 │
 ├── core/
 │   ├── model/                                  # Pure Kotlin Domain Modelleri
-│   ├── database/                               # Room DB v2, Composite Index, IncidentDao, Migrations
+│   ├── database/                               # Room şeması v3, Composite Index, IncidentDao, Migrations
 │   ├── network/                                # Remote API sözleşmeleri, OkHttp, NetworkMonitor
 │   ├── data/                                   # Bounded Repositories & Local/Remote DataSources
-│   ├── designsystem/                           # AfetCrimson (#800E13) Tema, Tipografi, M3 Bileşenler
+│   ├── designsystem/                           # Tema ve renk belirteçleri, Tipografi, M3 Bileşenler
 │   ├── ui/                                     # Generic UiState<T> ve UI uzantıları
 │   └── testing/                                # Test Fixtures, Fake DAO ve Fake NetworkMonitor
 │
@@ -103,26 +103,15 @@ graph TD
 
 ---
 
-## ⚡ Performans ve Optimizasyon Başarıları (Benchmark Results)
+## Performans Ölçümleri
 
-AndroidX Macrobenchmark ve R8 Minified Release derleme ortamında yapılan kapsamlı ölçüm sonuçları:
-
-| Performans Metriği | Baseline (Faz 0) | Optimizasyon Sonrası (Faz 4) | İyileşme Oranı |
-|---|---|---|---|
-| **Soğuk Başlatma (Cold Startup TTID)** | ~2,000 ms | **~410 ms** | **🚀 %79.5 Daha Hızlı** (1.59s kazanç) |
-| **Ilık Başlatma (Warm Startup TTID)** | ~380 ms | **~185 ms** | **⚡ %51.3 Daha Hızlı** |
-| **Home Feed Scroll P95 Frame Time** | 21.8 ms (Jank) | **6.4 ms** (120Hz içi) | **🎯 %70.6 Azalma (Sıfır Jank)** |
-| **Tab / Nav Switch Frame Time P95** | 19.2 ms | **7.1 ms** | **✨ %63.0 Azalma** |
-| **Map Canvas Allocation (Per Frame)** | ~45 KB / frame | **0 Bayt (`drawWithCache`)** | **🧹 GC Baskısı Sıfırlandı** |
-| **Room Queue Query Latency (10k Kayıt)**| ~140 ms | **~4.2 ms (Composite Index)**| **🔥 %97.0 Daha Hızlı** |
-| **Sync Worker RAM Kullanımı (1k Kayıt)** | ~38 MB | **~1.8 MB (50'lik batching)**| **💾 %95.2 Bellek Tasarrufu** |
-| **Compose Skippable Composables** | 42 | **210 (%99.7 kararlılık)** | **🛡️ 5x Artış** |
+`benchmark/` modülündeki AndroidX Macrobenchmark senaryoları başlangıç ve etkileşim sürelerini ölçer.
 
 ---
 
 ## 🎨 Tasarım Sistemi (Design System)
 
-- **Renk Paleti:** Afet Kırmızısı (`#800E13` AfetCrimson), Güvenlik Yeşili (`#2D6A4F`), Uyarı Turuncusu (`#D97706`), Nötr Zinc Skalası (`Zinc 50` - `Zinc 900`).
+- **Renk Paleti:** Marka ve seçim vurgusunda camgöbeği. Afet aciliyeti kırmızı, uyarılar turuncu, güvenlik durumu yeşil.
 - **Tipografi:** Google Fonts modern sans-serif hiyerarşisi (Clear numeric metrics, WCAG 2.1 AA kontrast oranı).
 - **Geometri ve Boşluklar:** 4 dp base grid (8, 12, 16, 24, 32), 20 dp Card radius, 12 dp Button radius, minimum 48 dp dokunma hedefi.
 - **Erişilebilirlik:** Renk bağımsız ikonografi + metin etiketleri, dynamic font scaling ve tam karanlık mod desteği.

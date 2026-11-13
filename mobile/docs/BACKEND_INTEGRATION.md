@@ -14,26 +14,30 @@ Set-Location backend
 ..\.venv\Scripts\python.exe fastapi_app.py
 ```
 
-Sunucu `0.0.0.0:8000` üzerinde dinler; bilgisayarda `http://127.0.0.1:8000/docs`
-ile açılır. Android emülatörü için aşağıdaki varsayılan adres yeterlidir. Fiziksel
-telefon için aynı Wi-Fi/hotspot ağındaki bilgisayar IP adresini Gradle özelliğiyle
-ver.
+Sunucu varsayılan olarak `127.0.0.1:8000` üzerinde dinler. Bilgisayarda
+`http://127.0.0.1:8000/docs`, Android emülatöründe `http://10.0.2.2:8000/` kullanılır.
+Fiziksel telefon için PowerShell'de başlatmadan önce `$env:QUAKEMIND_HOST = '0.0.0.0'`
+ayarlayın veya Git Bash'te repo kökünden `./start.sh --telefon` çalıştırın.
 
 ## API sunucu adresi
 
-Emülatörde debug varsayılanı: http://10.0.2.2:8000/
+Debug ve release varsayılanı: `https://quakemind-api.dehaozcan.online/`.
+Ek bir Gradle parametresi olmadan mobil istekler bu HTTPS sunucusuna gider.
 
 Fiziksel telefonda bilgisayarın yerel ağ IP adresini bul, telefon ve bilgisayarın
 birbirine erişebildiğini doğrula ve şu komutu çalıştır:
 
-    .\gradlew.bat :app:assembleDebug -PquakemindApiBaseUrl=http://192.168.1.50:8000/
+    .\gradlew.bat :app:assembleDebug -PquakemindDebugApiBaseUrl=http://192.168.1.50:8000/
 
-192.168.1.50 yerine gerçek bilgisayar IP adresini yaz. QUAKEMIND_API_BASE_URL
-ortam değişkeni de desteklenir; Gradle özelliği önceliklidir. Sunucunun ağ
-arayüzünde dinlemesi gerekir. Debug yapıda HTTP açık, release yapıda HTTP
-kapalıdır. Release'in varsayılan URL'si kasıtlı olarak çalışmayan
-https://mobile.invalid/ adresidir; yayımlamadan önce HTTPS sunucu adresi
-verilmelidir. Kullanıcı parolaları veya tokenları Gradle dosyalarına yazılmamalıdır.
+192.168.1.50 yerine gerçek bilgisayar IP adresini yaz. Emülatör için aynı
+debug özelliğine `http://10.0.2.2:8000/` verilebilir. `QUAKEMIND_DEBUG_API_BASE_URL`
+yalnız debug adresini değiştirir. Genel `quakemindApiBaseUrl` özelliği veya
+`QUAKEMIND_API_BASE_URL` ortam değişkeni iki yapının HTTPS adresini değiştirir;
+Gradle özelliği önceliklidir. URL içinde kullanıcı bilgisi, query veya fragment
+kabul edilmez. Release HTTP kabul etmez; TLS sertifika kontrolü kapatılmaz.
+Sunucu adresi açık kaynakta bulunabilir; parola, SSH/JWT anahtarı veya API
+sırrı uygulamaya ve Gradle dosyalarına yazılmaz. Backend yayını için
+`$quakemind-backend-deploy` kullanılır; push tek başına dağıtım başlatmaz.
 
 Windows'ta çalışma klasöründe Türkçe karakter olabildiği için
 android.overridePathCheck=true Gradle özelliği ayarlanmıştır.
@@ -60,12 +64,14 @@ komutu geçici boş Q: sürücü harfini kullanır, app + core:data birim testle
 | Kişisel güvende durumu | POST /api/afetzede/guvende-durumu |
 | Kapanmış yollar (saha ve üstü) | GET /api/katman/kapanmalar |
 
-Kimlik doğrulama JSON'dan erişim jetonu ve httpOnly qm_yenileme cookie'si
-alır. Android özel uygulama tercihlerinde saklar ve HTTP 401 sonrasında
-yenilemeyi bir defa dener. Çıkışta oturum bilgilerini temizler.
-WorkManager'ın kuyruğundaki ihbarlar aynı Idempotency-Key ile tekrar
-gönderilir. Kullanıcının elle girdiği konum manuel olarak etiketlenir;
-GPS etiketi yalnız gerçekten cihaz konum sağlayıcısından geldiğinde kullanılır.
+Android, erişim ve yenileme jetonlarını Android Keystore anahtarıyla şifreleyerek
+saklar. HTTP 401 sonrasında yenilemeyi bir defa dener ve çıkışta oturum bilgilerini
+temizler. Yeni misafir hesapları IP başına dakikada beş, yeni SOS çağrıları hesap
+başına on dakikada beş istekle sınırlıdır.
+
+İhbar formu önce cihaz konumunu ister ve elle koordinat girişine de izin verir.
+WorkManager, kategori, aciliyet, mahsur ve yaralı sayıları ile konum bilgilerini
+kuyrukta saklar. Geçici hatada aynı Idempotency-Key ile bekleyerek yeniden dener.
 
 Harita verisi için önce gerçek konum elde edilir ve MapRepository.refresh(location)
 çağrılır. Gerçek konum bulunamazsa sahte pin veya İstanbul konumu üretilemez.

@@ -31,6 +31,59 @@ def client(tmp_path, monkeypatch):
     veritabani.kapat()
 
 
+def test_misafir_ip_siniri_sadece_yeni_oturumlarda_uygulanir(client, monkeypatch):
+    monkeypatch.setattr(oturum, "MISAFIR_IP_SINIRI", 1)
+    ilk = client.post("/api/oturum/misafir")
+    assert ilk.status_code == 201
+    ayni = client.post("/api/oturum/misafir")
+    assert ayni.status_code == 201
+    assert ayni.json()["kullanici"]["id"] == ilk.json()["kullanici"]["id"]
+
+    client.cookies.clear()
+    engel = client.post("/api/oturum/misafir", headers={"X-Forwarded-For": "192.0.2.22"})
+    assert engel.status_code == 429
+    assert engel.headers["Retry-After"] == "60"
+
+
+def test_sos_siniri_kullaniciya_ozel(client):
+    ilk = client.post("/api/oturum/misafir").json()["erisimJetonu"]
+    client.cookies.clear()
+    ikinci = client.post("/api/oturum/misafir").json()["erisimJetonu"]
+    payload = {"lat": 40.99, "lon": 29.03, "oncelik": "kritik"}
+    for _ in range(5):
+        assert client.post("/api/sos", json=payload, headers={"Authorization": f"Bearer {ilk}"}).status_code == 201
+
+    engel = client.post("/api/sos", json=payload, headers={"Authorization": f"Bearer {ilk}"})
+    assert engel.status_code == 429
+    assert engel.headers["Retry-After"] == "600"
+    assert client.post("/api/sos", json=payload, headers={"Authorization": f"Bearer {ikinci}"}).status_code == 201
+
+
+def test_ihbar_beyan_alanlari_kalici_ve_idempotent(client):
+    token = client.post("/api/oturum/misafir").json()["erisimJetonu"]
+    headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "android-ihbar-beyan-1"}
+    beyan = {
+        "bildirilenKategori": "DEBRIS",
+        "bildirilenAciliyet": "CRITICAL",
+        "mahsurSayisi": 2,
+        "yaraliSayisi": 0,
+        "konumKaynagi": "gps",
+        "konumDogrulukM": 8,
+    }
+    payload = {"tur": "metin", "lat": 40.99, "lon": 29.03, "metin": "Enkaz ihbarı", **beyan}
+    ilk = client.post("/api/ihbarlar", json=payload, headers=headers)
+    assert ilk.status_code == 201
+    assert ilk.json()["bildirilenKategoriAdi"] == "Enkaz / Mahsur"
+    assert ilk.json()["skor"] is None
+    kayitlar = client.get("/api/ihbarlar", headers=headers).json()
+    assert len(kayitlar) == 1
+    assert {alan: kayitlar[0][alan] for alan in beyan} == beyan
+    tekrar = client.post("/api/ihbarlar", json=payload, headers=headers)
+    assert tekrar.json()["id"] == ilk.json()["id"]
+    degisti = client.post("/api/ihbarlar", json={**payload, "yaraliSayisi": 1}, headers=headers)
+    assert degisti.status_code == 409
+
+
 def test_misafir_oturumu_sos_ve_yenileme(client):
     guest = client.post("/api/oturum/misafir")
     assert guest.status_code == 201

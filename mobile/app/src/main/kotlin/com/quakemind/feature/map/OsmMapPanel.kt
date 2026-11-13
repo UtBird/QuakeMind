@@ -1,12 +1,15 @@
 package com.quakemind.feature.map
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import com.quakemind.core.designsystem.AfetCrimson
+import androidx.compose.ui.unit.dp
+import com.quakemind.core.designsystem.AfetBlue
 import com.quakemind.core.model.Earthquake
 import com.quakemind.core.model.GeoPoint
 import com.quakemind.core.model.MapPoint
@@ -65,11 +68,13 @@ fun OsmMapPanel(
             compassEnabled = false,
         ),
         contentPadding = contentPadding,
-        mapColorScheme = ComposeMapColorScheme.LIGHT,
+        mapColorScheme = if (MaterialTheme.colorScheme.background.luminance() < .5f) ComposeMapColorScheme.DARK else ComposeMapColorScheme.LIGHT,
         onMapClick = { onMapTapped() },
     ) {
         Clustering(
             items = markerItems,
+            // The SDK's native marker path reuses its drawable cache. Custom Compose
+            // marker content creates and measures an offscreen composition per item.
             onClusterItemClick = { item ->
                 item.earthquake?.let(onEarthquakeSelected)
                 item.point?.let(onPointSelected)
@@ -82,9 +87,9 @@ fun OsmMapPanel(
             Circle(
                 center = center,
                 radius = 24f,
-                strokeColor = AfetCrimson.copy(alpha = 0.24f),
+                strokeColor = AfetBlue.copy(alpha = 0.24f),
                 strokeWidth = 1.5f,
-                fillColor = AfetCrimson.copy(alpha = 0.12f),
+                fillColor = AfetBlue.copy(alpha = 0.12f),
                 zIndex = 1f,
             )
             Circle(
@@ -92,7 +97,7 @@ fun OsmMapPanel(
                 radius = 7f,
                 strokeColor = Color.White,
                 strokeWidth = 2.5f,
-                fillColor = AfetCrimson,
+                fillColor = AfetBlue,
                 zIndex = 2f,
             )
         }
@@ -146,7 +151,7 @@ private data class MapOverlayItem(
 
 private fun Earthquake.toMarkerItem() = MapOverlayItem(
     label = "M ${String.format(java.util.Locale.US, "%.1f", magnitude)} · $epicenter",
-    details = "${depthKm.toInt()} km derinlik · $occurredAt",
+    details = "${depthKm.toInt()} km derinlik · $occurredAt · $source",
     coordinate = LatLng(latitude, longitude),
     earthquake = this,
 )

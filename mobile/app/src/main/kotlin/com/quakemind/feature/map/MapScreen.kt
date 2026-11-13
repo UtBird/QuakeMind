@@ -47,6 +47,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,7 +57,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -69,9 +69,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.draw.clip
+import com.quakemind.core.designsystem.AfetAccent
 import com.quakemind.core.designsystem.AfetCrimson
 import com.quakemind.core.designsystem.AfetCrimsonMuted
+import com.quakemind.core.designsystem.AfetGreen
 import com.quakemind.core.designsystem.BorderZinc200
+import com.quakemind.core.designsystem.Shape8dp
 import com.quakemind.core.designsystem.Zinc100
 import com.quakemind.core.designsystem.Zinc400
 import com.quakemind.core.designsystem.Zinc500
@@ -94,7 +97,6 @@ import java.util.Locale
 
 private val mapFilters = listOf("Tümü", "Depremler", "Yakındakiler", "Toplanma", "Sağlık", "Eczane", "İtfaiye", "Polis")
 private const val nearbyRadiusMeters = 5_000f
-private val MapBackground = Color(0xFFF4F6F8)
 private val TurkishLocale = Locale.forLanguageTag("tr-TR")
 private val DefaultMapCenter = LatLng(40.65, 35.83)
 
@@ -164,7 +166,12 @@ fun MapScreen(
                 point.address.contains(normalizedQuery, ignoreCase = true) ||
                 pointTypeLabel(point.type).contains(normalizedQuery, ignoreCase = true))
         }.let { points ->
-            state.deviceLocation?.let { location -> points.sortedBy { distanceMetres(location, it) } }
+            state.deviceLocation?.let { location ->
+                // Compute each geodesic once, rather than inside every comparator call.
+                points.map { point -> point to distanceMetres(location, point) }
+                    .sortedBy { it.second }
+                    .map { it.first }
+            }
                 ?: points.sortedBy(MapPoint::title)
         }
     }
@@ -176,7 +183,7 @@ fun MapScreen(
     }
     val hasSelection = selectedPoint != null || selectedEarthquake != null
     val errorMessage = state.locationError ?: state.pointsError
-    val topMapInset = systemTopInset + if (showFilters) 126.dp else 92.dp
+    val topMapInset = systemTopInset + if (showFilters) 175.dp else 140.dp
     val bottomMapInset = navigationClearance + when {
         showPointList -> listPanelMaxHeight + 30.dp
         hasSelection -> 190.dp
@@ -201,7 +208,7 @@ fun MapScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MapBackground)
+            .background(MaterialTheme.colorScheme.background)
             .testTag("osm_map_screen"),
     ) {
         OsmMapPanel(
@@ -241,25 +248,24 @@ fun MapScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Zinc100),
-                shadowElevation = 8.dp,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderZinc200,
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(58.dp).padding(start = 14.dp, end = 4.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).padding(start = 14.dp, end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Icon(Icons.Outlined.Search, contentDescription = null, tint = Zinc600, modifier = Modifier.size(21.dp))
                     Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                         if (searchQuery.isBlank()) {
-                            Text("Yer, adres veya deprem ara", color = Zinc500, fontSize = 13.sp, maxLines = 1)
+                            Text("Yer, adres veya deprem ara", color = Zinc500, fontSize = 14.sp, maxLines = 1)
                         }
                         BasicTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             singleLine = true,
-                            textStyle = TextStyle(color = Zinc950, fontSize = 13.sp),
+                            textStyle = TextStyle(color = Zinc950, fontSize = 14.sp),
                             modifier = Modifier.fillMaxWidth().semantics {
                                 contentDescription = "Yer, adres veya deprem ara"
                             },
@@ -277,7 +283,7 @@ fun MapScreen(
                         Icon(
                             if (showFilters) Icons.Outlined.Tune else Icons.Outlined.FilterList,
                             contentDescription = null,
-                            tint = if (showFilters) AfetCrimson else Zinc700,
+                            tint = if (showFilters) AfetAccent else Zinc700,
                         )
                     }
                 }
@@ -292,21 +298,37 @@ fun MapScreen(
                         FilterChip(
                             selected = selectedFilter == filter,
                             onClick = { selectedFilter = filter },
-                            label = { Text(filter, fontSize = 11.sp, fontWeight = FontWeight.Medium) },
+                            label = { Text(filter, fontSize = 12.sp, fontWeight = FontWeight.Medium) },
                             shape = RoundedCornerShape(30.dp),
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AfetCrimson,
-                                selectedLabelColor = Color.White,
-                                containerColor = Color.White,
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                containerColor = MaterialTheme.colorScheme.surface,
                                 labelColor = Zinc700,
                             ),
                             border = FilterChipDefaults.filterChipBorder(
                                 enabled = true,
                                 selected = selectedFilter == filter,
                                 borderColor = Zinc100,
-                                selectedBorderColor = AfetCrimson,
+                                selectedBorderColor = AfetAccent,
                             ),
                         )
+                    }
+                }
+            }
+
+            Surface(shape = Shape8dp, color = MaterialTheme.colorScheme.surface) {
+                Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                    Text(
+                        "Deprem · Ulusal katalog",
+                        color = Zinc600, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "Yakın yerler · AFAD / OpenStreetMap",
+                        color = Zinc600, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    )
+                    if (filteredPoints.any { it.type == MapPointType.INCIDENT || it.type == MapPointType.CLOSED_ROAD }) {
+                        Text("İhbar ve yol kapanışı", color = AfetCrimson, fontSize = 12.sp)
                     }
                 }
             }
@@ -314,14 +336,14 @@ fun MapScreen(
             errorMessage?.let { message ->
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color.White.copy(alpha = 0.96f),
+                    color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, AfetCrimsonMuted),
                 ) {
                     Text(
                         text = message,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         color = AfetCrimson,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -368,17 +390,17 @@ fun MapScreen(
                         }
                             .semantics { contentDescription = "${filteredPoints.size} afet noktası, listeyi aç" },
                         shape = RoundedCornerShape(16.dp),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.surface,
                         shadowElevation = 6.dp,
                     ) {
                         Row(
-                            modifier = Modifier.height(48.dp).padding(horizontal = 12.dp),
+                            modifier = Modifier.heightIn(min = 52.dp).padding(horizontal = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = AfetCrimson, modifier = Modifier.size(17.dp))
                             Text("Noktalar", color = Zinc900, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            Text(filteredPoints.size.toString(), color = AfetCrimson, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(filteredPoints.size.toString(), color = AfetCrimson, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                     if (!hasSelection) MapControls(
@@ -434,7 +456,7 @@ private fun MapControls(
             modifier = Modifier.size(54.dp).clickable(onClick = onMyLocation)
                 .semantics { contentDescription = if (onRequestLocation == null) "Konumum" else "Konumuma git" },
             shape = CircleShape,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, Zinc100),
             shadowElevation = 7.dp,
         ) {
@@ -450,7 +472,7 @@ private fun MapControls(
         Surface(
             modifier = Modifier.width(48.dp),
             shape = RoundedCornerShape(17.dp),
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, Zinc100),
             shadowElevation = 5.dp,
         ) {
@@ -480,7 +502,7 @@ private fun PointListPanel(
     Surface(
         modifier = modifier.heightIn(max = maxHeight).testTag("map_points_panel"),
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 22.dp, bottomEnd = 22.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, Zinc100),
         shadowElevation = 18.dp,
     ) {
@@ -494,11 +516,11 @@ private fun PointListPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Afet noktaları", color = Zinc950, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text("Afet noktaları", color = Zinc950, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     Text(
                         if (refreshing) "Konumuna göre güncelleniyor…" else "${points.size} kayıt · kuş uçuşu sıralı",
                         color = Zinc500,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                     )
                 }
                 IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
@@ -538,9 +560,9 @@ private fun PointListPanel(
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(point.title, color = Zinc900, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(pointTypeLabel(point.type), color = Zinc500, fontSize = 10.5.sp, maxLines = 1)
+                                Text(pointTypeLabel(point.type), color = Zinc500, fontSize = 12.sp, maxLines = 1)
                             }
-                            distance?.let { Text(formatDistance(it), color = Zinc700, fontSize = 10.sp, fontWeight = FontWeight.Medium) }
+                            distance?.let { Text(formatDistance(it), color = Zinc700, fontSize = 12.sp, fontWeight = FontWeight.Medium) }
                             Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = Zinc400, modifier = Modifier.size(17.dp))
                         }
                     }
@@ -566,17 +588,17 @@ private fun SelectedMapItemCard(
     Surface(
         modifier = modifier.testTag("map_selected_item"),
         shape = RoundedCornerShape(22.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, Zinc100),
         shadowElevation = 16.dp,
     ) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Surface(shape = CircleShape, color = if (earthquake != null) AfetCrimsonMuted else Color(0xFFE2F4F1)) {
+                Surface(shape = CircleShape, color = if (earthquake != null) AfetCrimsonMuted else MaterialTheme.colorScheme.primaryContainer) {
                     Icon(
                         if (earthquake != null) Icons.Outlined.MyLocation else Icons.Outlined.LocationOn,
                         contentDescription = null,
-                        tint = if (earthquake != null) AfetCrimson else Color(0xFF147D72),
+                        tint = if (earthquake != null) AfetCrimson else MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(9.dp).size(18.dp),
                     )
                 }
@@ -584,8 +606,8 @@ private fun SelectedMapItemCard(
                     Text(
                         text = title,
                         color = Zinc950,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -593,7 +615,7 @@ private fun SelectedMapItemCard(
                         text = point?.let { pointTypeLabel(it.type) }
                             ?: earthquake?.let { "M ${magnitudeLabel(it.magnitude)} · ${it.depthKm.toInt()} km derinlik" }.orEmpty(),
                         color = Zinc600,
-                        fontSize = 10.5.sp,
+                        fontSize = 12.sp,
                         maxLines = 1,
                     )
                 }
@@ -606,7 +628,7 @@ private fun SelectedMapItemCard(
                 text = point?.address?.takeIf(String::isNotBlank)
                     ?: earthquake?.let { "${compactTimestamp(it.occurredAt)} · ${it.source}" }.orEmpty(),
                 color = Zinc600,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -614,21 +636,21 @@ private fun SelectedMapItemCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = { onOpenExternal(latitude, longitude, title) },
-                    modifier = Modifier.weight(1f).height(42.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                     shape = RoundedCornerShape(13.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AfetCrimson),
+                    colors = ButtonDefaults.buttonColors(containerColor = AfetCrimson, contentColor = MaterialTheme.colorScheme.onError),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                 ) {
-                    Text("Harici haritada aç", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    Text("Harici haritada aç", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
                 if (point?.type == MapPointType.INCIDENT) {
                     OutlinedButton(
                         onClick = { onIncident(point.id) },
-                        modifier = Modifier.weight(1f).height(42.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                         shape = RoundedCornerShape(13.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     ) {
-                        Text("İhbarı aç", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text("İhbarı aç", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
             }

@@ -57,8 +57,12 @@ export type Ihbar = {
   skor?: number | null
   guven?: number | null
   fotografVar: boolean
-  konumKaynagi?: 'gps' | 'mahalle' | 'metin' | null
+  konumKaynagi?: 'gps' | 'manuel' | 'mahalle' | 'metin' | null
   konumDogrulukM?: number | null
+  bildirilenKategoriAdi?: string
+  bildirilenAciliyet?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  mahsurSayisi?: number
+  yaraliSayisi?: number
   guncellendi?: number | null
   /* fotoğraf */
   model?: FotografModeli
@@ -164,6 +168,7 @@ export function ihbarKonumu(i: Ihbar): string {
     return `Metindeki adres: ${i.analiz?.konumMetin ?? 'model buldu'} (yaklaşık)`
   }
   if (i.konumKaynagi === 'mahalle') return `${i.mahalle ?? 'Mahalle'} merkezi (yaklaşık)`
+  if (i.konumKaynagi === 'manuel') return 'Elle girilen koordinat'
   if (i.konumDogrulukM != null) return `Cihaz konumu, ±${Math.round(i.konumDogrulukM)} m`
   return 'Cihaz konumu'
 }

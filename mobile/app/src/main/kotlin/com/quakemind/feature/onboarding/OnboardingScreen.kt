@@ -1,14 +1,16 @@
 package com.quakemind.feature.onboarding
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,15 +26,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -53,32 +55,32 @@ fun OnboardingScreen(
 ) {
     val steps = listOf(
         OnboardingStep(
-            title = "Anlık Deprem ve Sismik Bilgilendirme",
-            description = "Kandilli Rasathanesi ve AFAD resmi veri akışları ile konumunuza yakın sarsıntıları saniyeler içinde takip edin.",
-            tag = "01 / 03 · SİSMİK TAKİP",
+            title = "Deprem kayıtlarını takip et",
+            description = "Konumunuza yakın deprem kayıtlarını büyüklük, tarih ve kaynak bilgisiyle inceleyin.",
+            tag = "1 / 3",
             icon = Icons.Outlined.Notifications,
         ),
         OnboardingStep(
-            title = "Toplanma Alanları ve Güvenli Rotalar",
-            description = "Evinize ve iş yerinize en yakın afet toplanma alanlarını ve hasarlı yollardan kaçınan tahliye yollarını görüntüleyin.",
-            tag = "02 / 03 · TAHLİYE VE ROTA",
+            title = "Yakınındaki alanları bul",
+            description = "Haritada toplanma alanlarını ve hizmet noktalarını incele. Tahliye rotasını değerlendirirken yerel uyarıları kontrol et.",
+            tag = "2 / 3",
             icon = Icons.Outlined.LocationOn,
         ),
         OnboardingStep(
-            title = "Çevrimdışı İhbar ve Aile Güvenlik Ağı",
-            description = "İnternet bağlantısı koptuğunda dahi durumunuzu yerel kuyruğa kaydedin ve tek dokunuşla SMS ile ailenize bildirin.",
-            tag = "03 / 03 · ACİL SOS",
+            title = "İhtiyacını bildir, durumunu paylaş",
+            description = "İhbarın bağlantı kesildiğinde cihazında saklanır. Güvenlik durumunu bildirebilir, yakınlarına SMS taslağı hazırlayabilirsin.",
+            tag = "3 / 3",
             icon = Icons.Outlined.Emergency,
         ),
     )
 
-    var currentStep by remember { mutableIntStateOf(0) }
+    var currentStep by rememberSaveable { mutableIntStateOf(0) }
     val step = steps[currentStep]
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 16.dp),
@@ -90,30 +92,30 @@ fun OnboardingScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ShadcnBadge(
+            StatusBadge(
                 text = step.tag,
-                backgroundColor = AfetCrimsonMuted,
-                textColor = AfetCrimson,
-                borderColor = AfetCrimsonBorder,
+                backgroundColor = AfetAccentMuted,
+                textColor = AfetAccent,
+                borderColor = AfetAccentBorder,
             )
             TextButton(onClick = onSkip) {
-                Text("Atla", color = Zinc500, fontWeight = FontWeight.Medium, fontSize = 13.5.sp)
+                Text("Atla", color = Zinc500, fontWeight = FontWeight.Medium, fontSize = 14.sp)
             }
         }
 
         // Center Content
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(vertical = 32.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Surface(
                 modifier = Modifier.size(52.dp),
                 shape = RoundedCornerShape(10.dp),
-                color = AfetCrimsonMuted,
-                border = androidx.compose.foundation.BorderStroke(1.dp, AfetCrimsonBorder),
+                color = AfetAccentMuted,
+                border = androidx.compose.foundation.BorderStroke(1.dp, AfetAccentBorder),
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(step.icon, contentDescription = null, tint = AfetCrimson, modifier = Modifier.size(26.dp))
+                    Icon(step.icon, contentDescription = null, tint = AfetAccent, modifier = Modifier.size(26.dp))
                 }
             }
 
@@ -121,7 +123,7 @@ fun OnboardingScreen(
                 text = step.title,
                 fontSize = 24.sp,
                 color = Zinc950,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 lineHeight = 30.sp,
             )
 
@@ -149,7 +151,7 @@ fun OnboardingScreen(
                             .weight(1f)
                             .height(3.dp)
                             .clip(RoundedCornerShape(2.dp))
-                            .background(if (index <= currentStep) AfetCrimson else Zinc200),
+                            .background(if (index <= currentStep) AfetAccent else Zinc200),
                     )
                 }
             }
@@ -160,11 +162,11 @@ fun OnboardingScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .heightIn(min = 52.dp),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AfetCrimson,
-                    contentColor = Color.White,
+                    containerColor = AfetAccent,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             ) {
                 Text(

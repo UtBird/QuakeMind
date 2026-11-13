@@ -7,6 +7,13 @@ WEB_DIR="$ROOT_DIR/quakemind-web"
 LOG_DIR="$ROOT_DIR/.logs"
 mkdir -p "$LOG_DIR"
 
+BACKEND_HOST="${QUAKEMIND_HOST:-127.0.0.1}"
+case "${1:-}" in
+  --telefon) BACKEND_HOST="0.0.0.0" ;;
+  "") ;;
+  *) echo "Kullanim: ./start.sh [--telefon]" >&2; exit 2 ;;
+esac
+
 # Windows (Git Bash/MSYS) needs taskkill to kill the whole process tree,
 # otherwise child processes (e.g. node spawned by npm) survive Ctrl+C.
 case "$(uname -s)" in
@@ -75,11 +82,11 @@ else
   echo "  python -m venv .venv && .venv/Scripts/python -m pip install -r backend/requirements.txt"
   exit 1
 fi
-"$PYTHON_BIN" fastapi_app.py > "$LOG_DIR/backend.log" 2>&1 &
+QUAKEMIND_HOST="$BACKEND_HOST" "$PYTHON_BIN" fastapi_app.py > "$LOG_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
 WEB_PID=""
-WEB_STATUS="yuklenmedi (konsol klasoru bu sparse checkout'ta yok)"
+WEB_STATUS="yuklenmedi (quakemind-web klasoru bu sparse checkout'ta yok)"
 if [ -d "$WEB_DIR" ]; then
   echo "==> Frontend (Next.js) baslatiliyor..."
   cd "$WEB_DIR"
@@ -99,14 +106,19 @@ fi
 
 MOBILE_STATUS="Android projesi: cd mobile; ./gradlew :app:installDebug"
 
-LAN_IP="$(get_lan_ip)"
+LAN_IP=""
+if [ "$BACKEND_HOST" = "0.0.0.0" ]; then
+  LAN_IP="$(get_lan_ip)"
+fi
 
 echo ""
 echo "============================================================"
 echo " Backend : http://127.0.0.1:8000   (log: $LOG_DIR/backend.log)"
 echo " Frontend: $WEB_STATUS"
 echo " Mobil   : $MOBILE_STATUS"
-if [ -n "$LAN_IP" ]; then
+if [ "$BACKEND_HOST" != "0.0.0.0" ]; then
+  echo " Fiziksel telefon icin: ./start.sh --telefon"
+elif [ -n "$LAN_IP" ]; then
   echo " Mobil API IP: $LAN_IP:8000"
   echo "   (Android build backend URL ayarina"
   echo "    bu IP:port degerini yazin. Telefon ve bilgisayar ayni"

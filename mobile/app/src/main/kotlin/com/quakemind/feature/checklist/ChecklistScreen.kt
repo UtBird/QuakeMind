@@ -1,7 +1,9 @@
 package com.quakemind.feature.checklist
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,33 +13,25 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -64,34 +58,11 @@ fun ChecklistScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
         // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Geri", tint = Zinc950)
-            }
-            Spacer(Modifier.width(6.dp))
-            Column {
-                Text(
-                    text = "Afet ve Acil Durum Çantası",
-                    color = Zinc950,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "İlk 72 saat için hayati ihtiyaç listesi",
-                    color = Zinc500,
-                    fontSize = 12.sp,
-                )
-            }
-        }
+        ScreenHeader(title = "Afet çantası", onBack = onBack, subtitle = "İlk 72 saat için hazırlık listesi")
 
         LazyColumn(
             modifier = Modifier
@@ -105,18 +76,18 @@ fun ChecklistScreen(
 
             // Progress Hero Card (#800E13 Progress)
             item(key = "checklist_progress_hero", contentType = "hero") {
-                ShadcnCard {
+                QuakeCard {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Hazırlık Durumu", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Zinc950)
-                        ShadcnBadge(
+                        Text("Hazırlık Durumu", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Zinc950)
+                        StatusBadge(
                             text = "$completedCount / ${items.size} Tamamlandı",
-                            backgroundColor = if (progress >= 1f) AfetGreenMuted else AfetCrimsonMuted,
-                            textColor = if (progress >= 1f) AfetGreen else AfetCrimson,
-                            borderColor = if (progress >= 1f) AfetGreenBorder else AfetCrimsonBorder,
+                            backgroundColor = if (progress >= 1f) AfetGreenMuted else AfetAccentMuted,
+                            textColor = if (progress >= 1f) AfetGreen else AfetAccent,
+                            borderColor = if (progress >= 1f) AfetGreenBorder else AfetAccentBorder,
                         )
                     }
 
@@ -128,7 +99,7 @@ fun ChecklistScreen(
                             .fillMaxWidth()
                             .height(6.dp)
                             .clip(CircleShape),
-                        color = AfetCrimson,
+                        color = AfetAccent,
                         trackColor = Zinc100,
                     )
 
@@ -146,8 +117,8 @@ fun ChecklistScreen(
             groupedCategories.forEach { (category, catItems) ->
                 item(key = "checklist_category_$category", contentType = "category_header") {
                     Text(
-                        text = category.uppercase(),
-                        fontWeight = FontWeight.Bold,
+                        text = category,
+                        fontWeight = FontWeight.SemiBold,
                         fontSize = 12.sp,
                         color = Zinc500,
                         letterSpacing = 1.sp,
@@ -178,9 +149,9 @@ private fun ChecklistItemCard(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("checklist_item_${item.id}")
-            .clickable { onToggle(item.id) },
+            .toggleable(value = item.isChecked, role = Role.Checkbox, onValueChange = { onToggle(item.id) }),
         shape = Shape8dp,
-        color = if (item.isChecked) Zinc50 else Color.White,
+        color = if (item.isChecked) Zinc50 else MaterialTheme.colorScheme.surface,
         border = BorderZinc200,
     ) {
         Row(
@@ -191,12 +162,12 @@ private fun ChecklistItemCard(
             Surface(
                 modifier = Modifier.size(22.dp),
                 shape = Shape5dp,
-                color = if (item.isChecked) AfetCrimson else Color.White,
-                border = if (item.isChecked) BorderAfetCrimson1_5 else BorderZinc400_1_5,
+                color = if (item.isChecked) AfetAccent else MaterialTheme.colorScheme.surface,
+                border = if (item.isChecked) BorderStroke(1.5.dp, AfetAccent) else BorderZinc400_1_5,
             ) {
                 if (item.isChecked) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Outlined.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
                     }
                 }
             }
@@ -204,15 +175,15 @@ private fun ChecklistItemCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = item.title,
-                    fontSize = 13.5.sp,
+                    fontSize = 14.sp,
                     fontWeight = if (item.isChecked) FontWeight.Medium else FontWeight.SemiBold,
                     color = if (item.isChecked) Zinc500 else Zinc950,
                     textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None,
                 )
                 Text(
                     text = if (item.isCrucial) "Öncelikli Hayati Malzeme" else "Destek Malzemesi",
-                    fontSize = 11.5.sp,
-                    color = if (item.isCrucial) AfetCrimson else Zinc400,
+                    fontSize = 12.sp,
+                    color = if (item.isCrucial) AfetAccent else Zinc400,
                 )
             }
         }

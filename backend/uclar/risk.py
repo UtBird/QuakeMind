@@ -154,6 +154,10 @@ def risk_all_quakes(
                 "latitude": float(row["latitude"]),
                 "longitude": float(row["longitude"]),
                 "status": row.get("status") or "reviewed",
+                "source": (
+                    row["source"] if pd.notna(row.get("source")) else
+                    "USGS" if row.get("status") == "usgs_gapfill" else "Ulusal deprem kataloğu"
+                ),
             }
             for _, row in df.iterrows()
         ]

@@ -26,4 +26,9 @@ data class IncidentEntity(
     val version: Long,
     val conflict: Boolean,
     val idempotencyKey: String,
+    val urgency: String? = null,
+    val peopleCount: Int? = null,
+    val injuredCount: Int? = null,
+    val locationSource: String? = null,
+    val locationAccuracyMetres: Float? = null,
 )

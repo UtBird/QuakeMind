@@ -171,7 +171,14 @@ class BackendIncidentService @Inject constructor(
             put("konumKaynagi", draft.locationSource)
             if (needs != null) {
                 put("ihtiyaclar", kotlinx.serialization.json.buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive(needs)) })
-                if (draft.peopleCount > 0) put("kisiSayisi", draft.peopleCount)
+                if (draft.legacyPayload && draft.peopleCount > 0) put("kisiSayisi", draft.peopleCount)
+            }
+            if (!draft.legacyPayload) {
+                put("bildirilenKategori", draft.type.name)
+                put("bildirilenAciliyet", draft.urgency.name)
+                put("mahsurSayisi", draft.peopleCount)
+                put("yaraliSayisi", draft.injuredCount)
+                draft.locationAccuracyMetres?.let { put("konumDogrulukM", it) }
             }
         }
         val data = client.request(
@@ -195,13 +202,13 @@ class BackendIncidentService @Inject constructor(
             } ?: emptyList()
 
     private fun toIncident(data: JsonObject): Incident {
-        val type = when (data.text("tur")) {
-            "fotograf" -> IncidentType.BUILDING_DAMAGE
-            "ihtiyac" -> IncidentType.OTHER
-            else -> IncidentType.OTHER
-        }
+        val type = IncidentType.entries.firstOrNull { it.name == data.text("bildirilenKategori") }
+            ?: when (data.text("tur")) {
+                "fotograf" -> IncidentType.BUILDING_DAMAGE
+                else -> IncidentType.OTHER
+            }
         val score = data["skor"].number()
-        val urgency = when {
+        val urgency = Urgency.entries.firstOrNull { it.name == data.text("bildirilenAciliyet") } ?: when {
             score == null -> Urgency.MEDIUM
             score >= 0.85 -> Urgency.CRITICAL
             score >= 0.6 -> Urgency.HIGH
@@ -210,7 +217,9 @@ class BackendIncidentService @Inject constructor(
         }
         return Incident(
             id = data.text("id"),
-            title = data.text("etiket").ifBlank { data.text("metin").take(80).ifBlank { "İhbar" } },
+            title = data.text("bildirilenKategoriAdi").ifBlank {
+                data.text("etiket").ifBlank { data.text("metin").take(80).ifBlank { "İhbar" } }
+            },
             type = type,
             locationLabel = data.text("mahalle", "Konum kaydı"),
             urgency = urgency,
@@ -405,7 +414,10 @@ class BackendRiskAssessmentService @Inject constructor(private val client: Backe
             ?: throw IOException("Risk modelinin puan alanı bu sürümle eşleşmiyor.")
         return RiskResult(
             score = score.roundToInt(),
-            factors = emptyList(),
+            factors = data["factors"].obj()?.mapNotNull { (label, value) ->
+                val factor = value.number()?.takeIf(Double::isFinite) ?: return@mapNotNull null
+                "$label · ${java.text.NumberFormat.getNumberInstance().format(factor)}"
+            }.orEmpty(),
             updatedAt = data.text("lastUpdate"),
         )
     }

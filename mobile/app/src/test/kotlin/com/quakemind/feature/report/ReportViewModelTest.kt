@@ -40,7 +40,7 @@ class ReportViewModelTest {
     fun submitIncident_savesDraftAndSchedulesSync() = runTest(testDispatcher) {
         coEvery { incidentRepo.saveIncident(any()) } returns "QM-12345678"
 
-        val viewModel = ReportViewModel(incidentRepo, syncScheduler)
+        val viewModel = ReportViewModel(incidentRepo, syncScheduler, mockk())
         viewModel.submitIncident(
             description = "Enkaz altında 2 kişi",
             type = IncidentType.DEBRIS,

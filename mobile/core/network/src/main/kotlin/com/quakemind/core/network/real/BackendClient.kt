@@ -37,7 +37,7 @@ internal fun JsonElement?.bool(): Boolean = string()?.toBooleanStrictOrNull() ==
 /**
  * All mobile requests share one authenticated client. Access tokens are never placed
  * in URLs or HTTP logs. Refresh tokens come from the backend's httpOnly cookie.
- * Android's private preferences retain the cookie across process restarts.
+ * Android Keystore encrypts both tokens before they are persisted.
  */
 @Singleton
 class BackendClient @Inject constructor(
@@ -45,6 +45,7 @@ class BackendClient @Inject constructor(
     private val http: OkHttpClient,
 ) {
     private val prefs = context.getSharedPreferences("quakemind_backend_session", Context.MODE_PRIVATE)
+    private val tokenCipher = SessionTokenCipher()
     private val json = Json { ignoreUnknownKeys = true }
     private val baseUrl = BuildConfig.API_BASE_URL.trimEnd('/') + "/"
     private val renewalLock = Any()
@@ -57,17 +58,43 @@ class BackendClient @Inject constructor(
     private val _profiles = MutableStateFlow(savedProfile())
     val profiles = _profiles.asStateFlow()
 
-    val isSignedIn: Boolean get() = !prefs.getString("access", null).isNullOrEmpty()
+    val isSignedIn: Boolean
+        get() = prefs.contains("access_encrypted") || prefs.contains("access")
     fun savedProfile(): JsonObject? =
         prefs.getString("profile", null)?.let { runCatching { json.parseToJsonElement(it).obj() }.getOrNull() }
 
     fun clearSession() {
-        prefs.edit().remove("access").remove("refresh").remove("profile").apply()
+        prefs.edit()
+            .remove("access").remove("refresh")
+            .remove("access_encrypted").remove("refresh_encrypted")
+            .remove("profile").apply()
         _profiles.value = null
     }
 
-    private fun sessionToken(): String? = prefs.getString("access", null)
-    private fun cookie(): String? = prefs.getString("refresh", null)
+    private fun sessionToken(): String? = storedToken("access")
+    private fun cookie(): String? = storedToken("refresh")
+
+    private fun storedToken(field: String): String? = synchronized(renewalLock) {
+        try {
+            val encryptedField = "${field}_encrypted"
+            val encrypted = prefs.getString(encryptedField, null)
+            if (encrypted != null) return@synchronized tokenCipher.decrypt(encrypted, field)
+            val legacy = prefs.getString(field, null) ?: return@synchronized null
+            migrateTokens()
+            legacy
+        } catch (error: Exception) {
+            throw IOException("Cihazdaki oturum jetonu okunamadı.", error)
+        }
+    }
+
+    private fun migrateTokens() {
+        val edit = prefs.edit()
+        for (field in listOf("access", "refresh")) {
+            val legacy = prefs.getString(field, null) ?: continue
+            edit.putString("${field}_encrypted", tokenCipher.encrypt(legacy, field)).remove(field)
+        }
+        if (!edit.commit()) throw IOException("Oturum güvenli depoya taşınamadı.")
+    }
 
     private fun storeSession(body: JsonObject, responseCookies: List<String>) {
         val token = body["erisimJetonu"].string()
@@ -77,12 +104,21 @@ class BackendClient @Inject constructor(
         val responseUrl = baseUrl.toHttpUrl()
         val newRefresh = responseCookies.mapNotNull { Cookie.parse(responseUrl, it) }
             .firstOrNull { it.name == "qm_yenileme" }?.value
+        val encryptedAccess: String
+        val encryptedRefresh: String?
+        try {
+            encryptedAccess = tokenCipher.encrypt(token, "access")
+            encryptedRefresh = newRefresh?.let { tokenCipher.encrypt("qm_yenileme=$it", "refresh") }
+        } catch (error: Exception) {
+            throw IOException("Oturum jetonları şifrelenemedi.", error)
+        }
         val edit = prefs.edit()
-            .putString("access", token)
+            .remove("access").remove("refresh")
+            .putString("access_encrypted", encryptedAccess)
             .putString("profile", profile.toString())
-        if (newRefresh != null) edit.putString("refresh", "qm_yenileme=" + newRefresh)
-        else edit.remove("refresh")
-        edit.apply()
+        if (encryptedRefresh != null) edit.putString("refresh_encrypted", encryptedRefresh)
+        else edit.remove("refresh_encrypted")
+        if (!edit.commit()) throw IOException("Oturum cihazda saklanamadı.")
         _profiles.value = profile
     }
 

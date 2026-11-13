@@ -12,23 +12,20 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -36,6 +33,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -63,16 +62,16 @@ fun AuthScreen(
     isBusy: Boolean = false,
     error: String? = null,
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var identity by remember { mutableStateOf("") }
-    var fullName by remember { mutableStateOf("") }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var identity by rememberSaveable { mutableStateOf("") }
+    var fullName by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
@@ -99,7 +98,7 @@ fun AuthScreen(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(42.dp),
+                    .heightIn(min = 52.dp),
                 shape = RoundedCornerShape(8.dp),
                 color = Zinc100,
                 border = androidx.compose.foundation.BorderStroke(1.dp, Zinc200),
@@ -115,15 +114,15 @@ fun AuthScreen(
                                 onClick = { selectedTab = 0 },
                             ),
                         shape = RoundedCornerShape(6.dp),
-                        color = if (selectedTab == 0) Color.White else Color.Transparent,
+                        color = if (selectedTab == 0) MaterialTheme.colorScheme.surface else Color.Transparent,
                         border = if (selectedTab == 0) androidx.compose.foundation.BorderStroke(1.dp, Zinc200) else null,
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 text = "Giriş Yap",
-                                fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium,
-                                color = if (selectedTab == 0) AfetCrimson else Zinc500,
-                                fontSize = 13.5.sp,
+                                fontWeight = if (selectedTab == 0) FontWeight.SemiBold else FontWeight.Medium,
+                                color = if (selectedTab == 0) AfetAccent else Zinc500,
+                                fontSize = 14.sp,
                             )
                         }
                     }
@@ -137,15 +136,15 @@ fun AuthScreen(
                                 onClick = { selectedTab = 1 },
                             ),
                         shape = RoundedCornerShape(6.dp),
-                        color = if (selectedTab == 1) Color.White else Color.Transparent,
+                        color = if (selectedTab == 1) MaterialTheme.colorScheme.surface else Color.Transparent,
                         border = if (selectedTab == 1) androidx.compose.foundation.BorderStroke(1.dp, Zinc200) else null,
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 text = "Kayıt Ol",
-                                fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium,
-                                color = if (selectedTab == 1) AfetCrimson else Zinc500,
-                                fontSize = 13.5.sp,
+                                fontWeight = if (selectedTab == 1) FontWeight.SemiBold else FontWeight.Medium,
+                                color = if (selectedTab == 1) AfetAccent else Zinc500,
+                                fontSize = 14.sp,
                             )
                         }
                     }
@@ -157,7 +156,8 @@ fun AuthScreen(
                     value = fullName,
                     onValueChange = { fullName = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Ad Soyad", fontSize = 13.5.sp, color = Zinc400) },
+                    label = { Text("Ad soyad") },
+                    placeholder = { Text("Ad Soyad", fontSize = 14.sp, color = Zinc400) },
                     singleLine = true,
                     shape = RoundedCornerShape(8.dp),
                 )
@@ -167,15 +167,16 @@ fun AuthScreen(
                 value = identity,
                 onValueChange = { identity = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("E-posta Adresi", fontSize = 13.5.sp, color = Zinc400) },
+                label = { Text("E-posta adresi") },
+                placeholder = { Text("E-posta Adresi", fontSize = 14.sp, color = Zinc400) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 shape = RoundedCornerShape(8.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AfetCrimson,
+                    focusedBorderColor = AfetAccent,
                     unfocusedBorderColor = Zinc200,
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                 ),
             )
 
@@ -183,7 +184,8 @@ fun AuthScreen(
                 value = password,
                 onValueChange = { password = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Şifre", fontSize = 13.5.sp, color = Zinc400) },
+                label = { Text("Şifre") },
+                placeholder = { Text("Şifre", fontSize = 14.sp, color = Zinc400) },
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
@@ -199,10 +201,10 @@ fun AuthScreen(
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 shape = RoundedCornerShape(8.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AfetCrimson,
+                    focusedBorderColor = AfetAccent,
                     unfocusedBorderColor = Zinc200,
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                 ),
             )
 
@@ -214,11 +216,11 @@ fun AuthScreen(
                 enabled = !isBusy && identity.isNotBlank() && password.isNotBlank() && (selectedTab == 0 || fullName.isNotBlank()),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(46.dp),
+                    .heightIn(min = 52.dp),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AfetCrimson,
-                    contentColor = Color.White,
+                    containerColor = AfetAccent,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             ) {
                 Text(
@@ -227,14 +229,6 @@ fun AuthScreen(
                     fontSize = 14.sp,
                 )
             }
-
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Zinc200)
-                Text("  veya  ", color = Zinc400, fontSize = 12.sp)
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Zinc200)
-            }
-
-            Text("e-Devlet kimlik doğrulaması bu sürümde kullanılamıyor.", fontSize = 12.sp, color = Zinc500, textAlign = TextAlign.Center)
 
             if (error != null) {
                 Text(error, fontSize = 12.sp, color = AfetCrimson, textAlign = TextAlign.Center)
@@ -249,15 +243,15 @@ fun AuthScreen(
                     text = "Misafir Oturumu Aç (Acil Mod)",
                     color = Zinc600,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                 )
             }
         }
 
         // Footer
         Text(
-            text = "KVKK Aydınlatma Metni ve Kullanım Şartları",
-            fontSize = 11.5.sp,
+            text = "Hayati tehlikede 112’yi arayın.",
+            fontSize = 12.sp,
             color = Zinc400,
         )
     }
