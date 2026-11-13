@@ -32,26 +32,17 @@ DEFAULT_QUERY_CSV = (
     / "query.csv"
 )
 
-# --- Fay hatlari (risk_engine.py ile ayni) --------------------------------
+# --- Fay mesafesi (risk_engine.py ile ayni) -------------------------------
+# GEM Global Active Faults cizgilerine en kisa mesafe; urunle AYNI modul.
+# 19 Ekim 2026'ya kadar burada elle yazilmis ~38 yaklasik nokta vardi
+# (yalniz KAF, DAF, dort Ege grabeni). O olcumler git gecmisinde.
 
-FAULT_LINES = [
-    [
-        (40.4, 26.5), (40.6, 27.5), (40.8, 28.5), (40.9, 29.5),
-        (40.8, 30.5), (40.8, 31.5), (40.9, 32.5), (41.0, 33.5),
-        (40.8, 34.5), (40.7, 35.5), (40.6, 36.5), (40.3, 37.5),
-        (40.0, 38.5), (39.8, 39.5), (39.7, 40.5),
-    ],
-    [
-        (36.2, 36.1), (36.5, 36.3), (37.0, 36.8), (37.4, 37.0),
-        (37.8, 37.5), (38.0, 38.0), (38.3, 38.8), (38.5, 39.5),
-        (38.8, 40.5), (39.0, 41.0),
-    ],
-    [(39.5, 26.0), (39.5, 27.0), (39.5, 28.0)],
-    [(38.5, 26.5), (38.5, 27.5), (38.5, 28.5)],
-    [(37.8, 27.0), (37.8, 28.0), (37.8, 29.0)],
-    [(37.2, 27.5), (37.2, 28.5), (37.2, 29.5)],
-]
-FAULT_POINTS = [p for line in FAULT_LINES for p in line]
+import sys as _sys
+
+_RISK_KOKU = _HERE.parent.parent / "QuakeMindBackend" / "apps" / "earthquake_risk"
+if str(_RISK_KOKU) not in _sys.path:
+    _sys.path.insert(0, str(_RISK_KOKU))
+from fay_mesafesi import en_yakin_fay_km  # noqa: E402
 
 RISK_FEATURE_COLUMNS = [
     "latitude", "longitude", "depth",
@@ -125,10 +116,7 @@ def build_label_30d(df, thr_mag=4.0, horizon_days=30, radius_km=100.0):
 
 
 def add_fault_distance(df):
-    df["distance_to_fault"] = [
-        min(haversine(la, lo, f[0], f[1]) for f in FAULT_POINTS)
-        for la, lo in zip(df["latitude"].values, df["longitude"].values)
-    ]
+    df["distance_to_fault"] = en_yakin_fay_km(df["latitude"].values, df["longitude"].values)
     return df
 
 

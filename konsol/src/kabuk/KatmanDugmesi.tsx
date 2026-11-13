@@ -15,6 +15,7 @@ import { useSorguAraligi } from '@/durum/zamanDurumu'
 import { useEkipler, useOzet, useSosCagrilari } from '@/veri/sorgular'
 import { useIhbarlar } from '@/veri/ihbar'
 import { DEPREM_EN_AZ, useDepremler, useFaylar, useKapanmalar, useToplanmaAlanlari } from '@/veri/katman'
+import { useGorunenAltlik } from '@/harita/altlikGorunumu'
 import { sayi } from '@/lib/bicim'
 import { sn } from '@/lib/sinif'
 
@@ -44,10 +45,11 @@ export function KatmanDugmesi({ yukari = true }: { yukari?: boolean }) {
   const ekipler = useEkipler()
   // Aynı sorgu anahtarları kabuktakilerle paylaşılır: katman kapalıyken istek
   // atılmaz, açıkken sayı önbellekten gelir.
+  const { gorunen: gorunenBolgeler } = useGorunenAltlik()
   const kapanmalar = useKapanmalar(katmanlar.hasarliYollar)
   const depremler = useDepremler(katmanlar.depremler)
   const faylar = useFaylar(katmanlar.faylar)
-  const toplanma = useToplanmaAlanlari(katmanlar.toplanma)
+  const toplanma = useToplanmaAlanlari(katmanlar.toplanma, gorunenBolgeler)
 
   const acikSayisi = KATMANLAR.filter((k) => katmanlar[k] && KATMAN_BILGI[k].bagli).length
 

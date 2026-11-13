@@ -39,3 +39,6 @@ veri/altlik/
 
 # Yurume yol agi (J-44): yerel OSM kopyasindan uretilir, araclar_yol_agi_uret.py
 veri/yol_agi/
+
+# Il merkezleri (risk ekrani, 81 il): yerel OSM kopyasindan, araclar_il_merkezleri_uret.py
+veri/il_merkezleri.json

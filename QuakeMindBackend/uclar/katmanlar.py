@@ -15,8 +15,10 @@ Kaynaklar (kural 1: her katman kaynagini yazar; yanitin `kaynak` alani):
     bos oldugu icin cizgilerin adi yok.
   * Toplanma alanlari -- AFAD toplanma alanlari listesi (72 232 kayit, ulke geneli).
 
-Kutu (bbox) ile sorulur; kutu verilmezse altlik katalogundaki bes bolgeyi
-kapsayan kutu kullanilir. Dosyalar istek yolunda ayristirilmaz, bir kez bellege
+Kutu (bbox) ile sorulur. Kutu verilmezse depremler ve faylar Turkiye kutusundan
+gelir (risk ekrani 81 ili gosterir; ulke geneli ~4 bin deprem, ~400 fay);
+kapanma ve toplanma alanlari operasyon bolgelerinin kutusundan (toplanma ulke
+genelinde 72 bin kayit, konsol onu gorunen bolgenin kutusuyla sorar). Dosyalar istek yolunda ayristirilmaz, bir kez bellege
 alinir (kural 3). Zaman disariya milisaniye gider (sozlesme.py ile ayni karar).
 """
 
@@ -58,12 +60,14 @@ def _sn(ms: Optional[float]) -> Optional[float]:
 
 @lru_cache(maxsize=1)
 def _bolge_kutusu() -> Optional[tuple[float, float, float, float]]:
-    """Altlik uretilmis bolgeleri kapsayan kutu (bati, guney, dogu, kuzey)."""
+    """Operasyon bolgelerini kapsayan kutu (bati, guney, dogu, kuzey). `il`
+    turu altliklar sayilmaz: 81 il kutuyu Turkiye boyutuna cikarirdi."""
     yol = ALTLIK / "katalog.json"
     if not yol.exists():
         return None
     bolgeler = json.loads(yol.read_text(encoding="utf-8"))
-    kutular = [b["kutu"] for b in bolgeler if b.get("kutu")]
+    kutular = [b["kutu"] for b in bolgeler
+               if b.get("kutu") and b.get("tur", "operasyon") == "operasyon"]
     if not kutular:
         return None
     return (
@@ -74,8 +78,10 @@ def _bolge_kutusu() -> Optional[tuple[float, float, float, float]]:
     )
 
 
-def _kutu(metin: Optional[str]) -> tuple[float, float, float, float]:
+def _kutu(metin: Optional[str], ulke: bool = False) -> tuple[float, float, float, float]:
     if not metin:
+        if ulke:
+            return ck.TURKEY_BBOX
         varsayilan = _bolge_kutusu()
         if varsayilan is None:
             raise HTTPException(422, "Kutu verilmedi ve altlik katalogu yok.")
@@ -216,7 +222,7 @@ def depremler(
     _kul: dict = Depends(kimlik.rol_gerektir(*SAHA_VE_USTU)),
 ):
     """Katalogdaki depremler: kutu, en kucuk buyukluk ve baslangic zamaniyla."""
-    k = _kutu(kutu)
+    k = _kutu(kutu, ulke=True)
     veri = _deprem_katalogu()
     if veri is None:
         raise HTTPException(503, "Deprem katalogu (query.csv) bulunamadi.")
@@ -259,7 +265,7 @@ def faylar(
     _kul: dict = Depends(kimlik.rol_gerektir(*SAHA_VE_USTU)),
 ):
     """Kutudan gecen etkin fay cizgileri. Cizgiler [lon, lat] noktalarindan olusur."""
-    k = _kutu(kutu)
+    k = _kutu(kutu, ulke=True)
     w, s, e, n = k
     cizgiler = []
     for i, fay in enumerate(ck._get_turkey_fault_lines()):

@@ -20,14 +20,6 @@ GEOJSON_PATHS = [
     / "fay_haritası"
     / "gem_active_faults_harmonized.geojson",
 ]
-FAULT_LINE_NAMES = [
-    "Kuzey Anadolu Fayi",
-    "Dogu Anadolu Fayi",
-    "Edremit Fay Zonu",
-    "Izmir Fay Zonu",
-    "Aydin Fay Zonu",
-    "Mugla Fay Zonu",
-]
 
 
 def add_site_packages(project_root: Path) -> None:
@@ -207,16 +199,17 @@ def parse_summary(summary: str) -> dict[str, object]:
 
 
 def build_nearby_faults(risk_module, lat: float, lon: float) -> list[str]:
-    distances = []
-    for index, line in enumerate(getattr(risk_module, "FAULT_LINES", [])):
-        line_distance = min(
-            risk_module.haversine(lat, lon, point_lat, point_lon)
-            for point_lat, point_lon in line
-        )
-        name = FAULT_LINE_NAMES[index] if index < len(FAULT_LINE_NAMES) else f"Fay {index + 1}"
-        distances.append((line_distance, name))
-    distances.sort(key=lambda item: item[0])
-    return [f"{name} ({distance:.1f} km)" for distance, name in distances[:3]]
+    """En yakin uc ayri GEM fayi. Eskiden elle yazilmis alti yaklasik cizgiden
+    ve onlara verilmis adlardan uretiliyordu (Konya'da "Mugla Fay Zonu 274 km",
+    ayni panelde en yakin fay 7,5 km). GEM'de fay adi bos: ad yerine faylanma
+    turu ve katalog kimligi yazilir."""
+    yakin_faylar = getattr(risk_module, "yakin_faylar", None)
+    if yakin_faylar is None:
+        return []
+    return [
+        f"{f['tur'].capitalize()} fay · {f['kimlik']} ({f['km']:.1f} km)".replace(".", ",")
+        for f in yakin_faylar(lat, lon, 3)
+    ]
 
 
 def build_recent_events(city_quakes) -> tuple[list[str], str]:
@@ -274,6 +267,19 @@ def build_heatmap_events(city_quakes):
         }
         for _, row in heat_source.iterrows()
     ]
+
+
+# Yalniz `faultLines` icin (eski web ve mobil haritasi; konsol faylari GEM'den
+# /api/katman/faylar ile alir). Elle yazilmis yaklasik cizgilerin adlari;
+# mesafe ve "yakin faylar" listesinde KULLANILMAZ.
+FAULT_LINE_NAMES = [
+    "Kuzey Anadolu Fayi",
+    "Dogu Anadolu Fayi",
+    "Edremit Fay Zonu",
+    "Izmir Fay Zonu",
+    "Aydin Fay Zonu",
+    "Mugla Fay Zonu",
+]
 
 
 def build_fault_lines(risk_module, lat: float, lon: float):

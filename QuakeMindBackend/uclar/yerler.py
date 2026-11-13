@@ -77,8 +77,11 @@ def _hizmetler():
 
 @lru_cache(maxsize=1)
 def _bolgeler():
+    """Operasyon bolgeleri: hizmet verisi yalniz bunlarda uretildi. `il` turu
+    altliklar (risk ekraninin 81 ili) burada sayilmaz."""
     yol = ALTLIK / "katalog.json"
-    return json.loads(yol.read_text(encoding="utf-8")) if yol.exists() else []
+    bolgeler = json.loads(yol.read_text(encoding="utf-8")) if yol.exists() else []
+    return [b for b in bolgeler if b.get("tur", "operasyon") == "operasyon"]
 
 
 def _onyukle():

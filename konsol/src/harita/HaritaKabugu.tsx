@@ -93,10 +93,10 @@ export function HaritaKabugu({ children, className, ipucu, baslangic }: KabukSec
     }
   }, [])
 
-  const api = useMemo<HaritaApi>(
+  // İşlevler yalnız ref okur; görünüm değişince yeniden kurulmazlar. Kurulsalardı
+  // onlara bağlı her etki her kaydırmada yeniden koşar, haritayı geri uçururdu.
+  const islevler = useMemo<Omit<HaritaApi, 'hazir' | 'gorunum'>>(
     () => ({
-      hazir,
-      gorunum,
       katmanlariYaz: (katmanlar) => ortu.current?.setProps({ layers: katmanlar }),
       tiklamaYaz: (fn) => ortu.current?.setProps({ onClick: fn }),
       kutuyaUc: (k) => {
@@ -135,8 +135,9 @@ export function HaritaKabugu({ children, className, ipucu, baslangic }: KabukSec
       },
       haritaAl: () => harita.current,
     }),
-    [hazir, gorunum],
+    [],
   )
+  const api = useMemo<HaritaApi>(() => ({ hazir, gorunum, ...islevler }), [hazir, gorunum, islevler])
 
   return (
     <Baglam.Provider value={api}>

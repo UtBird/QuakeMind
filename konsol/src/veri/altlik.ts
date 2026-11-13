@@ -22,6 +22,10 @@ export type AltlikKaynagi = {
 export type AltlikBolgesi = {
   id: string
   ad: string
+  /** `operasyon`: hizmet, yol ağı ve afetzede verisi olan beş bölge.
+      `il`: risk ekranının 81 il seçicisi için il merkezi altlığı.
+      Eski katalogda alan yok; yoksa operasyon sayılır. */
+  tur?: 'operasyon' | 'il'
   kutu: Kutu
   sayilar: { yol: number; yapi: number; su: number; nehir: number }
   boyutBayt: number
@@ -165,6 +169,10 @@ export function useAltlikPaketleri(bolgeler: AltlikBolgesi[]) {
     })),
   })
 }
+
+/** Hizmet, yol ağı ve afetzede verisi olan bölgeler; il altlıkları hariç. */
+export const operasyonBolgeleri = (bolgeler: AltlikBolgesi[]) =>
+  bolgeler.filter((b) => (b.tur ?? 'operasyon') === 'operasyon')
 
 export function kutularKesisir(a: Kutu, b: Kutu): boolean {
   return a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]

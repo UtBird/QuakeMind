@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from './istemci'
+import type { AltlikBolgesi } from './altlik'
 
 /* ---------------------------------------------------------------------------
    Haritanın başvuru katmanları (J-56): yol kapanmaları, depremler, fay hatları,
@@ -8,8 +9,10 @@ import { apiGet } from './istemci'
    Her yanıt kendi kaynağını taşır (kural 1): katman listesinde ve ipucunda
    verinin nereden geldiği bu alandan yazılır, koda gömülmez.
 
-   Veri bölgeye göre değişmediği için bir kez istenir ve önbellekte kalır;
-   yoklama yok (kural 4). Kapanmalar analiz bitince canlı akışla tazelenir.
+   Depremler ve faylar Türkiye geneli bir kez istenir ve önbellekte kalır (risk
+   ekranı 81 ili gösterir). Toplanma alanları ülke genelinde 72 bin kayıt: görünen
+   altlık bölgelerinin kutusuyla istenir, yalnız görünen bölge değişince yeniden
+   sorulur. Yoklama yok (kural 4). Kapanmalar analiz bitince canlı akışla tazelenir.
 --------------------------------------------------------------------------- */
 
 export type KatmanKaynagi = {
@@ -68,6 +71,9 @@ export type ToplanmaAlani = {
 
 /** Katalogdan çizilen en küçük büyüklük; katman listesi bunu yazar. */
 export const DEPREM_EN_AZ = 4
+/** Türkiye kutusunda M ≥ 4 deprem 4.909 (19 Ekim 2026); uçtaki 3.000 varsayılanı
+    en eski kayıtları sessizce atıyordu. */
+const DEPREM_SINIRI = 10000
 
 export function useKapanmalar(acik: boolean) {
   return useQuery({
@@ -81,7 +87,11 @@ export function useDepremler(acik: boolean) {
   return useQuery({
     queryKey: ['katman', 'depremler', DEPREM_EN_AZ],
     enabled: acik,
-    queryFn: () => apiGet<KatmanYaniti<Deprem>>('/api/katman/depremler', { enAz: DEPREM_EN_AZ }),
+    queryFn: () =>
+      apiGet<KatmanYaniti<Deprem>>('/api/katman/depremler', {
+        enAz: DEPREM_EN_AZ,
+        sinir: DEPREM_SINIRI,
+      }),
   })
 }
 
@@ -93,11 +103,23 @@ export function useFaylar(acik: boolean) {
   })
 }
 
-export function useToplanmaAlanlari(acik: boolean) {
+/** `bolgeler`: haritada görünen altlık bölgeleri (useGorunenAltlik). Boşsa
+    (bölge ölçeğinin altında) istek atılmaz; katman zaten şehir ölçeğinde çizilir. */
+export function useToplanmaAlanlari(acik: boolean, bolgeler: AltlikBolgesi[]) {
+  const kimlikler = bolgeler.map((b) => b.id).sort()
+  const kutu = bolgeler.length
+    ? [
+        Math.min(...bolgeler.map((b) => b.kutu[0])),
+        Math.min(...bolgeler.map((b) => b.kutu[1])),
+        Math.max(...bolgeler.map((b) => b.kutu[2])),
+        Math.max(...bolgeler.map((b) => b.kutu[3])),
+      ].join(',')
+    : null
   return useQuery({
-    queryKey: ['katman', 'toplanma'],
-    enabled: acik,
-    queryFn: () => apiGet<KatmanYaniti<ToplanmaAlani>>('/api/katman/toplanma'),
+    queryKey: ['katman', 'toplanma', kimlikler.join(',')],
+    enabled: acik && !!kutu,
+    placeholderData: (onceki) => onceki,
+    queryFn: () => apiGet<KatmanYaniti<ToplanmaAlani>>('/api/katman/toplanma', { kutu: kutu! }),
   })
 }
 

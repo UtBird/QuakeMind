@@ -15,7 +15,7 @@ import { useSimulasyon } from '@/durum/simulasyonDurumu'
 import { isiDokusuKur } from '@/harita/isiDokusu'
 import { KANALLAR } from '@/durum/konsolDurumu'
 import { useAnalizSegmentleri } from '@/veri/analiz'
-import { useAltlikKatalogu } from '@/veri/altlik'
+import { operasyonBolgeleri, useAltlikKatalogu } from '@/veri/altlik'
 import { gunMetni } from '@/lib/bicim'
 import { Chip } from './parcalar'
 import {
@@ -126,11 +126,12 @@ const ISI_MERKEZI = { lon: 36.161, lat: 36.202 }
 const ISI_YARICAP_KM = 10
 
 /** Şehre git (J-41): prototipteki görünüm düğmeleri gibi; tek tıkla şehir
-    merkezine, "Tüm bölge" ile bütün şehirleri kapsayan görünüme uçar. */
+    merkezine, "Tüm bölge" ile bütün şehirleri kapsayan görünüme uçar. Yalnız
+    operasyon bölgeleri: 81 il altlığı risk ekranının il seçicisinden açılır. */
 function SehirDugmeleri() {
   const { ucus, kutuyaUc, gorunum } = useHarita()
   const katalog = useAltlikKatalogu()
-  const bolgeler = katalog.data ?? []
+  const bolgeler = operasyonBolgeleri(katalog.data ?? [])
   if (bolgeler.length === 0) return null
 
   const merkez = gorunum ? kutuMerkezi(gorunum.kutu) : null
@@ -177,15 +178,20 @@ function SehirDugmeleri() {
 function HaritaKunyesi() {
   const { katalog, gorunum, gorunen } = useGorunenAltlik()
   const tumu = katalog.data ?? []
+  const operasyon = operasyonBolgeleri(tumu)
+  const ilSayisi = tumu.length - operasyon.length
+  const uretilen = `${operasyon.map((b) => b.ad).join(', ')}${
+    ilSayisi ? ` ve ${ilSayisi} il merkezi` : ''
+  }`
   let metin: string
   if (katalog.isLoading) {
     metin = 'altlık kataloğu alınıyor…'
   } else if (katalog.isError || tumu.length === 0) {
     metin = 'üretilmedi — sunucuda `python araclar_altlik_uret.py` çalıştırılmalı.'
   } else if (gorunum && gorunum.zoom < ALTLIK_EN_AZ_ZOOM) {
-    metin = `bölge ölçeğinde çizilir; yakınlaş (üretilen bölgeler: ${tumu.map((b) => b.ad).join(', ')}).`
+    metin = `bölge ölçeğinde çizilir; yakınlaş (üretilen bölgeler: ${uretilen}).`
   } else if (gorunen.length === 0) {
-    metin = `bu alan için üretilmedi (üretilen bölgeler: ${tumu.map((b) => b.ad).join(', ')}).`
+    metin = `bu alan için üretilmedi (üretilen bölgeler: ${uretilen}).`
   } else {
     const k = gorunen[0].kaynak
     metin = `${k.atif} (${k.lisans}) · yerel kopya ${gunMetni(k.dosyaTarihi)} · ${gorunen
@@ -222,11 +228,12 @@ function KatmanKopru() {
   const ekipler = useEkipler()
 
   // Başvuru katmanları (J-56): yalnız katman açıkken istenir, sonra önbellekte
-  // kalır. Bölgeye göre değişmediği için zaman penceresine bağlı değiller.
+  // kalır. Zaman penceresine bağlı değiller; toplanma görünen bölgeye bağlı.
+  const { gorunen: gorunenBolgeler } = useGorunenAltlik()
   const kapanmalar = useKapanmalar(katmanlar.hasarliYollar)
   const depremler = useDepremler(katmanlar.depremler)
   const faylar = useFaylar(katmanlar.faylar)
-  const toplanma = useToplanmaAlanlari(katmanlar.toplanma)
+  const toplanma = useToplanmaAlanlari(katmanlar.toplanma, gorunenBolgeler)
 
   // Tatbikat koşusu (SIMULASYON_SOZLESMESI.md): sonuç canlı akış mesajıyla
   // tazelenir, maske jetonla indirilip ImageBitmap'e çevrilir.
@@ -417,10 +424,15 @@ function KatmanKopru() {
     if (hazir) katmanlariYaz(deckKatmanlari)
   }, [hazir, deckKatmanlari, katmanlariYaz])
 
-  // Analiz sonucu haritaya bindiğinde o alana git.
+  // Analiz sonucu haritaya bindiğinde o alana bir kez git; sonra kullanıcının
+  // yakınlaştırması ve kaydırması bozulmaz (veri yenilense de geri uçulmaz).
   const sinirlar = segmentler.data?.bounds
+  const ucurulanAnaliz = useRef<string | null>(null)
   useEffect(() => {
     if (!hazir || !sinirlar) return
+    const anahtar = `${sinirlar.west},${sinirlar.south},${sinirlar.east},${sinirlar.north}`
+    if (ucurulanAnaliz.current === anahtar) return
+    ucurulanAnaliz.current = anahtar
     ucus((sinirlar.west + sinirlar.east) / 2, (sinirlar.south + sinirlar.north) / 2, 14.5)
   }, [hazir, sinirlar, ucus])
 

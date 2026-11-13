@@ -731,15 +731,25 @@ def run_analysis_job(req: dict) -> dict:
         f"Sureler (sn): uydu={satellite_fetch_ms / 1000:.1f}, yol={overpass_ms / 1000:.1f}, AI={inference_ms / 1000:.1f}, lojistik={logistics_ms / 1000:.1f}, toplam={total_ms / 1000:.1f}"
     )
 
-    recommended = "Analiz basarili."
-    if blocked_road_pct > 0.5:
-        recommended = "Kritik: Yollarin buyuk kismi kapali. Alternatif rotalar planlanmali."
+    # Oneri olcululeni soyler, yargi uretmez: esikler (0,5 / 0,2 / 0,3) tasarim
+    # karari, olculmus degil. Eskiden yol katmani hic alinamadiginda ve 10
+    # kapali sokak bulundugunda da "Bolge genel olarak erisilebilir" yaziyordu.
+    oran = f"{blocked_road_pct * 100:.1f}".replace(".", ",")
+    kapali_metni = f"{blocked_count} sokak kapalı (kapalı yol pikseli oranı %{oran})"
+    if yol_katmani_yok:
+        recommended = ("Yol katmanı alınamadı; kapalı yol hesaplanamadı. Bu sonuç bölgenin "
+                       "erişilebilir olduğunu göstermez.")
+    elif blocked_road_pct > 0.5:
+        recommended = f"Kritik: {kapali_metni}. Alternatif rotalar planlanmalı."
     elif blocked_road_pct > 0.2:
-        recommended = "Dikkat: Bazi yollar kapali. Ekipler icin alternatif guzergah onerilir."
+        recommended = f"Dikkat: {kapali_metni}. Ekipler için alternatif güzergâh önerilir."
     elif damage_rate > 0.3:
-        recommended = "Yuksek hasar orani. Bolgeye dikkatli erisim saglanmali."
+        recommended = "Yüksek hasar oranı. Bölgeye dikkatli erişim sağlanmalı."
+    elif blocked_count > 0 or blocked_road_pct > 0:
+        recommended = f"{kapali_metni}. Kapalı sokaklar haritada işaretli; rota bunlardan kaçınarak planlanmalı."
     else:
-        recommended = "Bolge genel olarak erisilebilir durumda."
+        recommended = ("Bu görüntüde yolu kapatan hasar bulunmadı. Model hasarı eksik bulabilir; "
+                       "sahadan doğrulanmadan bölge açık sayılmamalı.")
 
     _report(analysis_id, 97, "Sonuc gorselleri hazirlaniyor...")
     try:

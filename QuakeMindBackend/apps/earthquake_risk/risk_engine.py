@@ -8,6 +8,13 @@ import pandas as pd
 from pathlib import Path
 from sklearn.model_selection import TimeSeriesSplit
 
+# Paket olarak (araclar_risk_egit.py) ya da RISK_ROOT sys.path'te iken ust
+# duzey modul olarak (cekirdek.py) yuklenir.
+try:
+    from .fay_mesafesi import ADIM_KM, en_yakin_fay_km, yakin_faylar  # noqa: F401
+except ImportError:
+    from fay_mesafesi import ADIM_KM, en_yakin_fay_km, yakin_faylar  # noqa: F401
+
 try:
     from catboost import CatBoostClassifier
 except ImportError:
@@ -20,7 +27,10 @@ except ImportError:
 
 # --- CONSTANTS ---
 
-# Detaylı Fay Hatları (Yaklaşık Koordinatlar)
+# Elle yazilmis YAKLASIK fay cizgileri. Yalniz eski gorsellestiriciler
+# (gui_app.py, main.py) cizim icin kullaniyor; mesafe hesabinda KULLANILMAZ:
+# yalniz KAF, DAF ve dort Ege grabeni vardi (Van'da en yakin fay 215 km
+# cikiyordu). Mesafe GEM verisinden gelir: fay_mesafesi.py.
 FAULT_LINES = [
     # Kuzey Anadolu Fayı (NAF) - Segmentler halinde
     [
@@ -42,8 +52,10 @@ FAULT_LINES = [
     [(37.2, 27.5), (37.2, 28.5), (37.2, 29.5)], # Muğla
 ]
 
-# Risk hesaplaması için tüm noktaları tek bir listede topla
 FAULT_POINTS = [point for line in FAULT_LINES for point in line]
+
+# distance_to_fault ozniteliginin nasil hesaplandigi. Parmak izine girer.
+FAY_YONTEMI = f"gem-harmonized-densify{ADIM_KM}km"
 
 # --- Egitilmis model dosyasi -----------------------------------------------
 # CLAUDE.md kural 3 / MIMARI.md 4: egitim AYRI bir komuttur, model dosyaya
@@ -182,11 +194,7 @@ def build_label_30d(
 
 
 def add_fault_distance(df, lat_col="latitude", lon_col="longitude"):
-    d_list = []
-    for la, lo in zip(df[lat_col].values, df[lon_col].values):
-        d = min([haversine(la, lo, f[0], f[1]) for f in FAULT_POINTS])
-        d_list.append(d)
-    df["distance_to_fault"] = d_list
+    df["distance_to_fault"] = en_yakin_fay_km(df[lat_col].values, df[lon_col].values)
     return df
 
 
@@ -201,7 +209,7 @@ def fault_hazard_score(dist_km):
 
 
 def nearest_fault_distance(lat, lon):
-    return min([haversine(lat, lon, f[0], f[1]) for f in FAULT_POINTS])
+    return en_yakin_fay_km(lat, lon)
 
 
 # --- ENGINE CLASS ---
@@ -322,6 +330,7 @@ class EarthquakeRiskEngine:
             ham = str(self.csv_path)
         ham += "|" + ",".join(RISK_FEATURE_COLUMNS)
         ham += "|" + json.dumps(EGITIM_AYARLARI, sort_keys=True)
+        ham += "|" + FAY_YONTEMI  # yontem degisince onbellek ve model gecersiz sayilir
         return hashlib.sha256(ham.encode("utf-8")).hexdigest()[:16]
 
     def modeli_yukle(self):

@@ -33,7 +33,9 @@ from utils.postgis_manager import postgis_engine
 from apps.road_damage.utils.serialization import compact_segment_coords as _compact_segment_coords, serialize_segments as _serialize_segments, haversine_m as _haversine_m
 from apps.road_damage.utils.imaging import image_array_to_b64 as _image_array_to_b64, build_damage_overlay as _build_damage_overlay, build_segmentation_overlay as _build_segmentation_overlay
 from apps.road_damage.utils.tiling import zoom_for_radius as _zoom_for_radius
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+import json
+import kimlik
 
 yonlendirici = APIRouter()
 
@@ -67,6 +69,20 @@ def predict_risk(req: ck.RiskRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+IL_MERKEZLERI = Path(__file__).resolve().parents[1] / "veri" / "il_merkezleri.json"
+
+
+@yonlendirici.get("/api/risk/iller")
+def risk_illeri(_kul: dict = Depends(kimlik.kullanici)):
+    """81 ilin merkez koordinati ve kaynak kunyesi (araclar_il_merkezleri_uret.py).
+
+    Risk istegi koordinatla gider; sunucu konumu dis servisten aramaz."""
+    if not IL_MERKEZLERI.exists():
+        return {"iller": [], "kaynak": None,
+                "not": "Il merkezleri uretilmedi: python araclar_il_merkezleri_uret.py"}
+    return json.loads(IL_MERKEZLERI.read_text(encoding="utf-8"))
 
 
 @yonlendirici.get("/api/risk/fault_lines")
