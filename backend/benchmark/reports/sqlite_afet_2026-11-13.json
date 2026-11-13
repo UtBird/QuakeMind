@@ -1,0 +1,198 @@
+{
+ "aciklama": "Afet senaryosu: 50 SOS/sn yazilirken 5 konsol tazelenir, 10 sn. 'once' = commit'li eski depo (tek baglanti, ozet 100 bin satir okur). 'yalniz_depo' = okuma baglantilari + SQL ozet, her mesajda tazeleme. 'birlesik' = konsol tazelemeleri 1 sn pencerede birlesir. 'indekssiz' = kapsayici indeksler oncesi. 'son' = hepsi. Not: 'son_1milyon' disindakilerde gerceklesen_hiz konsol bekleme suresini de paydaya katiyordu (dusuk gorunur); hepsinde 10 sn'de 501 yazma = 50/sn.",
+ "cihaz": "Windows 11 dizustu, 20 mantiksal cekirdek; depo katmani dogrudan (HTTP/JSON haric); gercek veritabaninin kopyasi + sentetik tekduze satirlar",
+ "kosular": {
+  "once_olay_100bin": {
+   "kip": "olay",
+   "satir": 100000,
+   "hedef_hiz": 50.0,
+   "konsol": 5,
+   "sure_sn": 10.2,
+   "pencere_sn": 1.0,
+   "yazma": {
+    "n": 41,
+    "ortanca": 125.7,
+    "p95": 722.8,
+    "p99": 1101.5,
+    "en_cok": 1101.5,
+    "gerceklesen_hiz": 4.0
+   },
+   "tazeleme_suresi": {
+    "n": 102,
+    "ortanca": 479.3,
+    "p95": 996.6,
+    "p99": 1381.4,
+    "en_cok": 1774.4
+   },
+   "tazeleme_sayisi": 102,
+   "guncellik_gecikmesi": {
+    "n": 102,
+    "ortanca": 3047.9,
+    "p95": 6052.3,
+    "p99": 6241.4,
+    "en_cok": 6636.8
+   },
+   "islenmeden_kalan_mesaj": 103
+  },
+  "sonra_yalniz_depo_olay_100bin": {
+   "kip": "olay",
+   "satir": 100000,
+   "hedef_hiz": 50.0,
+   "konsol": 5,
+   "sure_sn": 10.1,
+   "pencere_sn": 1.0,
+   "yazma": {
+    "n": 501,
+    "ortanca": 0.3,
+    "p95": 1.2,
+    "p99": 2.1,
+    "en_cok": 7.1,
+    "gerceklesen_hiz": 49.6
+   },
+   "tazeleme_suresi": {
+    "n": 201,
+    "ortanca": 243.8,
+    "p95": 309.2,
+    "p99": 323.6,
+    "en_cok": 326.4
+   },
+   "tazeleme_sayisi": 201,
+   "guncellik_gecikmesi": {
+    "n": 201,
+    "ortanca": 4427.3,
+    "p95": 8859.1,
+    "p99": 9269.1,
+    "en_cok": 9303.0
+   },
+   "islenmeden_kalan_mesaj": 2304
+  },
+  "sonra_depo_birlesik_100bin_indekssiz": {
+   "kip": "birlesik",
+   "satir": 100000,
+   "hedef_hiz": 50.0,
+   "konsol": 5,
+   "sure_sn": 10.6,
+   "pencere_sn": 1.0,
+   "yazma": {
+    "n": 501,
+    "ortanca": 0.3,
+    "p95": 0.5,
+    "p99": 1.0,
+    "en_cok": 7.5,
+    "gerceklesen_hiz": 47.5
+   },
+   "tazeleme_suresi": {
+    "n": 55,
+    "ortanca": 343.5,
+    "p95": 588.5,
+    "p99": 595.8,
+    "en_cok": 598.9
+   },
+   "tazeleme_sayisi": 55,
+   "guncellik_gecikmesi": {
+    "n": 2505,
+    "ortanca": 899.8,
+    "p95": 1418.8,
+    "p99": 1519.8,
+    "en_cok": 1600.7
+   },
+   "islenmeden_kalan_mesaj": 0
+  },
+  "sonra_depo_birlesik_1milyon_indekssiz": {
+   "kip": "birlesik",
+   "satir": 1000000,
+   "hedef_hiz": 50.0,
+   "konsol": 5,
+   "sure_sn": 12.6,
+   "pencere_sn": 1.0,
+   "yazma": {
+    "n": 501,
+    "ortanca": 0.3,
+    "p95": 0.5,
+    "p99": 3.5,
+    "en_cok": 41.5,
+    "gerceklesen_hiz": 39.9
+   },
+   "tazeleme_suresi": {
+    "n": 15,
+    "ortanca": 4131.6,
+    "p95": 4336.5,
+    "p99": 4361.2,
+    "en_cok": 4361.2
+   },
+   "tazeleme_sayisi": 15,
+   "guncellik_gecikmesi": {
+    "n": 2107,
+    "ortanca": 6199.0,
+    "p95": 8092.2,
+    "p99": 8349.4,
+    "en_cok": 8529.2
+   },
+   "islenmeden_kalan_mesaj": 398
+  },
+  "son_100bin": {
+   "kip": "birlesik",
+   "satir": 100000,
+   "hedef_hiz": 50.0,
+   "konsol": 5,
+   "sure_sn": 10.3,
+   "pencere_sn": 1.0,
+   "yazma": {
+    "n": 501,
+    "ortanca": 0.4,
+    "p95": 0.8,
+    "p99": 1.8,
+    "en_cok": 9.8,
+    "gerceklesen_hiz": 48.6
+   },
+   "tazeleme_suresi": {
+    "n": 55,
+    "ortanca": 94.4,
+    "p95": 199.4,
+    "p99": 219.0,
+    "en_cok": 222.0
+   },
+   "tazeleme_sayisi": 55,
+   "guncellik_gecikmesi": {
+    "n": 2505,
+    "ortanca": 613.2,
+    "p95": 1072.6,
+    "p99": 1133.0,
+    "en_cok": 1213.5
+   },
+   "islenmeden_kalan_mesaj": 0
+  },
+  "son_1milyon": {
+   "kip": "birlesik",
+   "satir": 1000000,
+   "hedef_hiz": 50.0,
+   "konsol": 5,
+   "sure_sn": 10.6,
+   "pencere_sn": 1.0,
+   "yazma": {
+    "n": 501,
+    "ortanca": 0.5,
+    "p95": 1.2,
+    "p99": 9.2,
+    "en_cok": 95.0,
+    "gerceklesen_hiz": 50.0
+   },
+   "tazeleme_suresi": {
+    "n": 55,
+    "ortanca": 455.5,
+    "p95": 547.0,
+    "p99": 551.5,
+    "en_cok": 552.6
+   },
+   "tazeleme_sayisi": 55,
+   "guncellik_gecikmesi": {
+    "n": 2505,
+    "ortanca": 987.7,
+    "p95": 1447.2,
+    "p99": 1519.5,
+    "en_cok": 1566.1
+   },
+   "islenmeden_kalan_mesaj": 0
+  }
+ }
+}

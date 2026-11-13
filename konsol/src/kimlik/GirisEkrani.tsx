@@ -1,19 +1,69 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useOturum } from './oturum'
-import { varsayilanYol } from './roller'
+import { GIRIS_KAPILARI, acilisYolu, type GirisKapisi } from './roller'
 import { Marka } from '@/kabuk/Marka'
+import { sn } from '@/lib/sinif'
 
-/* Giriş ve hesap açma. Afetzede, saha ekibi ve koordinasyon aynı kapıdan girer;
-   hangi ekranın açılacağını sunucudan gelen yetki belirler (kural 5).
-   Hesap açma formu eskiden yoktu: ekran "yeni hesaplar afetzede olarak açılır"
-   diyordu ama afetzedenin hesap açacağı bir yer yoktu (J-48). */
+/* ---------------------------------------------------------------------------
+   Giriş ve hesap açma (J-156).
+
+   Üç kapı: Afetzede · Saha ekibi · Koordinasyon. Kişi önce kim olarak girdiğini
+   seçer. Kapı ROL VERMEZ (CLAUDE.md kural 5): sunucu hesabın gerçek rolünü
+   seçilen kapıyla karşılaştırır, uymazsa oturum açmaz ve doğru kapıyı söyler.
+
+   Hesap açma yalnız Afetzede kapısında. Ekip ve koordinasyon hesaplarını
+   koordinasyon merkezi konsoldaki Kullanıcılar ekranından açar.
+--------------------------------------------------------------------------- */
 
 const SIFRE_EN_AZ = 8
+const KAPI_ANAHTARI = 'qm.girisKapisi'
+
+const KAPI: Record<
+  GirisKapisi,
+  { ad: string; ne: string; hesapYoksa: string | null }
+> = {
+  afetzede: {
+    ad: 'Afetzede',
+    ne: 'Yardım çağır, ihbar gönder, en yakın toplanma alanını gör.',
+    hesapYoksa: null, // bu kapıda hesap açılır
+  },
+  ekip: {
+    ad: 'Saha ekibi',
+    ne: 'Ekibine atanan görevler, yol tarifi ve görev durumu.',
+    hesapYoksa:
+      'Ekip hesabını koordinasyon merkezi açar ve sana geçici bir şifre verir. Şifreni unuttuysan ekip sorumluna söyle; yenisini o üretir.',
+  },
+  koordinasyon: {
+    ad: 'Koordinasyon',
+    ne: 'Konsol: harita, SOS kuyruğu, ekipler, analiz.',
+    hesapYoksa: 'Koordinatör hesabını yönetici açar. Şifreni unuttuysan yöneticiye başvur.',
+  },
+}
+
+function kayitliKapi(): GirisKapisi {
+  // Kişi başına kolaylık: son seçilen kapı hatırlanır. Okunamazsa afetzede.
+  try {
+    const k = localStorage.getItem(KAPI_ANAHTARI)
+    if (k && (GIRIS_KAPILARI as readonly string[]).includes(k)) return k as GirisKapisi
+  } catch {
+    /* gizli pencere / engelli depolama */
+  }
+  return 'afetzede'
+}
+
+function kapiyiKaydet(k: GirisKapisi) {
+  try {
+    localStorage.setItem(KAPI_ANAHTARI, k)
+  } catch {
+    /* önemli değil */
+  }
+}
 
 export function GirisEkrani() {
   const { oturum, girisYap, kayitOl } = useOturum()
   const git = useNavigate()
+  const [kapi, setKapi] = useState<GirisKapisi>(kayitliKapi)
   const [kip, setKip] = useState<'giris' | 'kayit'>('giris')
   const [adSoyad, setAdSoyad] = useState('')
   const [eposta, setEposta] = useState('')
@@ -21,16 +71,16 @@ export function GirisEkrani() {
   const [hata, setHata] = useState<string | null>(null)
   const [gonderiliyor, setGonderiliyor] = useState(false)
 
-  if (oturum) return <Navigate to={varsayilanYol(oturum.rol)} replace />
+  if (oturum) return <Navigate to={acilisYolu(oturum)} replace />
 
-  const kayit = kip === 'kayit'
+  const kayit = kip === 'kayit' && kapi === 'afetzede'
   const eksik = kayit
     ? [
         adSoyad.trim().length < 2 && 'ad soyad',
         !eposta.includes('@') && 'e-posta',
         sifre.length < SIFRE_EN_AZ && `en az ${SIFRE_EN_AZ} karakterlik şifre`,
       ].filter(Boolean)
-    : []
+    : [!eposta.trim() && 'e-posta', !sifre && 'şifre'].filter(Boolean)
 
   async function gonder(e: FormEvent) {
     e.preventDefault()
@@ -40,13 +90,21 @@ export function GirisEkrani() {
     try {
       const yeni = kayit
         ? await kayitOl(eposta.trim(), adSoyad.trim(), sifre)
-        : await girisYap(eposta, sifre)
-      git(varsayilanYol(yeni.rol), { replace: true })
+        : await girisYap(eposta.trim(), sifre, kapi)
+      kapiyiKaydet(kapi)
+      git(acilisYolu(yeni), { replace: true })
     } catch (err) {
       setHata(err instanceof Error ? err.message : kayit ? 'Hesap açılamadı.' : 'Giriş yapılamadı.')
     } finally {
       setGonderiliyor(false)
     }
+  }
+
+  function kapiSec(k: GirisKapisi) {
+    setKapi(k)
+    setKip('giris')
+    setHata(null)
+    setSifre('')
   }
 
   function kipDegistir(yeni: 'giris' | 'kayit') {
@@ -58,6 +116,7 @@ export function GirisEkrani() {
   const alan =
     'mt-1.5 w-full rounded-control border border-line-2 bg-sunken px-2.5 py-2 text-body text-ink outline-none focus:border-accent'
   const etiket = 'mt-3 block text-micro ls-micro text-ink-3 uppercase'
+  const tanim = KAPI[kapi]
 
   return (
     <div className="grid h-full place-items-center overflow-auto bg-ground p-6">
@@ -66,19 +125,45 @@ export function GirisEkrani() {
           <Marka />
         </div>
 
+        <p id="kapi-baslik" className="text-micro ls-micro text-ink-3 uppercase">
+          Kim olarak giriyorsun?
+        </p>
+        <div
+          role="radiogroup"
+          aria-labelledby="kapi-baslik"
+          className="mt-1.5 grid grid-cols-3 gap-1 rounded-control border border-line bg-panel p-1"
+        >
+          {GIRIS_KAPILARI.map((k) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={kapi === k}
+              onClick={() => kapiSec(k)}
+              className={sn(
+                'rounded-control px-2 py-2 text-body transition-colors duration-150 ease-out-qm',
+                kapi === k ? 'bg-accent-soft font-semibold text-ink' : 'text-ink-2 hover:bg-hover hover:text-ink',
+              )}
+            >
+              {KAPI[k].ad}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1.5 text-small text-ink-2">{tanim.ne}</p>
+
         <form
           onSubmit={gonder}
-          className="rounded-panel border border-line bg-panel p-3.5"
+          className="mt-3 rounded-panel border border-line bg-panel p-3.5"
           aria-labelledby="giris-baslik"
         >
           <h1 id="giris-baslik" className="text-subtitle text-ink">
-            {kayit ? 'Hesap aç' : 'Giriş yap'}
+            {kayit ? 'Afetzede hesabı aç' : `${tanim.ad} girişi`}
           </h1>
-          <p className="mt-1.5 text-small text-ink-2">
-            {kayit
-              ? 'Hesabın afetzede yetkisiyle açılır: yardım çağırır, çağrının durumunu ve en yakın toplanma alanını görürsün.'
-              : 'Hesabının yetkisi girişten sonra sunucudan gelir; ekran buna göre açılır.'}
-          </p>
+          {kayit && (
+            <p className="mt-1.5 text-small text-ink-2">
+              Yardım çağırır, çağrının durumunu ve en yakın toplanma alanını görürsün.
+            </p>
+          )}
 
           {kayit && (
             <>
@@ -144,7 +229,12 @@ export function GirisEkrani() {
         </form>
 
         <div className="mt-3 rounded-panel border border-line bg-panel p-3.5">
-          {kayit ? (
+          {kapi !== 'afetzede' ? (
+            <>
+              <p className="text-micro ls-micro text-ink-3 uppercase">Hesabın yoksa</p>
+              <p className="mt-2 text-small text-ink-2">{tanim.hesapYoksa}</p>
+            </>
+          ) : kayit ? (
             <>
               <p className="text-small text-ink-2">Hesabın var mı?</p>
               <button
@@ -159,16 +249,14 @@ export function GirisEkrani() {
             <>
               <p className="text-micro ls-micro text-ink-3 uppercase">Hesabın yoksa</p>
               <p className="mt-2 text-small text-ink-2">
-                Yardım çağırmak için hesap aç. Yeni hesaplar{' '}
-                <b className="font-medium text-ink">afetzede</b> yetkisiyle açılır. Saha,
-                koordinatör ve yönetici yetkisini yönetici verir; bu yetki burada seçilemez.
+                Yardım çağırmak için hesap aç; bir dakika sürer.
               </p>
               <button
                 type="button"
                 onClick={() => kipDegistir('kayit')}
                 className="mt-2.5 w-full rounded-control border border-line-2 px-3 py-2 text-body text-ink hover:bg-hover"
               >
-                Hesap aç
+                Afetzede hesabı aç
               </button>
             </>
           )}

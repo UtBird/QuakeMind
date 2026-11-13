@@ -5,8 +5,9 @@ import { sorguIstemcisi } from '@/veri/istemci'
 import { OturumSaglayici, useOturum } from '@/kimlik/oturum'
 import { Bekleme, RolKapisi } from '@/kimlik/RolKapisi'
 import { GirisEkrani } from '@/kimlik/GirisEkrani'
+import { SifreDegistirmeEkrani } from '@/kimlik/SifreDegistirmeEkrani'
 import { CanliSaglayici } from '@/canli/CanliSaglayici'
-import { KONSOL_ROLLERI, varsayilanYol } from '@/kimlik/roller'
+import { KONSOL_ROLLERI, acilisYolu } from '@/kimlik/roller'
 import { VARSAYILAN_MOD } from '@/modlar/modlar'
 
 // Rota bazlı kod bölme: afetzede ekranı harita motorunu indirmez (MIMARI §7).
@@ -28,6 +29,7 @@ export function App() {
             <Suspense fallback={<Bekleme />}>
               <Routes>
                 <Route path="/giris" element={<GirisEkrani />} />
+                <Route path="/sifre-degistir" element={<SifreDegistirmeEkrani />} />
                 <Route
                   path="/konsol/:mod"
                   element={
@@ -70,5 +72,5 @@ export function App() {
 function Acilis() {
   const { oturum, yukleniyor } = useOturum()
   if (yukleniyor) return <Bekleme />
-  return <Navigate to={oturum ? varsayilanYol(oturum.rol) : '/giris'} replace />
+  return <Navigate to={oturum ? acilisYolu(oturum) : '/giris'} replace />
 }

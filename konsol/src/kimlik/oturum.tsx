@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import type { Oturum } from './roller'
+import type { GirisKapisi, Oturum } from './roller'
 import * as uc from './oturumUcu'
 import { kimlikBagla } from '@/veri/istemci'
 
@@ -15,9 +15,10 @@ import { kimlikBagla } from '@/veri/istemci'
 type OturumDurumu = {
   oturum: Oturum | null
   yukleniyor: boolean
-  girisYap: (eposta: string, sifre: string) => Promise<Oturum>
+  girisYap: (eposta: string, sifre: string, kapi?: GirisKapisi) => Promise<Oturum>
   kayitOl: (eposta: string, adSoyad: string, sifre: string) => Promise<Oturum>
   cikisYap: () => Promise<void>
+  sifreDegistir: (eskiSifre: string, yeniSifre: string) => Promise<Oturum>
 }
 
 const Baglam = createContext<OturumDurumu | null>(null)
@@ -55,8 +56,8 @@ export function OturumSaglayici({ children }: { children: ReactNode }) {
   // sonsuz) önceki kullanıcının verisi yeni girişte olduğu gibi görünürdü --
   // koordinatörden sonra aynı sekmede giren afetzede herkesin çağrısını görürdü.
   const girisYap = useCallback(
-    async (eposta: string, sifre: string) => {
-      const yeni = await uc.girisYap(eposta, sifre)
+    async (eposta: string, sifre: string, kapi?: GirisKapisi) => {
+      const yeni = await uc.girisYap(eposta, sifre, kapi)
       qc.clear()
       setOturum(yeni)
       return yeni
@@ -80,9 +81,20 @@ export function OturumSaglayici({ children }: { children: ReactNode }) {
     setOturum(null)
   }, [qc])
 
+  const sifreDegistir = useCallback(
+    async (eskiSifre: string, yeniSifre: string) => {
+      const yeni = await uc.sifreDegistir(eskiSifre, yeniSifre)
+      // Şifre değişmeden önce korunan sorgular 403 almış olabilir; temiz başla.
+      qc.clear()
+      setOturum(yeni)
+      return yeni
+    },
+    [qc],
+  )
+
   const deger = useMemo(
-    () => ({ oturum, yukleniyor, girisYap, kayitOl, cikisYap }),
-    [oturum, yukleniyor, girisYap, kayitOl, cikisYap],
+    () => ({ oturum, yukleniyor, girisYap, kayitOl, cikisYap, sifreDegistir }),
+    [oturum, yukleniyor, girisYap, kayitOl, cikisYap, sifreDegistir],
   )
   return <Baglam.Provider value={deger}>{children}</Baglam.Provider>
 }

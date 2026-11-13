@@ -10,7 +10,7 @@ bu kuralları **istisnasız** uygular. Ayrıntılar iki belgede:
 | `PROJE_DOSYASI.md` | Sistem ve veri mimarisinin akademik tanıtımı (kanıt etiketli) |
 | `EKSIKLER_VE_SORUNLAR.md` | Açık sorunların kimlikli takibi |
 
-Son güncelleme: 20 Eylül 2026.
+Son güncelleme: 13 Kasım 2026 (veritabanı gerçeği: SQLite, §2–4 ve §10).
 
 ---
 
@@ -36,7 +36,8 @@ Uydu bölütlemesi, kamera tespiti, metin analizi ve acil çağrı; hepsi tek bi
 (konum, hasar/aciliyet skoru, güven, zaman damgası, kaynak tipi)
 ```
 
-Bu kayıtlar PostGIS `damage_points` tablosunda toplanır. **Yeni bir model eklemek, bu
+Bu kayıtlar tek tabloda toplanır: bugün SQLite `hasar_noktalari`
+(`backend/depo/sqlite_surucu.py`), hedef PostGIS `damage_points` (bkz. §10). **Yeni bir model eklemek, bu
 sözleşmeye uymak demektir.** Arayüz modellere değil bu sözleşmeye bağlanır; bu yüzden
 arayüz, modeller bitmeden geliştirilebilir.
 
@@ -45,21 +46,24 @@ arayüz, modeller bitmeden geliştirilebilir.
 Model çıkarımı, model eğitimi, ızgara hesabı ve karo üretimi istek yolunda yapılmaz.
 
 ```
-İstek  →  iş kuyruğu (Postgres tablosu + SKIP LOCKED)  →  işçi süreç
+İstek  →  iş kuyruğu                                  →  işçi süreç
                                                         ↓
 arayüz  ←  SSE "yeni veri var"  ←  sonuç tabloya yazılır
 ```
 
 - Modeller API sürecinde değil, tek bir çıkarım işçisinde bellekte durur.
 - Eğitim ayrı bir komuttur; model dosyaya yazılır, API yalnız yükler.
-  (Bugün ihlal ediliyor: `apps/earthquake_risk/risk_engine.py:408` ilk risk isteğinde
-  CatBoost eğitiyor ve diske yazmıyor.)
+  (Risk modeli buna uyuyor: `araclar_risk_egit.py` eğitir, model yoksa API eğitmez, hata verir.)
 - Uzun işler HTTP 202 + iş kimliği döner; istemci yoklamaz, SSE dinler.
+- **Bugünkü kuyruk:** süreç içi `ProcessPoolExecutor` (`cekirdek.py`, `road_damage_pool`)
+  ve bellekteki iş kaydı (`road_damage_jobs`). Sunucu yeniden başlarsa koşan işler kaybolur.
+  Hedef: Postgres tablosu + `FOR UPDATE SKIP LOCKED` (PostGIS'e geçince, §10).
 
 ## 4. Canlı veri tek akıştan gelir — yoklama yasak
 
 `setInterval` ile uç nokta yoklamak yasaktır. Tek bir SSE akışı vardır, sunucu yalnızca
-değişiklik olduğunda mesaj gönderir (Postgres `LISTEN/NOTIFY`).
+değişiklik olduğunda mesaj gönderir. Bugün yayın süreç içidir (`canli_yayin.py`) ve tek
+uvicorn worker'ı varsayar; birden çok worker'a geçilirse Postgres `LISTEN/NOTIFY`'a bağlanır.
 
 Ölçüm: bugünkü `quakemind-web/src/app/command/map/page.tsx` sekme başına dakikada ~65
 istek atıyor, hiçbir şey değişmese bile.
@@ -111,3 +115,15 @@ yeni konsol devralır. Eski web'de yalnız kritik düzeltme yapılır.
 - 7 Kasım 2026 itibarıyla eski Flutter klasörü yerini `mobile/` altındaki Kotlin/Compose Android uygulamasına bıraktı; Android-backend entegrasyonu geliştirme kapsamındadır.
 - `OPTIMIZASYON_ANALIZI.md` içindeki durum alanları bayat (hepsi "Bekliyor" görünüyor ama
   bazıları yapılmış). Oradan madde kullanmadan önce koda bak.
+- **Veritabanı (13 Kasım 2026): çalışan sistem SQLite kullanır**, PostgreSQL/PostGIS değil.
+  - Dosya `backend/veri/quakemind.sqlite3`; WAL kipinde. Tek yazma bağlantısı +
+    iş parçacığı başına okuma bağlantısı, kapsayıcı zaman indeksleri (`depo/sqlite_surucu.py`). Uçlar SQL görmez, yalnız depo yöntemlerini çağırır. ORM yok;
+    parametreli SQL kullanılır.
+  - PostGIS sürücüsü (`depo/postgis_surucu.py`) yazılmadı. Eski `utils/postgis_manager.py`
+    yalnız eski yol hasarı uçlarında kullanılır; makinede PostgreSQL olmadığı için yedek kipte
+    çalışır.
+  - Belgede, sunumda ve makalede "sistem PostGIS kullanıyor" denmez; PostGIS **hedef**
+    mimaridir.
+  - Performans (J-158): 50 SOS/sn ve 5 konsolda 1 milyon satıra kadar hedef yazma süresi
+    tutuyor. Sayım ve özet SQL'de yapılır, satırları Python'a çekip saymak yasak. Yeni zaman
+    pencereli sorgu eklenince `EXPLAIN QUERY PLAN` ile tablo taranmadığına bak.

@@ -40,8 +40,18 @@ import kimlik
 yonlendirici = APIRouter()
 
 
+#: Dis servise (Kandilli, USGS) istek atip deprem katalogunu yeniden yazan
+#: islemler yalniz koordinasyona acik (J-152).
+_KOORDINASYON = ("koordinator", "yonetici")
+
+
 @yonlendirici.post("/api/risk/predict")
-def predict_risk(req: ck.RiskRequest):
+def predict_risk(req: ck.RiskRequest, kul: dict = Depends(kimlik.kullanici)):
+    """Risk skoru (J-152): giris yapmis her rol. Eskiden kimliksizdi; herkes
+    sorgu atabiliyor, `refreshData` ile dis servise istek de attirabiliyordu.
+    `refreshData` artik yalniz koordinasyon icin calisir; digerlerinde yok sayilir."""
+    if req.refreshData and kul["rol"] not in _KOORDINASYON:
+        req.refreshData = False
     if not ck.risk_engine:
         raise HTTPException(status_code=503, detail="Risk model is not loaded.")
     
@@ -163,7 +173,7 @@ def risk_all_quakes(
 
 
 @yonlendirici.post("/api/risk/refresh_live_data")
-def risk_refresh_live_data():
+def risk_refresh_live_data(_kul: dict = Depends(kimlik.rol_gerektir(*_KOORDINASYON))):
     """Pulls fresh Kandilli (+ USGS gap-fill) data into query.csv and invalidates
     the risk engine's in-memory frames/model so the next request re-reads it."""
     if not ck.risk_engine:

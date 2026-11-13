@@ -1,5 +1,5 @@
 import { apiPost } from '@/veri/istemci'
-import type { Oturum, Rol } from './roller'
+import type { GirisKapisi, Oturum, Rol } from './roller'
 
 /* ---------------------------------------------------------------------------
    Gerçek kimlik akışı (backend: /api/oturum/*).
@@ -18,6 +18,7 @@ type SunucuKullanici = {
   birim?: string | null
   sehir?: string | null
   ekipId?: string | null
+  sifreDegismeli?: boolean
 }
 
 type OturumYaniti = { erisimJetonu: string; kullanici: SunucuKullanici }
@@ -39,12 +40,15 @@ function oturumaCevir(y: OturumYaniti): Oturum {
     eposta: y.kullanici.eposta,
     rol: y.kullanici.rol,
     ekipId: y.kullanici.ekipId ?? null,
+    sifreDegismeli: !!y.kullanici.sifreDegismeli,
     kaynak: 'jwt',
   }
 }
 
-export async function girisYap(eposta: string, sifre: string): Promise<Oturum> {
-  const yanit = await apiPost<OturumYaniti>('/api/oturum/giris', { eposta, sifre })
+/** `kapi` ROL DEĞİLDİR: giriş ekranında seçilen kapı. Sunucu hesabın
+    gerçek rolüyle karşılaştırır, uymazsa doğru kapıyı söyleyip reddeder (J-156). */
+export async function girisYap(eposta: string, sifre: string, kapi?: GirisKapisi): Promise<Oturum> {
+  const yanit = await apiPost<OturumYaniti>('/api/oturum/giris', { eposta, sifre, kapi })
   jetonYaz(yanit.erisimJetonu)
   return oturumaCevir(yanit)
 }
@@ -52,6 +56,14 @@ export async function girisYap(eposta: string, sifre: string): Promise<Oturum> {
 export async function kayitOl(eposta: string, adSoyad: string, sifre: string): Promise<Oturum> {
   // Rol alanı gönderilmiyor: yeni hesap her zaman afetzede olarak açılır.
   const yanit = await apiPost<OturumYaniti>('/api/oturum/kayit', { eposta, adSoyad, sifre })
+  jetonYaz(yanit.erisimJetonu)
+  return oturumaCevir(yanit)
+}
+
+/** Kişinin kendi şifresini değiştirmesi (J-157). Sunucu bütün eski oturumları
+    düşürür ve bu cihaza yeni oturum verir; yeni erişim jetonu buradan gelir. */
+export async function sifreDegistir(eskiSifre: string, yeniSifre: string): Promise<Oturum> {
+  const yanit = await apiPost<OturumYaniti>('/api/oturum/sifre', { eskiSifre, yeniSifre })
   jetonYaz(yanit.erisimJetonu)
   return oturumaCevir(yanit)
 }

@@ -196,6 +196,8 @@ def run_analysis_job(req: dict) -> dict:
     # Varsayilan 0 = uygulamanin her zamanki kurali (hasar yol maskesinin
     # ustunde). Yaricap kurali yalnizca acikca istenirse (bkz. J-26).
     blockage_radius_m = float(req.get("blockageRadiusM", 0.0))
+    # J-161: istege bagli yakin cekim (z+1). Varsayilan kapali; kunyeye yazilir.
+    yakin_cekim = bool(req.get("yakinCekim", False))
 
     started_at = time.perf_counter()
     t0 = started_at
@@ -361,6 +363,8 @@ def run_analysis_job(req: dict) -> dict:
     _egitim_gsd = kunye["girdi"]["egitimGsdM"]
     hedef_gsd_m = (float(_egitim_gsd[0]) + float(_egitim_gsd[1])) / 2.0
     kullanilacak_zoom = zoom_for_gsd(hedef_gsd_m, latitude)
+    if yakin_cekim:
+        kullanilacak_zoom = min(20, kullanilacak_zoom + 1)
 
     etkin_yaricap_km = radius_km
     if bbox is not None:
@@ -412,6 +416,19 @@ def run_analysis_job(req: dict) -> dict:
                 f"({gsd_of_zoom(used_zoom, latitude):.2f} m/piksel) tek kosuya "
                 f"{analiz_alani_km2:.2f} km2 sigdi, merkezden kirpildi."
             )
+    if used_zoom != requested_zoom and prov_code == "custom":
+        # J-160: OpenAerialMap/drone goruntusunde istenen yakinlastirmada karo
+        # yoksa sebep neredeyse her zaman KAPSAMA: analiz kutusunun merkezi
+        # goruntunun disinda (Defne/Elektrik: sehir merkezi + 2,5 km secilmis,
+        # goruntu alanin ~%1'i). Eskiden bir alt yakinlastirmaya inilip
+        # kosuluyordu: model 0,96 m/piksel ve cogu bos goruntu gordu, sonuc
+        # "0 kapali yol" cikti. Standart cozunurluk kurali (J-76) bozulmasin,
+        # sessiz yanlis sonuc uretilmesin: kosu durur, sebep yazilir.
+        raise ValueError(
+            "Secilen goruntu analiz alaninin merkezinde yok: istenen cozunurlukte "
+            f"(z{requested_zoom}) karo bulunamadi. Analiz alanini goruntunun ustune tasi "
+            "(Hasar analizi > goruntu listesi > 'Alani goruntuye tasi') ve yeniden baslat."
+        )
     if used_zoom != requested_zoom:
         imagery_notes.append(f"Istenen z{requested_zoom}'de karo yok, z{used_zoom} kullanildi")
     # ONCESI GORUNTUSU (kullanici istegi, 26 Eylul): ayni kutu, ayni
@@ -785,6 +802,8 @@ def run_analysis_job(req: dict) -> dict:
         # kaynaklarda cekim listesi bos ve iliski "unknown".
         "imageryZoom": used_zoom,
         "imageryRequestedZoom": requested_zoom,
+        # J-161: egitim olceginden bir kademe yakin mi kosuldu (deneysel).
+        "yakinCekim": yakin_cekim,
         "imageryCaptures": imagery_captures,
         "imageryEventTiming": imagery_event_timing,
         "damageRate": round(damage_rate, 4),
