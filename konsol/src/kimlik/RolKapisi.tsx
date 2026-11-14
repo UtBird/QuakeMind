@@ -16,6 +16,9 @@ export function RolKapisi({ izinli, children }: { izinli: Rol[]; children: React
 
   if (yukleniyor) return <Bekleme />
   if (!oturum) return <Navigate to="/giris" replace state={{ nereden: konum.pathname }} />
+  // Geçici şifreyle giren önce kendi şifresini koyar (J-157); sunucu da öbür
+  // uçları 403 ile kapatır.
+  if (oturum.sifreDegismeli) return <Navigate to="/sifre-degistir" replace />
   if (!izinli.includes(oturum.rol)) return <Navigate to={varsayilanYol(oturum.rol)} replace />
   return <>{children}</>
 }

@@ -852,6 +852,12 @@ class RoadDamageRequest(BaseModel):
     # olculen dogrulugu dusuk cikti (bkz. J-26). Yaricap kurali yalnizca
     # acikca istenirse (arastirma/duyarlilik) kullanilir.
     blockageRadiusM: float = 0.0
+    # J-161: modelin egitim olceginden BIR kademe yakin (z+1, ~0,24 m/piksel)
+    # kos. VARSAYILAN KAPALI: standart cozunurluk kurali (J-76, kullanici
+    # karari 26 Eylul) degismez. Olculen (13 Kasim, Defne/Elektrik): z18 8,
+    # z19 19 kapali yol; yer gercegi olmadigi icin dogruluk OLCULMEDI, egitim
+    # olceginin disinda. Arayuzde "deneysel" etiketiyle sunulur; sonuc kunyesi yazar.
+    yakinCekim: bool = False
 
 
 class SimulateClosuresRequest(BaseModel):

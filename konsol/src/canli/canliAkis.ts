@@ -39,6 +39,37 @@ const EN_UZUN_BEKLEME = 60_000
    ekran "canlı" derken hiçbir mesaj gelmez (J-45 sınamasında görüldü). */
 const NABIZ_SINIRI = 45_000
 const BEKCI_ARALIGI = 10_000
+/* Tazeleme birleştirme (J-158). Afette saniyede onlarca SOS gelebilir; her
+   mesaj her açık konsolda listenin TAMAMINI yeniden istetirse sunucu doyar
+   (ölçüm: 5 konsol × 50 SOS/sn ≈ 250 tam liste/sn). Aynı sorgu anahtarı için
+   ilk mesaj hemen tazeler; pencere içinde gelenler pencere sonunda TEK
+   tazelemede birleşir. Sessiz anda gecikme yoktur; yoğunlukta en çok 1 sn. */
+export const BIRLESTIRME_PENCERESI_MS = 1_000
+
+/** Anahtar başına ilk-çağrı + son-çağrı birleştirici; saat yalnız mesaj gelince kurulur. */
+export function birlestirici(calistir: (anahtar: string[]) => void, pencereMs = BIRLESTIRME_PENCERESI_MS) {
+  const acik = new Map<string, { zamanlayici: number; bekleyen: boolean }>()
+  const tetikle = (anahtar: string[]) => {
+    const ad = JSON.stringify(anahtar)
+    const durum = acik.get(ad)
+    if (durum) {
+      durum.bekleyen = true // pencere sonunda bir kez daha
+      return
+    }
+    calistir(anahtar)
+    const kapat = () => {
+      const d = acik.get(ad)
+      acik.delete(ad)
+      if (d?.bekleyen) tetikle(anahtar) // son mesajı kaçırma; yeni pencere açar
+    }
+    acik.set(ad, { zamanlayici: window.setTimeout(kapat, pencereMs), bekleyen: false })
+  }
+  const temizle = () => {
+    for (const d of acik.values()) window.clearTimeout(d.zamanlayici)
+    acik.clear()
+  }
+  return { tetikle, temizle }
+}
 
 export type AkisSecenek = {
   url?: string
@@ -62,6 +93,7 @@ export function canliAkisBaslat(qc: QueryClient, secenek: AkisSecenek = {}): () 
   const hepsiniTazele = () => {
     for (const a of AKIS_ANAHTARLARI) void qc.invalidateQueries({ queryKey: a })
   }
+  const tazeleyici = birlestirici((anahtar) => void qc.invalidateQueries({ queryKey: anahtar }))
 
   const isle = (ham: string) => {
     sonSinyal = Date.now()
@@ -72,9 +104,7 @@ export function canliAkisBaslat(qc: QueryClient, secenek: AkisSecenek = {}): () 
       return // biçimsiz mesaj sessizce atılır, akış kapatılmaz
     }
     if (!mesaj || !MESAJ_TIPLERI.includes(mesaj.tip)) return
-    for (const anahtar of tazelenecekler(mesaj)) {
-      void qc.invalidateQueries({ queryKey: anahtar })
-    }
+    for (const anahtar of tazelenecekler(mesaj)) tazeleyici.tetikle(anahtar)
     useCanliAkisDurumu.setState((d) => ({
       sonMesaj: { tip: mesaj.tip, zaman: Date.now() },
       mesajSayisi: d.mesajSayisi + 1,
@@ -130,6 +160,7 @@ export function canliAkisBaslat(qc: QueryClient, secenek: AkisSecenek = {}): () 
 
   return () => {
     kapandi = true
+    tazeleyici.temizle()
     window.clearInterval(bekci)
     if (zamanlayici) window.clearTimeout(zamanlayici)
     kaynak?.close()

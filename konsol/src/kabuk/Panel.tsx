@@ -28,7 +28,10 @@ export function Panel({
     <section
       aria-label={baslik}
       className={sn(
-        'flex min-h-0 flex-col overflow-hidden rounded-panel border border-line bg-panel',
+        // w-full: panel, sabit genişlikli sütunun TAMAMINI kaplar. Eskiden içerik
+        // kadar daralıyordu; hasar analizinde ilerleme çubuğu gelince sağ panel
+        // bir anda genişliyordu (kullanıcı, 13 Kasım).
+        'flex w-full min-h-0 flex-col overflow-hidden rounded-panel border border-line bg-panel',
         className,
       )}
     >

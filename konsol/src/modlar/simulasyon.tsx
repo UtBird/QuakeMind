@@ -495,10 +495,17 @@ export function SimulasyonSag() {
 
       {s.olcum && (
         <Bolum baslik="Ölçüm" ek={<Micro>{sayi(s.olcum.ciftSayisi)} çift</Micro>}>
-          <p className="text-body text-ink">
-            Ortalama uzama {mesafe(s.olcum.ortalamaUzamaM)} (%
-            {s.olcum.ortalamaUzamaYuzde.toFixed(1).replace('.', ',')})
-          </p>
+          {s.olcum.ortalamaUzamaM != null && s.olcum.ortalamaUzamaYuzde != null ? (
+            <p className="text-body text-ink">
+              Ortalama uzama {mesafe(s.olcum.ortalamaUzamaM)} (%
+              {s.olcum.ortalamaUzamaYuzde.toFixed(1).replace('.', ',')})
+            </p>
+          ) : (
+            <p className="text-body text-ink-2">
+              Uzama hesaplanamadı: uzama yalnız araçla ulaşılan çiftlerden alınır, bu koşuda öyle
+              çift yok.
+            </p>
+          )}
           {s.olcum.enBuyukUzamaM != null && (
             <p className="mt-1 text-small text-ink-2">En çok uzama {mesafe(s.olcum.enBuyukUzamaM)}</p>
           )}
@@ -522,8 +529,16 @@ export function SimulasyonSag() {
             <div key={ad} className="flex items-baseline justify-between gap-2 py-0.5">
               <span className="text-small text-ink-2">{ad}</span>
               <span className="text-small text-ink">
-                {sureMetni(Math.round(deger.ortalamaSureDk))}
-                {deger.uDonusuSayisi != null && ` · ${sayi(deger.uDonusuSayisi)} U dönüşü`}
+                {/* Kollar dakikanın altında ayrışıyor (ör. 2,4 · 2,2 · 1,6 dk): tam
+                    sayıya yuvarlamak üçünü de "2 dk" yapıp farkı siliyordu (J-154). */}
+                {deger.ortalamaSureDk == null
+                  ? 'araçla ulaşılan görev yok'
+                  : deger.ortalamaSureDk < 10
+                    ? `${deger.ortalamaSureDk.toFixed(1).replace('.', ',')} dk`
+                    : sureMetni(Math.round(deger.ortalamaSureDk))}
+                {deger.ortalamaSureDk != null &&
+                  deger.uDonusuSayisi != null &&
+                  ` · ${sayi(deger.uDonusuSayisi)} U dönüşü`}
               </span>
             </div>
           ))}

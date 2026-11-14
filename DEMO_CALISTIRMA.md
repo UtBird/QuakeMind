@@ -18,12 +18,43 @@ tembel yüklenir, ilk tatbikata kadar belleğe girmez).
 
 ## 2. Giriş
 
-Sunum hesabı: `demo@quakemind.local`, rol **koordinatör**. Şifre
-`araclar_kullanici.py` içindeki varsayılandır. Hesap yoksa:
+Veritabanı (`QuakeMindBackend/veri/quakemind.sqlite3`) depoya girmez. Projeyi yeni çeken herkes
+**bir kez** demo hesaplarını kendi bilgisayarında kurar:
 
 ```bash
-QuakeMindBackend/../venv/Scripts/python.exe QuakeMindBackend/araclar_kullanici.py ekle demo@quakemind.local "Demo Sunum" koordinator
+venv/Scripts/python.exe QuakeMindBackend/araclar_demo_hesaplari.py
 ```
+
+Araç eksik hesapları açar, var olanlara dokunmaz. Saha hesabını bir ekibe bağlar; ekip yoksa
+"Demo Ekip"i açar. Var olan bir demo hesabının şifresi bilinmiyorsa `--sifreleri-sifirla` ile
+demo şifresine çekilir.
+
+| Rol | E-posta | Şifre | Giriş ekranında seç |
+|---|---|---|---|
+| Yönetici | `yonetici-demo@quakemind.local` | `degistir1234` | Koordinasyon |
+| Koordinatör (sunum hesabı) | `demo@quakemind.local` | `degistir1234` | Koordinasyon |
+| Saha ekibi | `saha-demo@quakemind.local` | `degistir1234` | Saha ekibi |
+| Afetzede | `afetzede-demo@quakemind.local` | `degistir1234` | Afetzede |
+
+Bu şifre depoda açık yazılıdır; yalnız yerel geliştirme ve tanıtım içindir. Gerçek kullanımda bu
+hesaplar açılmaz.
+
+**Giriş ekranının üç kapısı var (J-156):** Afetzede · Saha ekibi · Koordinasyon. Önce kapıyı seç;
+hesabın rolü kapıya uymazsa sunucu girişi reddeder ve doğru kapıyı söyler. Demo hesabı
+**Koordinasyon**, `saha-demo` **Saha ekibi** kapısından girer.
+
+Hesap açma yalnız Afetzede kapısında. Ekip hesaplarını koordinatör konsoldaki **Kullanıcılar**
+sekmesinden yönetir (tam sayfa, J-157):
+- **Yeni ekip hesabı:** ad, e-posta, ekip → "Hesabı aç ve şifre üret". Tek seferlik şifre bir kez
+  görünür; kişiye ilet. Kişi ilk girişte kendi şifresini koymadan hiçbir ekrana geçemez.
+- **Düzenle:** tablodan bir satıra tıkla. Çekmecede ad, rol, ekip ve durumu (Aktif / Askıda)
+  değiştir, **Kaydet**. Ekipsiz saha hesabı görev göremez; tablonun üstündeki uyarı bunları
+  gösterir.
+- **Şifre unutuldu:** çekmecede "yeni geçici şifre üret".
+- **Kayıt defteri** sekmesi: kim, kime, ne zaman, ne yaptı.
+
+Koordinatör saha hesaplarını yönetir; koordinatör ve yönetici hesabını yalnız yönetici açar ve
+değiştirir. Kimse kendi rolünü ya da durumunu değiştiremez.
 
 ## 3. Tatbikatı koşturma
 

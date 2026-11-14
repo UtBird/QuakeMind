@@ -17,6 +17,7 @@ import math
 import sqlite3
 import time
 import uuid
+import threading
 from threading import Lock
 from typing import Any, Iterable, Optional
 
@@ -33,6 +34,21 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
     son_giris     REAL,
     ekip_id       TEXT
 );
+
+-- Hesap islemleri kayit defteri (J-157): kim, kime, ne zaman, ne yapti.
+-- Silinmez, guncellenmez; yalniz eklenir.
+CREATE TABLE IF NOT EXISTS hesap_kayitlari (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    zaman         REAL NOT NULL,
+    yapan_id      TEXT,
+    yapan_ad      TEXT,
+    hedef_id      TEXT NOT NULL,
+    hedef_ad      TEXT,
+    hedef_eposta  TEXT,
+    islem         TEXT NOT NULL,
+    ayrinti       TEXT
+);
+CREATE INDEX IF NOT EXISTS hesap_kayitlari_hedef ON hesap_kayitlari (hedef_id, zaman);
 
 CREATE TABLE IF NOT EXISTS oturumlar (
     jeton_ozeti   TEXT PRIMARY KEY,
@@ -57,7 +73,11 @@ CREATE TABLE IF NOT EXISTS hasar_noktalari (
     bolge       TEXT,
     ek          TEXT
 );
-CREATE INDEX IF NOT EXISTS ix_hasar_zaman ON hasar_noktalari(zaman);
+-- J-158: zaman araligi + kaynak + skor tek kapsayici indeksten okunur (ozet
+-- 1 milyon satirda 1,4 sn -> ~40-60 ms). Eski tek sutunlu indeks kaldirilir:
+-- kalirsa planlayici onu ya da kaynak indeksini secip tabloyu tariyordu.
+DROP INDEX IF EXISTS ix_hasar_zaman;
+CREATE INDEX IF NOT EXISTS ix_hasar_zaman_kapsar ON hasar_noktalari(zaman, kaynak, skor);
 CREATE INDEX IF NOT EXISTS ix_hasar_kaynak ON hasar_noktalari(kaynak);
 CREATE INDEX IF NOT EXISTS ix_hasar_konum ON hasar_noktalari(lon, lat);
 
@@ -77,9 +97,16 @@ CREATE TABLE IF NOT EXISTS sos_cagrilari (
     kanal         TEXT,
     ek            TEXT
 );
-CREATE INDEX IF NOT EXISTS ix_sos_zaman ON sos_cagrilari(zaman);
+-- J-158: zaman araligi + kutu + durum tek kapsayici indeksten (kutulu liste
+-- 1 milyon satirda 0,5 sn -> ~16-30 ms; durum sayilari 0,9 sn -> ~30 ms).
+DROP INDEX IF EXISTS ix_sos_zaman;
+CREATE INDEX IF NOT EXISTS ix_sos_zaman_kapsar ON sos_cagrilari(zaman, lon, lat, durum);
 CREATE INDEX IF NOT EXISTS ix_sos_durum ON sos_cagrilari(durum);
-CREATE INDEX IF NOT EXISTS ix_sos_kullanici ON sos_cagrilari(kullanici_id);
+-- J-158: afetzedenin kendi cagrilari (kullanici + zaman sirasi). Tek sutunlu
+-- indeksle planlayici siralamadan kacmak icin tabloyu zaman sirasiyla tariyordu:
+-- 1 milyon satirda 10 sn -> <1 ms.
+DROP INDEX IF EXISTS ix_sos_kullanici;
+CREATE INDEX IF NOT EXISTS ix_sos_kullanici_zaman ON sos_cagrilari(kullanici_id, zaman);
 
 -- Ekip (J-54): kurum, tur ve kisi sayisi sevkte "kac kisi gidiyor" sorusunun
 -- cevabidir. `durum` yalniz elle verilen durumdur (musait | hizmet-disi);
@@ -199,7 +226,8 @@ CREATE TABLE IF NOT EXISTS ihbarlar (
     guncellendi   REAL
 );
 CREATE INDEX IF NOT EXISTS ix_ihbar_zaman ON ihbarlar(zaman);
-CREATE INDEX IF NOT EXISTS ix_ihbar_kullanici ON ihbarlar(kullanici_id);
+DROP INDEX IF EXISTS ix_ihbar_kullanici;
+CREATE INDEX IF NOT EXISTS ix_ihbar_kullanici_zaman ON ihbarlar(kullanici_id, zaman);
 
 -- Fotograf ayri tabloda: ihbar listesi okunurken goruntu bellege alinmasin.
 CREATE TABLE IF NOT EXISTS ihbar_fotograflari (
@@ -228,7 +256,7 @@ class GorevHatasi(Exception):
 
 
 def yeni_ihbar_kimligi() -> str:
-    return f"ihb-{uuid.uuid4().hex[:8]}"
+    return f"ihb-{uuid.uuid4().hex[:16]}"
 
 
 def _satir(row: Optional[sqlite3.Row]) -> Optional[dict]:
@@ -240,6 +268,19 @@ def _satirlar(rows: Iterable[sqlite3.Row]) -> list[dict]:
 
 
 class SqliteDepo:
+    """Tek YAZMA baglantisi + is parcacigi basina OKUMA baglantisi (J-158).
+
+    Eskiden okuma da yazma da tek baglantida, tek kilitle siraya giriyordu:
+    konsollarin 5 000 satirlik listeleri (~45 ms) afetzedenin SOS yazmasini
+    saniyelerce bekletiyordu. WAL kipinde okuyucular yaziciyi beklemez; her
+    is parcacigi kendi salt-okunur baglantisiyla okur, yazma tek baglantida
+    kilitle siralanir (SQLite zaten tek yazici kabul eder).
+
+    Tutarlilik: okuma baglantisi yalniz COMMIT edilmis veriyi gorur. Yazma
+    akisi icinde (kilit tutulurken) okuma gerekiyorsa yazma baglantisi
+    kullanilir (`self._baglanti.execute(...)`), `_oku`/`_tek` degil.
+    """
+
     def __init__(self, yol: str):
         self.yol = yol
         self._kilit = Lock()
@@ -248,15 +289,39 @@ class SqliteDepo:
         self._baglanti.execute("PRAGMA journal_mode=WAL")
         self._baglanti.execute("PRAGMA synchronous=NORMAL")
         self._baglanti.execute("PRAGMA foreign_keys=ON")
+        self._baglanti.execute("PRAGMA busy_timeout=5000")
         with self._kilit:
             self._baglanti.executescript(SEMA)
             self._sutunlari_tamamla()
             self._baglanti.commit()
+        # Okuma baglantilari: is parcacigi basina bir tane, ilk okumada acilir.
+        self._yerel = threading.local()
+        self._okuma_baglantilari: list[sqlite3.Connection] = []
+        self._okuma_kilidi = Lock()  # yalniz listeyi korur, sorguyu degil
+
+    def _okuma_baglantisi(self) -> sqlite3.Connection:
+        b = getattr(self._yerel, "baglanti", None)
+        if b is None:
+            b = sqlite3.connect(self.yol, check_same_thread=False)
+            b.row_factory = sqlite3.Row
+            b.execute("PRAGMA query_only=ON")
+            b.execute("PRAGMA busy_timeout=5000")
+            self._yerel.baglanti = b
+            with self._okuma_kilidi:
+                self._okuma_baglantilari.append(b)
+        return b
 
     # Sonradan eklenen sutunlar. `CREATE TABLE IF NOT EXISTS` var olan tabloya
     # sutun eklemez; eski veritabani burada tamamlanir, veri kaybolmaz.
     _SONRADAN_EKLENEN = {
-        "kullanicilar": (("ekip_id", "TEXT"),),
+        "kullanicilar": (
+            ("ekip_id", "TEXT"),
+            # J-157: askidaki hesap giremez, eldeki oturumu da gecersizdir.
+            ("askida", "INTEGER NOT NULL DEFAULT 0"),
+            # J-157: koordinasyonun urettigi gecici sifreyle ilk giriste
+            # sifre degistirilmeden hicbir uc kullanilamaz.
+            ("sifre_degismeli", "INTEGER NOT NULL DEFAULT 0"),
+        ),
         "ekipler": (
             ("kurum", "TEXT"),
             ("tur", "TEXT"),
@@ -280,14 +345,20 @@ class SqliteDepo:
             self._baglanti.commit()
 
     def _oku(self, sql: str, parametreler: tuple = ()) -> list[dict]:
-        with self._kilit:
-            return _satirlar(self._baglanti.execute(sql, parametreler).fetchall())
+        # Kilit YOK: is parcacigi kendi okuma baglantisini kullanir (J-158).
+        return _satirlar(self._okuma_baglantisi().execute(sql, parametreler).fetchall())
 
     def _tek(self, sql: str, parametreler: tuple = ()) -> Optional[dict]:
-        with self._kilit:
-            return _satir(self._baglanti.execute(sql, parametreler).fetchone())
+        return _satir(self._okuma_baglantisi().execute(sql, parametreler).fetchone())
 
     def kapat(self) -> None:
+        with self._okuma_kilidi:
+            for b in self._okuma_baglantilari:
+                try:
+                    b.close()
+                except sqlite3.Error:
+                    pass
+            self._okuma_baglantilari.clear()
         with self._kilit:
             self._baglanti.close()
 
@@ -335,8 +406,87 @@ class SqliteDepo:
         )
 
     def rol_ata(self, kullanici_id: str, rol: str) -> None:
-        """Rol YALNIZCA buradan degisir; istemci gonderdigi rolle rol alamaz."""
-        self._yaz("UPDATE kullanicilar SET rol = ? WHERE id = ?", (rol, kullanici_id))
+        """Rol YALNIZCA buradan degisir; istemci gonderdigi rolle rol alamaz.
+        Saha disina cikan kisi ekibinden de cikar: ekip uyeligi yalniz saha
+        rolundekiler icindir (`ekip_uyelerini_ayarla`)."""
+        if rol == "saha":
+            self._yaz("UPDATE kullanicilar SET rol = ? WHERE id = ?", (rol, kullanici_id))
+        else:
+            self._yaz(
+                "UPDATE kullanicilar SET rol = ?, ekip_id = NULL WHERE id = ?", (rol, kullanici_id)
+            )
+
+    def sifre_ata(self, kullanici_id: str, sifre_ozeti: str, degismeli: bool = False) -> None:
+        """`degismeli=True`: gecici sifre; kisi ilk giriste degistirmek zorunda."""
+        self._yaz(
+            "UPDATE kullanicilar SET sifre_ozeti = ?, sifre_degismeli = ? WHERE id = ?",
+            (sifre_ozeti, 1 if degismeli else 0, kullanici_id),
+        )
+
+    def ad_ata(self, kullanici_id: str, ad_soyad: str) -> None:
+        self._yaz("UPDATE kullanicilar SET ad_soyad = ? WHERE id = ?", (ad_soyad.strip(), kullanici_id))
+
+    def askiya_al(self, kullanici_id: str, askida: bool) -> None:
+        self._yaz(
+            "UPDATE kullanicilar SET askida = ? WHERE id = ?", (1 if askida else 0, kullanici_id)
+        )
+
+    def ekipten_cikar(self, kullanici_id: str) -> None:
+        self._yaz("UPDATE kullanicilar SET ekip_id = NULL WHERE id = ?", (kullanici_id,))
+
+    # ---- hesap kayit defteri (J-157) --------------------------------------
+
+    def hesap_kaydi_ekle(
+        self,
+        yapan: Optional[dict],
+        hedef: dict,
+        islem: str,
+        ayrinti: Optional[dict] = None,
+    ) -> None:
+        self._yaz(
+            """INSERT INTO hesap_kayitlari
+               (zaman, yapan_id, yapan_ad, hedef_id, hedef_ad, hedef_eposta, islem, ayrinti)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (
+                time.time(),
+                yapan["id"] if yapan else None,
+                yapan.get("ad_soyad") if yapan else None,
+                hedef["id"],
+                hedef.get("ad_soyad"),
+                hedef.get("eposta"),
+                islem,
+                json.dumps(ayrinti, ensure_ascii=False) if ayrinti else None,
+            ),
+        )
+
+    def hesap_kayitlari(self, hedef_id: Optional[str] = None, sinir: int = 100) -> list[dict]:
+        if hedef_id:
+            satirlar = self._oku(
+                "SELECT * FROM hesap_kayitlari WHERE hedef_id = ? ORDER BY zaman DESC, id DESC LIMIT ?",
+                (hedef_id, sinir),
+            )
+        else:
+            satirlar = self._oku(
+                "SELECT * FROM hesap_kayitlari ORDER BY zaman DESC, id DESC LIMIT ?", (sinir,)
+            )
+        for s in satirlar:
+            s["ayrinti"] = json.loads(s["ayrinti"]) if s.get("ayrinti") else None
+        return satirlar
+
+    def ekibe_bagla(self, kullanici_id: str, ekip_id: str) -> None:
+        """Tek kisiyi ekibe ekler (oteki uyelere dokunmaz). Yalniz saha rolu."""
+        self._yaz(
+            "UPDATE kullanicilar SET ekip_id = ? WHERE id = ? AND rol = 'saha'",
+            (ekip_id, kullanici_id),
+        )
+
+    def kullanici_listele(self) -> list[dict]:
+        """Rol yonetimi ekrani icin: sifre ozeti DONMEZ."""
+        return self._oku(
+            """SELECT id, eposta, ad_soyad, rol, ekip_id, olusturuldu, son_giris,
+                      askida, sifre_degismeli
+               FROM kullanicilar ORDER BY olusturuldu DESC"""
+        )
 
     def kullanici_sayisi(self) -> int:
         satir = self._tek("SELECT COUNT(*) AS n FROM kullanicilar")
@@ -382,7 +532,7 @@ class SqliteDepo:
         ek: dict | None = None,
     ) -> dict:
         kayit = {
-            "id": f"hsr-{uuid.uuid4().hex[:10]}",
+            "id": f"hsr-{uuid.uuid4().hex[:16]}",
             "lon": float(lon),
             "lat": float(lat),
             "skor": float(skor),
@@ -453,7 +603,7 @@ class SqliteDepo:
         """`ek`: yapilandirilmis ek bilgi (kisi sayisi, ihtiyaclar, konumun
         kaynagi) -- tablodaki `ek` sutununa JSON olarak yazilir."""
         kayit = {
-            "id": f"sos-{uuid.uuid4().hex[:8]}",
+            "id": f"sos-{uuid.uuid4().hex[:16]}",
             "lon": float(lon),
             "lat": float(lat),
             "oncelik": oncelik,
@@ -529,7 +679,8 @@ class SqliteDepo:
         kosullar, parametreler = self._zaman_kutu_kosullari(baslangic, bitis, None)
         nerede = f"WHERE {' AND '.join(kosullar)}" if kosullar else ""
         satirlar = self._oku(
-            f"SELECT durum, COUNT(*) AS n FROM sos_cagrilari {nerede} GROUP BY durum",
+            # "+durum": gruplama durum indeksini secip tabloyu taramasin (J-158).
+            f"SELECT durum, COUNT(*) AS n FROM sos_cagrilari {nerede} GROUP BY +durum",
             tuple(parametreler),
         )
         return {s["durum"]: int(s["n"]) for s in satirlar}
@@ -546,7 +697,7 @@ class SqliteDepo:
         lat: float | None = None,
     ) -> dict:
         simdi = time.time()
-        ekip_id = f"ekp-{uuid.uuid4().hex[:6]}"
+        ekip_id = f"ekp-{uuid.uuid4().hex[:10]}"
         self._yaz(
             """INSERT INTO ekipler
                (id, ad, lon, lat, durum, gorev_id, guncellendi, ek, kurum, tur, kisi_sayisi, konum_zamani)
@@ -752,7 +903,7 @@ class SqliteDepo:
                         "Ekip büyüdüyse önce ekip kaydını güncelle.",
                     )
 
-                gorev_id = f"grv-{uuid.uuid4().hex[:8]}"
+                gorev_id = f"grv-{uuid.uuid4().hex[:16]}"
                 try:
                     self._baglanti.execute(
                         """INSERT INTO gorevler
@@ -985,7 +1136,7 @@ class SqliteDepo:
         cizebilsin. Onceden yalnizca parcanin orta noktasi tutuluyordu ve
         harita her kapanmayi tek bir nokta olarak gosteriyordu."""
         kayit = {
-            "id": f"kap-{uuid.uuid4().hex[:10]}",
+            "id": f"kap-{uuid.uuid4().hex[:16]}",
             "lon": float(lon),
             "lat": float(lat),
             "derece": int(derece),
@@ -1000,6 +1151,36 @@ class SqliteDepo:
             tuple(kayit.values()),
         )
         return kayit
+
+    def hasar_ozeti(
+        self, baslangic: float | None = None, bitis: float | None = None, yikik_esigi: float = 0.8
+    ) -> dict:
+        """/api/ozet icin sayilar SQL'de (J-158). Eskiden 100 000 satir Python'a
+        cekilip sayiliyordu: yavasti ve 100 000'den fazla kayitta sessizce
+        eksik sayiyordu."""
+        kosullar, parametreler = self._zaman_kutu_kosullari(baslangic, bitis, None)
+        nerede = f"WHERE {' AND '.join(kosullar)}" if kosullar else ""
+        satirlar = self._oku(
+            f"""SELECT kaynak,
+                       COUNT(*) AS n,
+                       SUM(CASE WHEN skor >= ? THEN 1 ELSE 0 END) AS yikik
+                FROM hasar_noktalari {nerede} GROUP BY +kaynak""",  # "+": kaynak indeksi secilmesin (J-158)
+            (yikik_esigi, *parametreler),
+        )
+        kaynaklar = {s["kaynak"]: int(s["n"]) for s in satirlar}
+        uydu = next((s for s in satirlar if s["kaynak"] == "uydu"), None)
+        yikik = int(uydu["yikik"] or 0) if uydu else 0
+        return {
+            "kaynakSayilari": kaynaklar,
+            "yikikYapi": yikik,
+            "hasarliYapi": (int(uydu["n"]) - yikik) if uydu else 0,
+        }
+
+    def kapanma_sayisi(self, baslangic: float | None = None, bitis: float | None = None) -> int:
+        kosullar, parametreler = self._zaman_kutu_kosullari(baslangic, bitis, None)
+        nerede = f"WHERE {' AND '.join(kosullar)}" if kosullar else ""
+        satir = self._tek(f"SELECT COUNT(*) AS n FROM yol_kapanmalari {nerede}", tuple(parametreler))
+        return int(satir["n"]) if satir else 0
 
     def kapanma_listele(
         self,
