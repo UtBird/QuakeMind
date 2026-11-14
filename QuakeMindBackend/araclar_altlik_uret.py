@@ -48,6 +48,13 @@ BOLGELER = [
     {"id": "adiyaman", "ad": "Adıyaman", "lat": 37.76, "lon": 38.27},
 ]
 
+# `--ulke`: il daireleri ve operasyon bolgeleri disinda zoom 9'un altinda ya da
+# aralarda zemin bomboş kalmasin diye (kullanici bulgusu, 8 Kasim 2026) butun
+# Turkiye'yi kapsayan tek hafif iskelet: yalniz otoyol/devlet yolu + sehir/ilce
+# adi. Kiyi seridi ya da arazi rengi yok, o veri bu hatta hic yok.
+ULKE_KUTU = (25.5, 35.5, 45.0, 42.5)
+ULKE_YOL_SINIFLARI = (0, 1)
+
 IL_MERKEZLERI = BACKEND / "veri" / "il_merkezleri.json"
 # Il altliginin yaricapi il nufusuna gore (OSM `population`; buyuksehirde ilin
 # tamami). 8 km'lik kare Konya gibi sehirleri kenardan kesiyordu (20 Ekim).
@@ -244,6 +251,44 @@ def paketle(b, cizgi, alan, yer):
             "su": sular, "yapilar": yapilar, "yerler": yerler, "sokaklar": sokaklar}
 
 
+def ulke_uret(pbf):
+    """Turkiye capinda hafif iskelet: yalniz otoyol/devlet yolu + sehir/ilce
+    adi. Oteki paketler gibi kutuya gore secilmez, her zaman cizilir (konsol
+    tarafinda tur == 'ulke' ozel davranir)."""
+    import pyogrio
+    import shapely
+
+    tipler = [t for t, s in YOL_SINIFI.items() if s in ULKE_YOL_SINIFLARI]
+    t0 = time.perf_counter()
+    cizgi = pyogrio.read_dataframe(
+        pbf, layer="lines", columns=["highway"], bbox=ULKE_KUTU,
+        where="highway IN (" + ",".join(f"'{t}'" for t in tipler) + ")")
+    t1 = time.perf_counter()
+    yer = pyogrio.read_dataframe(
+        pbf, layer="points", columns=["name", "place"], bbox=ULKE_KUTU,
+        where="name IS NOT NULL AND place IN ('city','town')")
+    t2 = time.perf_counter()
+    print(f"ulke okuma: yol {t1 - t0:.1f} sn, yer {t2 - t1:.1f} sn ({len(cizgi)} cizgi, {len(yer)} yer)",
+          flush=True)
+
+    cizgi["geometry"] = shapely.clip_by_rect(cizgi.geometry.values, *ULKE_KUTU)
+    yollar = []
+    for sinif in sorted(ULKE_YOL_SINIFLARI):
+        tipler_s = [t for t, s in YOL_SINIFI.items() if s == sinif]
+        secim = cizgi[cizgi["highway"].isin(tipler_s)]
+        diziler = [p for g in shapely.simplify(secim.geometry.values, 5e-5) for p in parcalar(g, 2)]
+        kod = kodla(diziler, 2)
+        if kod["adet"]:
+            yollar.append({"sinif": sinif, **kod})
+
+    bos = {"adet": 0, "baslangic": [], "koord": []}
+    yerler = [{"ad": str(a), "tur": str(t), "lon": round(g.x, 5), "lat": round(g.y, 5)}
+              for a, t, g in zip(yer["name"], yer["place"], yer.geometry.values)]
+    return {"kutu": [round(v, 5) for v in ULKE_KUTU], "yollar": yollar, "nehirler": bos,
+            "su": bos, "yapilar": bos, "yerler": yerler,
+            "sokaklar": {"ad": [], "lon": [], "lat": [], "aci": [], "sinif": []}}
+
+
 def yerler_yaz():
     """Butun paketlerdeki yer adlarini tek hafif listeye yazar (veri/altlik/
     yerler.json, ~40 KB): afetzede ekrani konum alinamadiginda mahalle
@@ -376,6 +421,22 @@ def main(secilen):
     katalog_yolu = CIKTI / "katalog.json"
     katalog = {k["id"]: k for k in (json.loads(katalog_yolu.read_text(encoding="utf-8"))
                                     if katalog_yolu.exists() else [])}
+
+    if "--ulke" in secilen:
+        govde = ulke_uret(str(pbf))
+        paket = {"bolge": "ulke", "ad": "Türkiye", "olcek": OLCEK, "kaynak": kaynak,
+                 "uretim": datetime.datetime.now().isoformat(timespec="seconds"), **govde}
+        yol = CIKTI / "ulke.json.gz"
+        with gzip.open(yol, "wt", encoding="utf-8", compresslevel=9) as f:
+            json.dump(paket, f, ensure_ascii=False, separators=(",", ":"))
+        sayilar = {"yol": sum(y["adet"] for y in paket["yollar"]), "yapi": 0, "su": 0, "nehir": 0}
+        katalog["ulke"] = {"id": "ulke", "ad": "Türkiye", "tur": "ulke", "kutu": paket["kutu"],
+                           "sayilar": sayilar, "boyutBayt": yol.stat().st_size,
+                           "kaynak": kaynak, "uretim": paket["uretim"]}
+        katalog_yolu.write_text(json.dumps(list(katalog.values()), ensure_ascii=False, indent=1),
+                                encoding="utf-8")
+        print(f"ulke: {sayilar} | {yol.stat().st_size / 1e6:.2f} MB", flush=True)
+        return 0
 
     iller = "--iller" in secilen
     hedefler = il_bolgeleri() if iller else BOLGELER

@@ -24,8 +24,11 @@ export type AltlikBolgesi = {
   ad: string
   /** `operasyon`: hizmet, yol ağı ve afetzede verisi olan beş bölge.
       `il`: risk ekranının 81 il seçicisi için il merkezi altlığı.
+      `ulke`: il dairelerinin ve operasyon bölgelerinin dışında zemin boş
+      kalmasın diye tüm Türkiye'yi kapsayan hafif yol iskeleti (J-40 sınırı);
+      kutu ve viewport kesişiminden bağımsız her zaman çizilir.
       Eski katalogda alan yok; yoksa operasyon sayılır. */
-  tur?: 'operasyon' | 'il'
+  tur?: 'operasyon' | 'il' | 'ulke'
   kutu: Kutu
   sayilar: { yol: number; yapi: number; su: number; nehir: number }
   boyutBayt: number
