@@ -1,0 +1,190 @@
+{
+ "_not": "SENTETIK, ETIKETLI OLCUM KUMESI (CLAUDE.md kural 1). Metinler gercek cagri degildir: tatbikat ihbarlari (27 Eylul, elle yazildi) ve konsol/afetzede ekranlarindaki ornek cumleler. 'beklenenKategori' yazarin niyetidir (dogruluk degil ortusme olculur). 'beklenenYer' metinde gecen GERCEK yer adidir; 'beklenenKonum' yerel OSM yer adi dizininden (veri/altlik/yerler.json) ya da ilce merkezinden (tr_locations); dizinde yoksa bos.",
+ "_uretim": "17 Kasim 2026, J-170",
+ "kayitlar": [
+  {
+   "kaynak": "tatbikat_metinleri/hatay/0",
+   "metin": "Elektrik Mahallesi 5. sokakta üç katlı bina tamamen çöktü, enkaz altından ses geliyor acil ekip lazım",
+   "beklenenKategori": "Enkaz Bildirimi",
+   "beklenenYer": "Elektrik",
+   "beklenenKonum": [
+    36.19815,
+    36.14963
+   ]
+  },
+  {
+   "kaynak": "tatbikat_metinleri/hatay/1",
+   "metin": "Defne Elektrik Mahallesinde apartmanın giriş katı göçtü, içeride iki kişi olduğunu söylüyorlar",
+   "beklenenKategori": "Enkaz Bildirimi",
+   "beklenenYer": "Elektrik",
+   "beklenenKonum": [
+    36.19815,
+    36.14963
+   ]
+  },
+  {
+   "kaynak": "tatbikat_metinleri/hatay/2",
+   "metin": "Elektrik Mahallesi sokak arası molozla kapandı, ambulans giremiyor başka yoldan gelsinler",
+   "beklenenKategori": "Yol Kapanma Bilgisi / Lojistik",
+   "beklenenYer": "Elektrik",
+   "beklenenKonum": [
+    36.19815,
+    36.14963
+   ]
+  },
+  {
+   "kaynak": "tatbikat_metinleri/hatay/3",
+   "metin": "Mahalle girişindeki cadde çökmüş duvar yüzünden kapalı, iş makinesi gerekiyor",
+   "beklenenKategori": "Yol Kapanma Bilgisi / Lojistik",
+   "beklenenYer": null,
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "tatbikat_metinleri/hatay/4",
+   "metin": "Burada yaşlı bir çift mahsur kaldı, kalp ilacı bitmiş acilen ilaç ve sağlık ekibi lazım",
+   "beklenenKategori": "Acil Yardım İhtiyacı",
+   "beklenenYer": null,
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "tatbikat_metinleri/hatay/5",
+   "metin": "Çocuklu dört aile sokakta kaldık, battaniye ve çadır gönderin lütfen hava çok soğuk",
+   "beklenenKategori": "Lojistik İhtiyaç Bildirimi",
+   "beklenenYer": null,
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "tatbikat_metinleri/hatay/6",
+   "metin": "Su ve bebek maması bitti, mahallede dağıtım yapılmadı henüz",
+   "beklenenKategori": "Lojistik İhtiyaç Bildirimi",
+   "beklenenYer": null,
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "tatbikat_metinleri/hatay/7",
+   "metin": "Yan binanın kolonlarında büyük çatlaklar var, boşaltılması lazım riskli görünüyor",
+   "beklenenKategori": "Enkaz Bildirimi",
+   "beklenenYer": null,
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "tatbikat_metinleri/hatay/8",
+   "metin": "Herkese geçmiş olsun, Allah yardımcımız olsun",
+   "beklenenKategori": "Alakasız",
+   "beklenenYer": null,
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "tatbikat_metinleri/gaziantep/0",
+   "metin": "İslahiye merkezde iki bina yan yatmış, altında araç kalmış olabilir ekip yönlendirin",
+   "beklenenKategori": "Enkaz Bildirimi",
+   "beklenenYer": "İslahiye",
+   "beklenenKonum": [
+    37.0242,
+    36.6317
+   ]
+  },
+  {
+   "kaynak": "tatbikat_metinleri/gaziantep/1",
+   "metin": "Nurdağı çıkışında yol tamamen kapalı, molozdan geçiş yok",
+   "beklenenKategori": "Yol Kapanma Bilgisi / Lojistik",
+   "beklenenYer": "Nurdağı",
+   "beklenenKonum": [
+    37.1833,
+    36.75
+   ]
+  },
+  {
+   "kaynak": "tatbikat_metinleri/gaziantep/2",
+   "metin": "Nurdağı'nda bir apartmanda enkaz altından ses duyuluyor, acil arama kurtarma",
+   "beklenenKategori": "Enkaz Bildirimi",
+   "beklenenYer": "Nurdağı",
+   "beklenenKonum": [
+    37.1833,
+    36.75
+   ]
+  },
+  {
+   "kaynak": "tatbikat_metinleri/gaziantep/3",
+   "metin": "İslahiye'de jeneratör ve aydınlatma lazım, gece çalışma yapılamıyor",
+   "beklenenKategori": "Lojistik İhtiyaç Bildirimi",
+   "beklenenYer": "İslahiye",
+   "beklenenKonum": [
+    37.0242,
+    36.6317
+   ]
+  },
+  {
+   "kaynak": "tatbikat_metinleri/gaziantep/4",
+   "metin": "Yaralı var kanaması durmuyor, en yakın sağlık ekibi gelsin lütfen",
+   "beklenenKategori": "Acil Yardım İhtiyacı",
+   "beklenenYer": null,
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "tatbikat_metinleri/kahramanmaras/0",
+   "metin": "Şekeroba'da okulun yanındaki bina çökmüş, enkaz kaldırma ekibi gerekiyor",
+   "beklenenKategori": "Enkaz Bildirimi",
+   "beklenenYer": "Şekeroba",
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "tatbikat_metinleri/kahramanmaras/1",
+   "metin": "Merkezde stadyum çevresindeki yol çatlamış, ağır araç geçemiyor",
+   "beklenenKategori": "Yol Kapanma Bilgisi / Lojistik",
+   "beklenenYer": null,
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "tatbikat_metinleri/kahramanmaras/2",
+   "metin": "Isınamıyoruz, soba ve yakacak gönderilmesi gerekiyor acil",
+   "beklenenKategori": "Lojistik İhtiyaç Bildirimi",
+   "beklenenYer": null,
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "tatbikat_metinleri/kahramanmaras/3",
+   "metin": "Enkaz altındaki akrabamdan haber alamıyorum, lütfen bu adrese ekip gönderin",
+   "beklenenKategori": "Acil Yardım İhtiyacı",
+   "beklenenYer": null,
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "konsol ornegi: enkaz",
+   "metin": "Antakya Armutlu mahallesinde bina çökmüş, üç kişi enkaz altında, acil yardım lazım.",
+   "beklenenKategori": "Enkaz Bildirimi",
+   "beklenenYer": "Armutlu",
+   "beklenenKonum": [
+    36.19532,
+    36.15143
+   ]
+  },
+  {
+   "kaynak": "konsol ornegi: medikal",
+   "metin": "Defne Atatürk caddesinde yaralı var, kanaması durmuyor, ambulans gelemiyor.",
+   "beklenenKategori": "Acil Yardım İhtiyacı",
+   "beklenenYer": "Atatürk",
+   "beklenenKonum": null
+  },
+  {
+   "kaynak": "konsol ornegi: ihtiyac",
+   "metin": "Sümerler mahallesinde çadırdayız, su ve battaniye bitti, iki bebek var.",
+   "beklenenKategori": "Lojistik İhtiyaç Bildirimi",
+   "beklenenYer": "Sümerler",
+   "beklenenKonum": [
+    36.19005,
+    36.15505
+   ]
+  },
+  {
+   "kaynak": "afetzede ornegi",
+   "metin": "Armutlu Mahallesi 5. Sokak'ta bina çöktü, iki kişi enkaz altında.",
+   "beklenenKategori": "Enkaz Bildirimi",
+   "beklenenYer": "Armutlu",
+   "beklenenKonum": [
+    36.19532,
+    36.15143
+   ]
+  }
+ ]
+}

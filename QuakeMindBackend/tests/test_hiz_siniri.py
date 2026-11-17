@@ -256,7 +256,8 @@ def test_hazir_ucu(monkeypatch):
     c = TestClient(u)
     monkeypatch.setattr(ck, "road_damage_pool", None)
     y = c.get("/api/hazir")
-    assert y.status_code == 503 and y.json() == {"hazir": False, "veritabani": True, "analizIscisi": False}
+    assert y.status_code == 503 and y.json() == {"hazir": False, "veritabani": True, "analizIscisi": False,
+                                                 "metinModeli": None}
     monkeypatch.setattr(ck, "road_damage_pool", object())
     y = c.get("/api/hazir")
     assert y.status_code == 200 and y.json()["hazir"] is True

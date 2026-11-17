@@ -42,74 +42,43 @@ yonlendirici = APIRouter()
 
 @yonlendirici.post("/api/nlp/analyze")
 def analyze_nlp(req: ck.NLPRequest, kul: dict = Depends(kimlik.rol_gerektir("saha", "koordinator", "yonetici"))):
+    """Konsoldan metin analizi (J-170). Kayit acmaz, haritaya yazmaz.
+
+    Model API surecinde degil, metin iscisinde (metin_analizi/isci.py). Adres
+    yerel dizinden cozulur; metin disari gitmez (Nominatim kaldirildi).
+    Eskiden bu uc sonucu bellekteki eski konum listesine ve PostGIS hasar
+    tablosuna da yaziyordu: bir deneme analizi isi haritasina nokta birakiyordu."""
+    import hiz_siniri
     import islem_kaydi
+    from metin_analizi import isci
 
-    pipeline = ck._get_nlp_pipeline()
-    if not pipeline:
-        raise HTTPException(status_code=503, detail="NLP model is not loaded.")
-
+    hiz_siniri.metin_kontrol(kul["id"])
     try:
-        t0 = time.perf_counter()
-        with ck.temporary_sys_path(ck.NLP_ROOT), ck.temporary_cwd(ck.NLP_ROOT):
-            result = pipeline.process_tweet(req.text)
-        sure_ms = round((time.perf_counter() - t0) * 1000)
-        # Islem kaydi (J-165): metnin ilk 500 karakteri ve modelin karari.
-        if not result:
-            islem_kaydi.kaydet(
-                kul, "metin_analizi", "Metin analizi: afetle ilgisiz bulundu",
-                ayrinti={"metin": req.text[:500], "ilgili": False, "sureMs": sure_ms},
-            )
-            return {"status": "ignored", "reason": "Not related to disaster"}
-        islem_kaydi.kaydet(
-            kul,
-            "metin_analizi",
-            f"Metin analizi: {result.get('kategori') or 'kategori yok'}"
-            + (f", aciliyet {result.get('aciliyet')}" if result.get("aciliyet") is not None else "")
-            + (f", konum: {result.get('konum_metin')}" if result.get("konum_metin") else ", konum bulunamadı"),
-            ayrinti={
-                "metin": req.text[:500],
-                "ilgili": True,
-                "kategori": result.get("kategori"),
-                "aciliyet": result.get("aciliyet"),
-                "guven": result.get("guven_skoru"),
-                "konumMetin": result.get("konum_metin"),
-                "konum": result.get("konum"),
-                "sureMs": sure_ms,
-            },
-        )
+        sonuc = isci.coz(req.text)
+    except isci.MetinModeliYok as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
-        konum = result.get("konum")
-        if konum and len(konum) == 2:
-            entry = {
-                "id": str(uuid.uuid4()),
-                "latitude": konum[0],
-                "longitude": konum[1],
-                "konumMetin": result.get("konum_metin"),
-                "kategori": result.get("kategori"),
-                "aciliyet": result.get("aciliyet"),
-                "sourceText": req.text,
-                "receivedAt": datetime.now(timezone.utc).isoformat(),
-            }
-            with ck.nlp_locations_lock:
-                ck.nlp_locations.append(entry)
-            result["nlpLocationId"] = entry["id"]
-
-            # Best-effort: a geocoded tweet is a location-tagged "bildirim" just
-            # like a camera detection or an SOS alert -- feeds the same
-            # damage_points table so /heatmap can count report density per
-            # source (Twitter/NLP, camera, SOS) instead of only satellite data.
-            try:
-                postgis_engine.insert_damage_point(
-                    "twitter", konum[0], konum[1],
-                    severity=result.get("guven_skoru") or 0.5,
-                    label=result.get("kategori") or "Twitter/NLP Bildirimi",
-                )
-            except Exception as e:
-                print(f"damage_points insert (twitter) hatasi: {e}")
-
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    islem_kaydi.kaydet(
+        kul,
+        "metin_analizi",
+        f"Metin analizi: {sonuc['kategori']}"
+        + (f", aciliyet {sonuc['aciliyet']}" if sonuc.get("aciliyet") is not None else "")
+        + (f", konum: {sonuc['konumMetin']} ({sonuc['konumDuzeyi']})" if sonuc.get("konumMetin") else ", konum bulunamadı"),
+        ayrinti={
+            "metin": req.text[:500],
+            "ilgili": sonuc["ilgili"],
+            "kategori": sonuc["kategori"],
+            "kategoriKaynagi": sonuc.get("kategoriKaynagi"),
+            "aciliyet": sonuc.get("aciliyet"),
+            "guven": sonuc.get("guven"),
+            "konumMetin": sonuc.get("konumMetin"),
+            "konumDuzeyi": sonuc.get("konumDuzeyi"),
+            "konum": sonuc.get("konum"),
+            "sinyaller": [x["sinyal"] for x in sonuc.get("sinyaller", [])],
+            "sureMs": sonuc.get("sureMs"),
+        },
+    )
+    return sonuc
 
 
 @yonlendirici.get("/api/nlp/locations")

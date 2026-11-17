@@ -25,6 +25,7 @@ import type { Kutu, Nokta } from '@/durum/secimDurumu'
 import type { Yol } from '@/veri/analiz'
 import type { AltlikVerisi, Etiket } from '@/veri/altlik'
 import { IHBAR_DURUMU, IHBAR_TURU, ihbarBasligi, ihbarKonumu, type Ihbar, type IhbarTuru } from '@/veri/ihbar'
+import type { BelirsizlikCemberi } from '@/veri/metin'
 import { DEPREM_EN_AZ, type Deprem, type Fay, type Kapanma, type ToplanmaAlani } from '@/veri/katman'
 import { VARYANT_ADI, type SimGorev, type SimKenar } from '@/veri/simulasyon'
 import { goruntuKatmani } from './goruntuKatmani'
@@ -214,6 +215,10 @@ export type KatmanGirdisi = {
   ihbarlar?: Ihbar[]
   ihbarTurleri?: readonly IhbarTuru[]
   seciliIhbar?: string | null
+  /** Seçili kaydın konum belirsizliği (J-170): metinden çözülen adresin ya da
+      cihaz konumunun sapabileceği alan. `nokta`: kayıt haritada başka katmanda
+      yoksa (konsoldaki deneme analizi) merkezi de çizilir. */
+  belirsizlik?: KonumBelirsizligi | null
   /** Soldan seçilen görüntü kaynağının karosu (Hasar analizi modu). */
   goruntu?: { url: string; kunye: string; ortuculuk?: number } | null
   /** Bitmiş hasar analizinin yol geometrisi. */
@@ -234,6 +239,8 @@ export type KatmanGirdisi = {
     taslak: { kutu?: Kutu; nokta?: Nokta[] } | null
   }
 }
+
+type KonumBelirsizligi = BelirsizlikCemberi
 
 function kutuHalkasi(k: Kutu): Nokta[] {
   return [
@@ -512,6 +519,47 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
     )
   }
 
+  // Konum belirsizliği (J-170): noktanın kesin yer olmadığını gösterir. İçi çok
+  // soluk, kenarı vurgu renginde; ihbar noktalarının ALTINDA kalır.
+  const b = g.belirsizlik
+  if (b) {
+    const vurgu = tokenRenk('--color-accent')
+    L.push(
+      new ScatterplotLayer<KonumBelirsizligi>({
+        id: 'konum-belirsizligi',
+        data: [b],
+        getPosition: (d) => [d.lon, d.lat],
+        getRadius: (d) => d.yaricapM,
+        radiusUnits: 'meters',
+        radiusMinPixels: 10,
+        getFillColor: [...vurgu, 22],
+        stroked: true,
+        lineWidthMinPixels: 1.5,
+        getLineColor: [...vurgu, 200],
+        // Seçilmez: altındaki hasar noktalarının tıklamasını yutmasın.
+        pickable: false,
+      }),
+    )
+    if (b.nokta) {
+      L.push(
+        new ScatterplotLayer<KonumBelirsizligi>({
+          id: 'konum-belirsizligi-merkez',
+          data: [b],
+          getPosition: (d) => [d.lon, d.lat],
+          getRadius: 30,
+          radiusUnits: 'meters',
+          radiusMinPixels: 4,
+          radiusMaxPixels: 9,
+          getFillColor: [...tokenRenk('--color-ihbar-metin'), 235],
+          stroked: true,
+          lineWidthMinPixels: 1.5,
+          getLineColor: [232, 236, 244, 255],
+          pickable: true,
+        }),
+      )
+    }
+  }
+
   // Afetzede ihbarları: türün rengiyle (afetzede ekranındaki düğmeyle aynı).
   // Kapanan ihbar sönük kalır; SOS'un altında çizilir.
   if (g.katmanlar.ihbarlar && g.ihbarlar?.length) {
@@ -665,6 +713,11 @@ export function haritaIpucu({ object, layer }: PickingInfo) {
         tarihSaat(i.zaman),
         'Tıkla: seç ve yakınlaş',
       ])
+    }
+    case 'konum-belirsizligi':
+    case 'konum-belirsizligi-merkez': {
+      const b = object as KonumBelirsizligi
+      return ipucuKutusu(b.baslik, [b.aciklama])
     }
     case 'hasar-noktalari': {
       const h = object as HasarNoktasi

@@ -1,21 +1,49 @@
 import { create } from 'zustand'
+import type {
+  AdresAdayi,
+  AdresEslesmesi,
+  IhtiyacBilgisi,
+  KategoriUyarisi,
+  KisiBilgisi,
+  KonumDuzeyi,
+  SinyalBilgisi,
+} from '@/veri/metin'
 
 /** Metin ve kamera çözümlemelerinin son sonucu: sol panel gönderir, sağ panel
     gösterir. Sorgu değil tek seferlik iş olduğu için ayrı bir depoda durur. */
 
+/** /api/nlp/analyze yanıtı (J-170). Kayıt açmaz, haritaya yazmaz. */
 export type MetinSonucu = {
+  ilgili: boolean
   kategori: string
+  guven: number
+  kategoriKaynagi: string | null
+  ikinciKategori: { kategori: string; puan: number } | null
+  kategoriPuanlari: { kategori: string; puan: number }[]
+  kategoriUyarilari: KategoriUyarisi[]
+  /** Belirsiz ve ilgisiz metinde yok (1 "düşük" demek uydurma olurdu). */
+  aciliyet: number | null
+  /** [enlem, boylam] */
   konum: [number, number] | null
-  konum_metin: string | null
-  konum_adaylari: string[]
-  aciliyet: number
-  guven_skoru: number
-  nlpLocationId?: string
+  konumDuzeyi: KonumDuzeyi | null
+  belirsizlikM: number | null
+  adres: Record<string, string> | null
+  konumMetin: string | null
+  adresEslesmeleri: AdresEslesmesi[]
+  adresAdaylari: AdresAdayi[]
+  adresNotlari: string[]
+  adresKaynagi: string
+  kisiler: KisiBilgisi[]
+  ihtiyaclar: IhtiyacBilgisi[]
+  sinyaller: SinyalBilgisi[]
+  model: { siniflandirici: string }
+  sureMs: number
 }
 
 type CozumlemeDurumu = {
   metin: { girdi: string; sonuc: MetinSonucu; zaman: number } | null
   metinYaz: (girdi: string, sonuc: MetinSonucu) => void
+  metinTemizle: () => void
   /** Risk modunda seçili bölge: iki panel aynı seçimi paylaşır. */
   riskBolge: string | null
   riskBolgeSec: (id: string) => void
@@ -66,6 +94,7 @@ export const useKameraCozumleme = create<KameraDurumu>((set) => ({
 export const useCozumleme = create<CozumlemeDurumu>((set) => ({
   metin: null,
   metinYaz: (girdi, sonuc) => set({ metin: { girdi, sonuc, zaman: Date.now() } }),
+  metinTemizle: () => set({ metin: null }),
   riskBolge: null,
   riskBolgeSec: (id) => set({ riskBolge: id }),
 }))

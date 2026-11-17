@@ -59,10 +59,14 @@ def hazir():
     except Exception:  # noqa: BLE001
         veritabani = False
     isci = ck.road_damage_pool is not None
+    from metin_analizi import isci as metin_iscisi
+
+    # None: metin iscisi kurulmadi (testler); False: isiniyor ya da yuklenemedi.
+    metin = metin_iscisi.hazir_mi()
     hazir_mi = veritabani and isci
     return JSONResponse(
         status_code=200 if hazir_mi else 503,
-        content={"hazir": hazir_mi, "veritabani": veritabani, "analizIscisi": isci},
+        content={"hazir": hazir_mi, "veritabani": veritabani, "analizIscisi": isci, "metinModeli": metin},
     )
 
 

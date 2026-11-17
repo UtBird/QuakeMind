@@ -781,8 +781,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Road Damage pool warm-up failed (will still lazy-init on first job): {e}", flush=True)
 
+    # Metin modeli kendi isci surecinde (J-170, CLAUDE.md 3). Isinma acilisi
+    # BEKLETMEZ: ilk istek isinma surerken gelirse kuyrukta bekler.
+    from metin_analizi import isci as metin_iscisi
+
+    metin_iscisi.baslat()
+
     yield
 
+    metin_iscisi.durdur()
     if road_damage_sweeper_stop is not None:
         road_damage_sweeper_stop.set()
     road_damage_pool.shutdown(wait=False, cancel_futures=True)
@@ -796,7 +803,8 @@ async def lifespan(app: FastAPI):
 
 
 class NLPRequest(BaseModel):
-    text: str
+    # J-170: uzunluk siniri (eskiden sinirsizdi; model 512 jetonu okur).
+    text: str = Field(..., min_length=5, max_length=1000)
 
 
 class SOSAlertRequest(BaseModel):

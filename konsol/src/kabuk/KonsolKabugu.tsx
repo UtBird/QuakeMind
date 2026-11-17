@@ -9,6 +9,8 @@ import { useSecim, type Kutu } from '@/durum/secimDurumu'
 import { useSorguAraligi } from '@/durum/zamanDurumu'
 import { useEkipler, useHasarNoktalari, useIsiIzgarasi, useSosCagrilari } from '@/veri/sorgular'
 import { useIhbarlar, type IhbarTuru } from '@/veri/ihbar'
+import { belirsizlikMetni, duzeyAciklamasi, ihbarBelirsizligi, type BelirsizlikCemberi } from '@/veri/metin'
+import { useCozumleme } from '@/durum/cozumlemeDurumu'
 import { useDepremler, useFaylar, useKapanmalar, useToplanmaAlanlari } from '@/veri/katman'
 import { useSimAlanlar, useSimMaske, useSimSonuc } from '@/veri/simulasyon'
 import { useSimulasyon } from '@/durum/simulasyonDurumu'
@@ -390,6 +392,28 @@ function KatmanKopru() {
     katmanlariAyarla([...tanim.katmanlar])
   }, [tanim, katmanlariAyarla])
 
+  // Konum belirsizliği (J-170): seçili ihbarın; metin modunda ihbar seçili
+  // değilse konsoldaki deneme analizinin (kayıt açmadığı için başka katmanda yok).
+  const deneme = useCozumleme((d) => d.metin)
+  const belirsizlik = useMemo<BelirsizlikCemberi | null>(() => {
+    if (seciliKayit?.tip === 'ihbar') {
+      const i = ihbar.data?.find((x) => x.id === seciliKayit.id)
+      return i ? ihbarBelirsizligi(i) : null
+    }
+    const s = deneme?.sonuc
+    if (tanim.id === 'metin' && !seciliKayit && s?.konum && s.belirsizlikM) {
+      return {
+        lat: s.konum[0],
+        lon: s.konum[1],
+        yaricapM: s.belirsizlikM,
+        baslik: `Deneme analizi · ${belirsizlikMetni(s.belirsizlikM)}`,
+        aciklama: [s.konumMetin, duzeyAciklamasi(s.konumDuzeyi), 'Kayıt açılmadı.'].filter(Boolean).join(' · '),
+        nokta: true,
+      }
+    }
+    return null
+  }, [seciliKayit, ihbar.data, deneme, tanim.id])
+
   const deckKatmanlari = useMemo(
     () =>
       katmanlariKur({
@@ -406,6 +430,7 @@ function KatmanKopru() {
         ihbarlar: ihbar.data ?? [],
         ihbarTurleri: MOD_IHBARLARI[tanim.id],
         seciliIhbar: seciliKayit?.tip === 'ihbar' ? seciliKayit.id : null,
+        belirsizlik,
         secim: { kutu: secimKutusu, cokgen: secimCokgeni, taslak: secimTaslagi },
         goruntu: analizKarosu,
         analiz: segmentler.data ?? null,
@@ -430,6 +455,7 @@ function KatmanKopru() {
       tanim.id,
       ekipler.data,
       seciliKayit,
+      belirsizlik,
       secimKutusu,
       secimCokgeni,
       secimTaslagi,

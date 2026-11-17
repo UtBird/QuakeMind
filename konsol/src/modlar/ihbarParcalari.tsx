@@ -25,12 +25,12 @@ import {
 import { IHBAR_IKONU, IHTIYAC_IKONU } from '@/veri/ihbarIkon'
 import { acikGorev } from '@/veri/gorev'
 import { GorevOzetSatiri, SevkBolumu } from './sevk'
+import { MetinSonucKarti, ihbarGorunumu } from './metinKarti'
 
 /* Konsolda afetzede ihbarının satırı ve ayrıntısı (J-51). Genel durum, kamera,
    metin ve ihtiyaç modları aynı parçaları kullanır: aynı ihbar her yerde aynı
    renkle, aynı adla ve aynı düğmelerle görünür. */
 
-const ACILIYET_TONU = (n: number) => (n >= 5 ? 'crit' : n >= 4 ? 'high' : n >= 3 ? 'mid' : 'ok')
 
 /** Türün renkli simgesi. Renk tek başına anlam taşımaz; yanında ad yazılır. */
 export function TurSimgesi({ tur, boy = 'kucuk' }: { tur: IhbarTuru | 'sos'; boy?: 'kucuk' | 'buyuk' }) {
@@ -147,7 +147,7 @@ export function IhbarDetayi({ ihbar }: { ihbar: Ihbar }) {
               <span className="whitespace-pre-line">{ihbar.metin}</span>
             </Satir>
           )}
-          <Satir ad="Konum">{ihbarKonumu(ihbar)}</Satir>
+          {ihbar.tur !== 'metin' && <Satir ad="Konum">{ihbarKonumu(ihbar)}</Satir>}
           <Satir ad="Zaman">
             <span className="font-mono">{tarihSaat(ihbar.zaman)}</span>
           </Satir>
@@ -278,27 +278,19 @@ function FotografAyrintisi({ ihbar }: { ihbar: Ihbar }) {
 }
 
 function MetinAyrintisi({ ihbar }: { ihbar: Ihbar }) {
-  const a = ihbar.analiz
+  const g = ihbar.analiz ? ihbarGorunumu(ihbar.analiz) : null
   return (
-    <>
-      <blockquote className="rounded-control border border-line-2 bg-sunken px-2.5 py-2 text-body whitespace-pre-line text-ink">
-        {ihbar.metin}
-      </blockquote>
-      {!a ? (
-        <p className="mt-2 text-small text-ink-2">Model incelemedi (afetzede incelemeden gönderdi).</p>
-      ) : a.ilgisiz ? (
-        <p className="mt-2 text-small text-ink-2">Model bu metni afetle ilgisiz buldu; afetzede yine de gönderdi.</p>
-      ) : (
-        <dl className="kilav-kv mt-2 gap-x-2.5 gap-y-1.5 text-small">
-          <Satir ad="Kategori">{a.kategori ?? '—'}</Satir>
-          <Satir ad="Aciliyet">
-            {a.aciliyet != null ? <Rozet ton={ACILIYET_TONU(a.aciliyet)}>{`${a.aciliyet}/5`}</Rozet> : '—'}
-          </Satir>
-          <Satir ad="Model güveni">{a.guven != null ? `%${Math.round(a.guven * 100)}` : '—'}</Satir>
-          <Satir ad="Adres">{a.konumMetin ?? 'metinde adres bulunamadı'}</Satir>
-        </dl>
-      )}
-    </>
+    <MetinSonucKarti
+      metin={ihbar.metin ?? ''}
+      g={g}
+      konumNotu={
+        <p className="mt-2 border-t border-line pt-2 text-small text-ink-2">
+          {ihbar.konumKaynagi === 'metin'
+            ? 'Afetzede ekibi bu adrese yönlendirdi; haritadaki nokta burası.'
+            : `Afetzede ekibi kendi konumuna yönlendirdi: ${ihbarKonumu(ihbar)}.`}
+        </p>
+      }
+    />
   )
 }
 

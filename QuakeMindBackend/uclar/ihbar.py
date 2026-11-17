@@ -281,44 +281,47 @@ class MetinAnalizIstegi(BaseModel):
 
 @yonlendirici.post("/api/afetzede/metin-analiz")
 def metin_analiz(istek: MetinAnalizIstegi, kul: dict = Depends(kimlik.kullanici)):
-    """Metin modelini (BERTurk + adres cozumleme) kosar. Kayit acmaz.
+    """Afetzedenin yazdigi metni cozer (J-170). Kayit acmaz.
 
-    Eski `/api/nlp/analyze` her cagrida sonucu bellekteki konum listesine ve
-    isi haritasina yaziyordu; burada yazma yalniz ihbar olusturulunca olur."""
+    Model metin iscisinde; adres yerel dizinden (metin disari gitmez). Yazma
+    yalniz ihbar olusturulunca olur."""
+    import hiz_siniri
+    from metin_analizi import isci
+
     metin = istek.metin.strip()
     if len(metin) < 5:
         raise HTTPException(status_code=422, detail="Metin çok kısa.")
-    pipeline = ck._get_nlp_pipeline()
-    if not pipeline:
-        raise HTTPException(status_code=503, detail="Metin modeli sunucuda yüklü değil.")
-
-    t0 = time.perf_counter()
+    hiz_siniri.metin_kontrol(kul["id"])
     try:
-        with ck.temporary_sys_path(ck.NLP_ROOT), ck.temporary_cwd(ck.NLP_ROOT):
-            sonuc = pipeline.process_tweet(metin)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Metin modeli çalışmadı: {e}")
-    sure_ms = round((time.perf_counter() - t0) * 1000)
+        sonuc = isci.coz(metin)
+    except isci.MetinModeliYok as e:
+        raise HTTPException(status_code=503, detail="Metin modeli şu an çalışmıyor. " + str(e)) from e
 
-    if not sonuc:
-        # Model metni afetle ilgisiz buldu; ihbar yine gonderilebilir ama
-        # modelin kategorisi, aciliyeti ve adresi yok.
-        analiz = {"ilgisiz": True, "kategori": None, "aciliyet": None, "guven": None,
-                  "konum": None, "konumMetin": None, "adaylar": []}
-    else:
-        k = sonuc.get("konum")
-        analiz = {
-            "ilgisiz": False,
-            "kategori": sonuc.get("kategori"),
-            "aciliyet": sonuc.get("aciliyet"),
-            "guven": sonuc.get("guven_skoru"),
-            # Boru hatti [enlem, boylam] doner.
-            "konum": {"lat": float(k[0]), "lon": float(k[1])} if k and len(k) == 2 else None,
-            "konumMetin": sonuc.get("konum_metin"),
-            "adaylar": list(sonuc.get("konum_adaylari") or [])[:6],
-        }
+    k = sonuc.get("konum")
+    analiz = {
+        # Eski alanlar (ihbar kaydi ve eski istemciler bunlari okur).
+        "ilgisiz": not sonuc["ilgili"],
+        "kategori": sonuc["kategori"] if sonuc["ilgili"] else None,
+        "aciliyet": sonuc.get("aciliyet"),
+        "guven": sonuc.get("guven"),
+        "konum": {"lat": float(k[0]), "lon": float(k[1])} if k else None,
+        "konumMetin": sonuc.get("konumMetin"),
+        "adaylar": [x["konumMetin"] for x in sonuc.get("adresAdaylari", [])][:6],
+        # J-170
+        "konumDuzeyi": sonuc.get("konumDuzeyi"),
+        "belirsizlikM": sonuc.get("belirsizlikM"),
+        "adres": sonuc.get("adres"),
+        "adresNotlari": sonuc.get("adresNotlari", []),
+        "adresEslesmeleri": sonuc.get("adresEslesmeleri", []),
+        "kategoriKaynagi": sonuc.get("kategoriKaynagi"),
+        "ikinciKategori": sonuc.get("ikinciKategori"),
+        "kategoriUyarilari": sonuc.get("kategoriUyarilari", []),
+        "kisiler": sonuc.get("kisiler", []),
+        "ihtiyaclar": sonuc.get("ihtiyaclar", []),
+        "sinyaller": sonuc.get("sinyaller", []),
+    }
     analiz_id = _sakla({"tur": "metin", "kullanici_id": kul["id"], "metin": metin, "analiz": analiz})
-    return {"analizId": analiz_id, **analiz, "sureMs": sure_ms}
+    return {"analizId": analiz_id, **analiz, "sureMs": sonuc.get("sureMs")}
 
 
 # --- 2. ihbar --------------------------------------------------------------------

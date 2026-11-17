@@ -171,17 +171,20 @@ def test_kamera_tavsiyesi_siddeti_yalniz_bina_sinifindan_alir():
 
 def test_metin_analizi_kaydedilir(ortam, monkeypatch):
     istemci, h, _ = ortam
+    from metin_analizi import isci
 
-    class SahteHat:
-        def process_tweet(self, metin):
-            return {"kategori": "Enkaz", "aciliyet": 0.9, "konum_metin": "Test Mah.", "konum": None}
+    def sahte_coz(metin):
+        return {"ilgili": True, "kategori": "Enkaz Bildirimi", "aciliyet": 5, "guven": 0.9,
+                "kategoriKaynagi": "model", "konum": [36.2, 36.15], "konumMetin": "Test Mah., Hatay",
+                "konumDuzeyi": "mahalle", "sinyaller": [{"sinyal": "enkaz_altinda"}], "sureMs": 30}
 
-    monkeypatch.setattr(ck, "_get_nlp_pipeline", lambda: SahteHat())
+    monkeypatch.setattr(isci, "coz", sahte_coz)
     y = istemci.post("/api/nlp/analyze", json={"text": "Test Mahallesinde enkaz altında kalanlar var"},
                      headers=_baslik(h["koordinator"]))
     assert y.status_code == 200, y.text
     k = _son(istemci, h, "metin_analizi")
-    assert "Enkaz" in k["ozet"] and k["ayrinti"]["metin"].startswith("Test Mahallesinde")
+    assert "Enkaz" in k["ozet"] and "(mahalle)" in k["ozet"]
+    assert k["ayrinti"]["metin"].startswith("Test Mahallesinde") and k["ayrinti"]["sinyaller"] == ["enkaz_altinda"]
 
 
 def test_sayfalama(ortam):

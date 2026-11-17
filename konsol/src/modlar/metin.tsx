@@ -1,55 +1,243 @@
-import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { WarningCircle } from '@phosphor-icons/react'
 import { Amac, Bolum, HazirSecenekler, SuAn, Teknik, VeriYok } from '@/kabuk/Panel'
 import { Micro, Rozet } from '@/kabuk/parcalar'
-import { apiPost } from '@/veri/istemci'
+import { ApiHatasi, apiPost } from '@/veri/istemci'
 import { useHarita } from '@/harita/HaritaKabugu'
 import { useCozumleme, type MetinSonucu } from '@/durum/cozumlemeDurumu'
-import { GelenIhbarlar } from './ihbarParcalari'
+import { useKonsol } from '@/durum/konsolDurumu'
+import { useSorguAraligi } from '@/durum/zamanDurumu'
+import { sn } from '@/lib/sinif'
+import { sayi, tarihSaat } from '@/lib/bicim'
+import { IHBAR_DURUMU, useIhbarlar, type Ihbar } from '@/veri/ihbar'
+import { DUZEY_ADI, belirsizlikMetni } from '@/veri/metin'
+import { IhbarDetayi } from './ihbarParcalari'
+import { GorevOzetSatiri } from './sevk'
+import {
+  ACILIYET_TONU,
+  MetinSonucKarti,
+  denemeGorunumu,
+  ihbarGorunumu,
+  kontrolNedeni,
+  ucusZoom,
+  type MetinGorunumu,
+} from './metinKarti'
 
-/* Metin modu: Türkçe ihbar metninden kategori, konum ve aciliyet çıkarımı.
-   Model sunucuda koşar; ekran yalnız metni gönderir ve künyesiyle gösterir. */
+/* ---------------------------------------------------------------------------
+   Metin modu (J-170). Asıl iş afetzedelerden gelen yazılı ihbarların
+   kuyruğudur: en acil ve koordinatörün bakması gereken önce. Seçilen ihbar
+   sağda tek kartta açılır (metin içinde işaretli adres, kişi, ihtiyaç),
+   haritada konumu ve ne kadar sapabileceği çizilir.
+
+   "Metni kendin incelet" ikincil bir araçtır: kayıt açmaz, haritaya yazmaz.
+   Eskiden bu deneme analizi işi haritasına nokta bırakıyordu.
+--------------------------------------------------------------------------- */
+
+const SUZGECLER = [
+  { id: 'acik', etiket: 'Açık' },
+  { id: 'kontrol', etiket: 'Bakılması gereken' },
+  { id: 'kapandi', etiket: 'Kapanan' },
+  { id: 'hepsi', etiket: 'Hepsi' },
+] as const
+type SuzgecId = (typeof SUZGECLER)[number]['id']
+
+type Satir = { ihbar: Ihbar; g: MetinGorunumu | null; neden: string | null }
+
+const KUYRUK_SINIRI = 60
+
+export function MetinSol() {
+  const aralik = useSorguAraligi()
+  const ihbar = useIhbarlar(aralik)
+  const [suzgec, setSuzgec] = useState<SuzgecId>('acik')
+  const secili = useKonsol((d) => d.seciliKayit)
+  const kayitSec = useKonsol((d) => d.kayitSec)
+  const { ucus } = useHarita()
+
+  const tum = useMemo<Satir[]>(
+    () =>
+      (ihbar.data ?? [])
+        .filter((i) => i.tur === 'metin')
+        .map((i) => {
+          const g = i.analiz ? ihbarGorunumu(i.analiz) : null
+          return { ihbar: i, g, neden: kontrolNedeni(g) }
+        }),
+    [ihbar.data],
+  )
+  const acik = tum.filter((s) => s.ihbar.durum !== 'kapandi')
+  const bakilacak = acik.filter((s) => s.neden)
+  const liste = useMemo(() => {
+    const secilen =
+      suzgec === 'acik'
+        ? tum.filter((s) => s.ihbar.durum !== 'kapandi')
+        : suzgec === 'kontrol'
+          ? tum.filter((s) => s.ihbar.durum !== 'kapandi' && s.neden)
+          : suzgec === 'kapandi'
+            ? tum.filter((s) => s.ihbar.durum === 'kapandi')
+            : tum
+    // Açık önce; sonra en acil; eşitse en yeni.
+    return [...secilen].sort(
+      (a, b) =>
+        Number(a.ihbar.durum === 'kapandi') - Number(b.ihbar.durum === 'kapandi') ||
+        (b.g?.aciliyet ?? -1) - (a.g?.aciliyet ?? -1) ||
+        b.ihbar.zaman - a.ihbar.zaman,
+    )
+  }, [tum, suzgec])
+
+  return (
+    <>
+      <Bolum baslik="Yazılı ihbarlar" ek={<Micro>{`${sayi(acik.length)} açık`}</Micro>} dolgusuz>
+        <div className="px-3">
+          <Amac>
+            Afetzedelerin yazdığı ihbarlar, en acil olan önce. Model kategoriyi, aciliyeti ve metindeki
+            adresi çıkardı; seçince metin işaretli olarak sağda açılır.
+          </Amac>
+          <HazirSecenekler etiket="İhbar süzgeci" secenekler={SUZGECLER} secili={suzgec} onSec={setSuzgec} />
+          <SuAn>
+            {ihbar.isPending
+              ? 'Yükleniyor…'
+              : acik.length
+                ? `${sayi(acik.length)} açık yazılı ihbar${
+                    bakilacak.length ? `; ${sayi(bakilacak.length)} tanesinde modelin sonucuna bakılmalı` : ''
+                  }.`
+                : 'Seçili zaman aralığında açık yazılı ihbar yok.'}
+          </SuAn>
+        </div>
+        {ihbar.isError ? (
+          <div className="px-3 py-3">
+            <VeriYok ne="İhbarlar" neden="ihbar ucu yanıt vermedi" />
+          </div>
+        ) : liste.length ? (
+          <div className="mt-2.5 border-t border-line">
+            {liste.slice(0, KUYRUK_SINIRI).map((s) => (
+              <MetinSatiri
+                key={s.ihbar.id}
+                satir={s}
+                secili={secili?.tip === 'ihbar' && secili.id === s.ihbar.id}
+                onSec={() => {
+                  kayitSec({ tip: 'ihbar', id: s.ihbar.id })
+                  // Metinden çözülen konumda çember sığsın diye düzeye göre.
+                  ucus(s.ihbar.lon, s.ihbar.lat, s.ihbar.konumKaynagi === 'metin' ? ucusZoom(s.g?.konumDuzeyi) : 16)
+                }}
+              />
+            ))}
+            {liste.length > KUYRUK_SINIRI && (
+              <p className="px-3 py-2 text-small text-ink-3">
+                {`İlk ${KUYRUK_SINIRI} gösteriliyor (${sayi(liste.length)} ihbar). Zaman aralığını daraltın.`}
+              </p>
+            )}
+          </div>
+        ) : (
+          !ihbar.isPending && (
+            <p className="mt-2.5 border-t border-line px-3 py-2.5 text-small text-ink-3">Bu süzgeçte ihbar yok.</p>
+          )
+        )}
+      </Bolum>
+      <KendinIncelet />
+    </>
+  )
+}
+
+function MetinSatiri({ satir, secili, onSec }: { satir: Satir; secili: boolean; onSec: () => void }) {
+  const { ihbar: i, g, neden } = satir
+  const d = IHBAR_DURUMU[i.durum]
+  const konum =
+    g && !g.eski
+      ? g.konumDuzeyi
+        ? [DUZEY_ADI[g.konumDuzeyi], belirsizlikMetni(g.belirsizlikM), g.konumMetin].filter(Boolean).join(' · ')
+        : 'Metinde adres yok'
+      : (g?.konumMetin ?? null)
+  return (
+    <button
+      type="button"
+      onClick={onSec}
+      aria-pressed={secili}
+      className={sn(
+        'block w-full border-b border-l-2 border-b-line px-3 py-2.5 text-left',
+        secili ? 'border-l-ihbar-metin bg-raised' : 'border-l-transparent hover:bg-raised',
+        i.durum === 'kapandi' && 'opacity-60',
+      )}
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-2">
+          {g?.aciliyet != null ? (
+            <Rozet ton={ACILIYET_TONU(g.aciliyet)}>{`${g.aciliyet}/5`}</Rozet>
+          ) : (
+            <Rozet ton="nötr">—</Rozet>
+          )}
+          <span className="truncate text-small text-ink">{g?.ilgisiz ? 'Afetle ilgisiz' : (g?.kategori ?? i.etiket)}</span>
+        </span>
+        <Rozet ton={d.ton}>{d.ad}</Rozet>
+      </span>
+      <span className="mt-1 line-clamp-2 text-small text-ink-2">{i.metin}</span>
+      <GorevOzetSatiri gorevler={i.gorevler} olayZamani={i.zaman} bekleyenYaz={false} />
+      <span className="mt-1 flex justify-between gap-2 text-small text-ink-3">
+        <span className="line-clamp-1">{konum ?? '—'}</span>
+        <span className="shrink-0 font-mono">{tarihSaat(i.zaman)}</span>
+      </span>
+      {neden && i.durum !== 'kapandi' && (
+        <span className="mt-1 flex items-center gap-1.5 text-small text-ink-2">
+          <WarningCircle size={14} weight="bold" className="shrink-0 text-high" aria-hidden />
+          Bak: {neden}
+        </span>
+      )}
+    </button>
+  )
+}
+
+/* ---- deneme --------------------------------------------------------------- */
 
 const ORNEKLER = [
-  { id: 'enkaz', etiket: 'Enkaz bildirimi' },
-  { id: 'medikal', etiket: 'Tıbbi yardım' },
-  { id: 'ihtiyac', etiket: 'Temel ihtiyaç' },
+  { id: 'enkaz', etiket: 'Enkaz' },
+  { id: 'medikal', etiket: 'Yaralı' },
+  { id: 'ihtiyac', etiket: 'İhtiyaç' },
+  { id: 'belirsiz', etiket: 'Adresi belirsiz' },
 ] as const
 type OrnekId = (typeof ORNEKLER)[number]['id']
 
 const ORNEK_METIN: Record<OrnekId, string> = {
-  enkaz: 'Antakya Armutlu mahallesinde bina çökmüş, üç kişi enkaz altında, acil yardım lazım.',
-  medikal: 'Defne Atatürk caddesinde yaralı var, kanaması durmuyor, ambulans gelemiyor.',
+  enkaz: 'Armutlu Mahallesi 5. Sokak’ta bina çöktü, iki kişi enkaz altında, ses geliyor.',
+  medikal: 'Defne Elektrik mahallesinde yaralı var, kanaması durmuyor, ambulans giremiyor.',
   ihtiyac: 'Sümerler mahallesinde çadırdayız, su ve battaniye bitti, iki bebek var.',
+  belirsiz: 'Atatürk Caddesi’nde bir apartman yan yatmış, içeride insanlar var.',
 }
 
-const ACILIYET_TONU = (n: number) => (n >= 5 ? 'crit' : n >= 4 ? 'high' : n >= 3 ? 'mid' : 'ok')
+const METIN_SINIRI = 1000
 
-export function MetinSol() {
-  const [metin, setMetin] = useState(ORNEK_METIN.enkaz)
-  const [ornek, setOrnek] = useState<OrnekId | null>('enkaz')
-  const qc = useQueryClient()
+function hataMetni(e: unknown): string {
+  if (e instanceof ApiHatasi) {
+    if (e.durum === 503) return 'Metin modeli şu an çalışmıyor; sunucu yöneticisine haber verin.'
+    return e.message
+  }
+  return e instanceof Error ? e.message : 'Çözümlenemedi.'
+}
+
+function KendinIncelet() {
+  const [metin, setMetin] = useState('')
+  const [ornek, setOrnek] = useState<OrnekId | null>(null)
   const { ucus } = useHarita()
   const metinYaz = useCozumleme((d) => d.metinYaz)
+  const kayitSec = useKonsol((d) => d.kayitSec)
 
   const coz = useMutation({
     mutationFn: (govde: { text: string }) => apiPost<MetinSonucu>('/api/nlp/analyze', govde),
     onSuccess: (sonuc, degisken) => {
       metinYaz(degisken.text, sonuc)
-      if (sonuc.konum) ucus(sonuc.konum[1], sonuc.konum[0], 14)
-      void qc.invalidateQueries({ queryKey: ['ozet'] })
+      // Sonuç sağda görünsün: seçili ihbar varsa bırakılır.
+      kayitSec(null)
+      if (sonuc.konum) ucus(sonuc.konum[1], sonuc.konum[0], ucusZoom(sonuc.konumDuzeyi))
     },
   })
+  const kisa = metin.trim().length < 5
 
   return (
-    <Bolum baslik="Metin ihbarı" ek={<Micro>BERTurk</Micro>}>
+    <Bolum baslik="Metni kendin incelet">
       <Amac>
-        Gelen Türkçe ihbar ne diyor? Metni kategoriye ayırır, içindeki adresi konuma çevirir ve
-        aciliyetini çıkarır.
+        Telefonla, telsizle gelen bir ihbarı ya da modelin bir cümleyi nasıl okuduğunu dene. Kayıt
+        açılmaz, haritaya nokta yazılmaz.
       </Amac>
-
       <HazirSecenekler
-        etiket="Örnek ihbarlar"
+        etiket="Örnek metinler"
         secenekler={ORNEKLER}
         secili={ornek}
         onSec={(id) => {
@@ -57,120 +245,88 @@ export function MetinSol() {
           setMetin(ORNEK_METIN[id])
         }}
       />
-
-      <label className="mt-3 block text-micro ls-micro text-ink-3 uppercase" htmlFor="ihbar">
-        İhbar metni
-      </label>
+      <div className="mt-3 flex items-baseline justify-between gap-2">
+        <label className="text-micro ls-micro text-ink-3 uppercase" htmlFor="ihbar-deneme">
+          Metin
+        </label>
+        <span className="text-small text-ink-3">
+          {metin.length}/{METIN_SINIRI}
+        </span>
+      </div>
       <textarea
-        id="ihbar"
-        rows={4}
+        id="ihbar-deneme"
+        rows={3}
+        maxLength={METIN_SINIRI}
         value={metin}
+        placeholder="Ne oldu, nerede, kaç kişi?"
         onChange={(e) => {
           setMetin(e.target.value)
           setOrnek(null)
         }}
-        className="mt-1.5 w-full rounded-control border border-line-2 bg-sunken px-2.5 py-2 text-body text-ink"
+        className="mt-1.5 w-full resize-none rounded-control border border-line-2 bg-sunken px-2.5 py-2 text-body text-ink"
       />
-
       <button
         type="button"
-        disabled={!metin.trim() || coz.isPending}
+        disabled={kisa || coz.isPending}
         onClick={() => coz.mutate({ text: metin.trim() })}
-        className="mt-2 w-full rounded-control bg-accent px-3 py-2.5 text-body font-semibold text-accent-ink disabled:opacity-40"
+        className="mt-2 w-full rounded-control border border-accent px-3 py-2 text-body font-semibold text-accent hover:bg-accent-soft disabled:opacity-40"
       >
-        {coz.isPending ? 'Model koşuyor…' : 'Metni çözümle'}
+        {coz.isPending ? 'İnceleniyor…' : 'İncelet'}
       </button>
-
       {coz.isError && (
         <p role="alert" className="mt-2 text-small text-crit">
-          {coz.error instanceof Error ? coz.error.message : 'Çözümlenemedi.'}
+          {hataMetni(coz.error)}
         </p>
       )}
-
-      <SuAn>
-        {coz.data
-          ? `Son çözümleme: ${coz.data.kategori}, aciliyet ${coz.data.aciliyet}/5, konum ${
-              coz.data.konum_metin ?? 'bulunamadı'
-            }.`
-          : 'Bir metin gönder; sonuç sağ panelde künyesiyle görünür.'}
-      </SuAn>
-
       <Teknik>
-        Model sunucuda, API sürecinde tembel yüklenir; ilk istek modeli belleğe alır, sonrakiler
-        hızlıdır. Konum, metindeki adres adaylarından coğrafi kodlamayla bulunur — adres yoksa
-        konum boş döner, uydurulmaz.
+        Kategori BERTurk sınıflandırıcısından gelir (modelin tahmini; seyrek kategorilerde zayıf). Adres
+        yerel adres dizininden çözülür (OpenStreetMap: il, ilçe, mahalle, köy, sokak); metin dışarı
+        gitmez. Dizinde olmayan ad uydurulmaz, notu düşülür. Hesap başına dakikada 30 inceleme.
       </Teknik>
     </Bolum>
   )
 }
 
-/** Afetzedelerin yazılı ihbarları metin modunun başında durur (J-51). */
+/* ---- sağ panel -------------------------------------------------------------- */
+
 export function MetinSag() {
-  return (
-    <>
-      <GelenIhbarlar
-        tur="metin"
-        baslik="Afetzedelerden gelen yazılı ihbarlar"
-        amac="Afetzedenin yazıp modele incelettiği ihbarlar: kategori, aciliyet ve metindeki adres. Seçince metnin tamamı açılır."
-      />
-      <KendiCozumlemem />
-    </>
-  )
-}
+  const aralik = useSorguAraligi()
+  const ihbar = useIhbarlar(aralik)
+  const secili = useKonsol((d) => d.seciliKayit)
+  const deneme = useCozumleme((d) => d.metin)
+  const temizle = useCozumleme((d) => d.metinTemizle)
 
-function KendiCozumlemem() {
-  const kayit = useCozumleme((d) => d.metin)
-  const sonuc = kayit?.sonuc
+  const seciliIhbar =
+    secili?.tip === 'ihbar' ? ihbar.data?.find((i) => i.id === secili.id && i.tur === 'metin') : undefined
+  if (seciliIhbar) return <IhbarDetayi ihbar={seciliIhbar} />
 
-  if (!sonuc) {
+  if (deneme) {
     return (
-      <Bolum baslik="Kendi çözümlemen">
-        <Amac>Soldan gönderdiğin metnin kategorisi, aciliyeti ve konumu burada görünür.</Amac>
-        <div className="mt-2">
-          <VeriYok ne="Çözümleme" neden="henüz metin gönderilmedi" />
-        </div>
+      <Bolum
+        baslik="Deneme incelemesi"
+        ek={
+          <button type="button" onClick={temizle} className="text-small text-ink-3 hover:text-ink">
+            Temizle
+          </button>
+        }
+      >
+        <p className="mb-3 text-small text-ink-3">
+          {`Konsolda incelendi, ${tarihSaat(deneme.zaman)}. Kayıt açılmadı; haritadaki çember yalnız bu ekranda.`}
+        </p>
+        <MetinSonucKarti metin={deneme.girdi} g={denemeGorunumu(deneme.sonuc)} />
       </Bolum>
     )
   }
 
   return (
-    <Bolum baslik="Çözümleme">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-subtitle text-ink">{sonuc.kategori}</span>
-        <Rozet ton={ACILIYET_TONU(sonuc.aciliyet)}>aciliyet {sonuc.aciliyet}/5</Rozet>
+    <Bolum baslik="Yazılı ihbar">
+      <Amac>
+        Soldaki kuyruktan bir ihbar seç: metin, modelin bulduğu adres, kişi ve ihtiyaçlar işaretli olarak
+        burada açılır; haritada konumun ne kadar sapabileceği çizilir.
+      </Amac>
+      <div className="mt-2">
+        <VeriYok ne="Seçili ihbar" neden="henüz seçilmedi" />
       </div>
-
-      <dl className="kilav-kv mt-3 gap-x-2.5 gap-y-1.5 text-small">
-        <dt className="text-ink-3">Konum</dt>
-        <dd className="text-ink">{sonuc.konum_metin ?? 'metinde adres bulunamadı'}</dd>
-        <dt className="text-ink-3">Koordinat</dt>
-        <dd className="font-mono text-ink">
-          {sonuc.konum ? `${sonuc.konum[0].toFixed(5)}, ${sonuc.konum[1].toFixed(5)}` : '—'}
-        </dd>
-        <dt className="text-ink-3">Güven</dt>
-        <dd className="text-ink">
-          %{(sonuc.guven_skoru * 100).toFixed(1).replace('.', ',')}
-        </dd>
-      </dl>
-
-      {sonuc.konum_adaylari?.length > 0 && (
-        <>
-          <p className="mt-3 text-micro ls-micro text-ink-3 uppercase">Adres adayları</p>
-          <ul className="mt-1.5">
-            {sonuc.konum_adaylari.slice(0, 4).map((a) => (
-              <li key={a} className="border-t border-line py-1.5 text-small text-ink-2">
-                {a}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      <Teknik>
-        Kategori ve güven doğrudan modelin çıktısı; aciliyet kural tabanlı türetilir. Sekiz model
-        karşılaştırmasında BERTurk mikro-F₁ 0,82 ölçüldü, ancak seyrek kategorilerde klasik taban
-        çizgilerinin altında kalıyor — bu ekrandaki sonuç da o sınırın içinde okunmalı.
-      </Teknik>
     </Bolum>
   )
 }

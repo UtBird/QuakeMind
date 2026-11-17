@@ -5612,6 +5612,7 @@ baktığı, ekip konum paylaşımı ve hash zinciri.
   - Adres, kamuya açık OSM Nominatim'e gönderiliyor (`apps/disaster_nlp/src/ner_extraction.py:120`).
   - Afetzedenin yazdığı adres üçüncü tarafa çıkıyor.
   - Nominatim saniyede 1 istek kuralı koyuyor; internet zayıfsa adres bulunamıyor. Yerel mahalle/sokak dizini önerilir.
+  - ✅ Düzeltildi (17 Kasım, J-170): adres yerel dizinden çözülüyor, metin dışarı gitmiyor.
 - **S-6 ⚪ Canlı akış kimliği yalnız bağlanırken denetliyor** (`uclar/canli.py`). Hesap askıya alınsa da açık akış sürer. Kodda görüldü, ölçülmedi.
   - ✅ Düzeltildi (17 Kasım, Grup B): `uclar/canli.py`, `konsol/src/canli/canliAkis.ts`.
     - Açık akış oturumu 15 saniyede bir yeniden denetliyor.
@@ -5625,6 +5626,7 @@ baktığı, ekip konum paylaşımı ve hash zinciri.
   - Kutudaki örnek, "Armutlu Mahallesi 5. Sokak'ta bina çöktü, iki kişi enkaz altında…", "metinde adres bulunamadı" sonucu verdi.
   - Kategori "Acil Yardım İhtiyacı" çıktı (enkaz cümlesi).
   - İlk istek 31,8 sn sürdü.
+  - ✅ Düzeltildi (17 Kasım, J-170): aynı cümle "5. Sokak, Armutlu Mah., Hatay" (sokak düzeyi, ±400 m), kategori "Enkaz Bildirimi".
 - **F-2 🟡 Koordinatla gelen SOS'ta mahalle boş.**
   - Konsolda "Mahalle bilinmiyor", saha ekranında yalnız ham koordinat (`36.19250, 36.14150`) görünüyor.
   - Sunucu koordinattan mahalleyi bulabilir (altlıkta mahalle var).
@@ -5678,6 +5680,7 @@ baktığı, ekip konum paylaşımı ve hash zinciri.
     - afetzede haritasını yalnız maplibre ile çiz;
     - yavaş 3G'de "SOS'a basılabilir" süresini ölç.
 - **P-2 Metin analizinin ilk isteği 31,8 sn.** Model tembel yükleniyor, üstüne Nominatim bekleniyor. Model işçide açılışta ısıtılmalı; adres çözümü yerelde yapılmalı (S-5).
+  - ✅ Düzeltildi (17 Kasım, J-170): model ayrı işçide, açılışta ısınıyor. Isınma sürerken gelen ilk istek ~7 sn, sonrakiler ~65 ms.
 - **P-3 Isı haritası soğukken yavaş.**
   - İlk açılışta 4 paralel istek 4,3 sn sürüyor; ısınınca 28 ms.
   - Öneri: açılışta ısıt ya da 4 kaynağı tek istekte dön.
@@ -5736,6 +5739,68 @@ baktığı, ekip konum paylaşımı ve hash zinciri.
   - Reddedilen silmeden sonra açık işlem kalmıyor.
   - Başka bir bağlantı 0,5 sn içinde yazabiliyor.
 - `pytest -q` **89/89**.
+
+## J-170 🟠 Metin analizi: adres dış servise gidiyordu ve çoğu zaman yanlış yerdi; sonuç ekranı okunmuyordu
+**Durum:** KAPALI (kategori kararı hariç, aşağıda) · **Ölçüldü** · **İlgili:** J-167 (F-1, P-2, S-5), J-111, J-51
+
+**Bulgu (17 Kasım).**
+- Adres metinden NER modeliyle aday çıkarılıp kamuya açık Nominatim'e soruluyordu: afetzedenin yazdığı adres üçüncü tarafa gidiyordu.
+- Çoğu metinde yalnız ilçe merkezi bulunuyordu; "Armutlu Mahallesi" yazan metin Antakya merkezine düşüyordu. Ekranda bunun yaklaşık olduğu yazmıyordu.
+- Model API sürecinde tembel yükleniyordu: ilk istek 31,8 sn.
+- Metin uzunluğu sınırsızdı, analiz başına hız sınırı yoktu.
+- Konsoldaki deneme analizi sonucu PostGIS hasar tablosuna ve bellekteki konum listesine yazıyordu: deneme haritaya nokta bırakıyordu.
+- Konsolda metin modu tek bir metni çözümlüyordu; gelen yazılı ihbarlar ayrı, sıralanmamış bir listedeydi. Sonuçta düzey, sapma payı, kişi ve ihtiyaç yoktu; haritayla bağ yoktu.
+
+**Yapılan: arka uç** (`QuakeMindBackend/metin_analizi/`).
+- `adres.py`: yerel adres dizini, ağa çıkmaz.
+  - Dizin `araclar_adres_dizini_kur.py` ile OSM'den kurulur (`roads.gpkg`, `yerler.json`, `tr_locations`): 81 il, 151 ilçe, 496 mahalle/köy, 6 173 sokak kaydı. 117 KB, kurulum 21 sn. ODbL künyesi dosyada.
+  - Her sonuç düzeyini (sokak, mahalle, köy, ilçe, il) ve sapma payını yazar: sokak ≥400 m, mahalle 800 m, köy 1,5 km, ilçe 5 km, il 30 km.
+  - Sokak yalnız yazılan mahalleye bağlıysa ya da 800 m içindeyse seçilir; aynı adlı yerler ayırt edilemiyorsa konum seçilmez, adaylar döner.
+  - Dizinde olmayan ad uydurulmaz, "dizininde yok" notu düşülür. Bulanık eşleşme yalnız büyük harfle başlayan sözcükte ("altından" → Altındağ hatası).
+  - Metindeki her eşleşmenin karakter aralığı döner (ekranda vurgu için).
+- `cikarim.py`: kişi sayısı, ihtiyaç (su, gıda, barınma, ısınma, ilaç, tuvalet) ve aciliyet işaretleri (enkaz altında, ses geliyor, yaralı, mahsur, çökme, riskli bina, yol kapalı, savunmasız kişi). Kural tabanlı.
+- Metindeki işaret modelin kategorisiyle çelişirse "kontrol et" uyarısı döner; **karar değiştirilmez**.
+- NER modeli artık yüklenmiyor (adres dizinden çözüldüğü için çıktısının kullanılacak yolu kalmadı). Tatbikat kanalı kendi NER kullanımını koruyor.
+- Model ayrı işçi süreçte (`isci.py`, CLAUDE.md §3); açılışta açılışı bekletmeden ısınır. `/api/hazir` `metinModeli` alanını raporlar. Model çalışmazsa 503.
+- Metin en çok 1 000 karakter; hesap başına dakikada 30 analiz (`hiz_siniri.metin_kontrol`).
+- `/api/nlp/analyze` artık kayıt açmıyor, haritaya yazmıyor; yalnız işlem kaydına düşüyor.
+- `apps/disaster_nlp/src/classification.py`: `classify_detay` hazır tahminleri alabiliyor (model iki kez koşmasın). Karar mantığı aynı.
+
+**Yapılan: arayüz** (`konsol/src/modlar/metin.tsx`, `metinKarti.tsx`, `veri/metin.ts`).
+- Metin modunun solu yazılı ihbar kuyruğu: en acil ve açık olan önce; süzgeç "Açık / Bakılması gereken / Kapanan / Hepsi". Satırda aciliyet, kategori, adres düzeyi ve sapma payı; bakılması gerekenlerde nedeni ("kategori metinle çelişiyor", "adres yalnız bölge düzeyinde", "metinde adres yok").
+- Sağda tek sonuç kartı: kategori ve aciliyet, model güveni ve ikinci olasılık, uyarılar, adres/kişi/işaret/ihtiyaç vurgulu metin, düzey rozeti ve sapma payıyla adres kartı, "Haritada göster".
+- Haritada seçili kaydın sapma alanı çember olarak çiziliyor (metinden çözülen adreste düzeyin payı, cihaz konumunda telefonun doğruluğu). Payı bilinmeyen konumda çember çizilmez.
+- "Metni kendin incelet" ikincil araç: kayıt açmaz; sonuç aynı kartta, haritada merkez noktası ve çemberle.
+- Afetzede "Yazarak bildir" iki adıma indi: yaz → kontrol et ve gönder. Ekibin gideceği yer adresin düzeyine göre önseçili (sokak/mahalle/köy → metindeki adres; ilçe/il → kendi konumu); "adres Nominatim'e gider" yazısı kalktı.
+
+**Ölçüm** `[Ö]` (`araclar_metin_adres_olc.py`, `apps/disaster_nlp/data/metin_adres_kumesi.json`: 22 elle yazılmış, etiketli sentetik metin; yer adları gerçek. Raporlar `benchmark/reports/metin_adres_taban.json`, `metin_adres_yeni.json`).
+
+| | Önce | Sonra |
+|---|---|---|
+| Beklenen yer bulundu | 7/12 | 11/12 |
+| Koordinat 1,5 km içinde | 5/12 | 10/12 |
+| Dış servise giden metin | 5 | 0 |
+| İstek süresi (ortanca) | 52,5 ms | 27,8 ms |
+| Kategori örtüşmesi | 14/22 | 14/22 (karar değişmedi) |
+
+- Gerçek işçiyle uçtan uca: API 6 sn'de açıldı; ısınma sürerken gelen ilk istek 6,8 sn (önce 31,8 sn), sonrakiler ~65 ms.
+- `tests/test_metin_analizi.py` (15); `pytest -q` 104/104.
+- Ekran denemesi veritabanı kopyasında (8001): afetzede telefon boyutunda (375×812) gönderdi, konsolda kuyruk, kart, çember ve deneme aracı görüldü.
+
+**Kullanıcı bulgusu (17 Kasım akşam): "Cumhuriyet meydanında ölüler var 2 tane".**
+- Önce: model "afetle ilgisiz" (%65) dedi; adres, kişi ve işaret bulunamadı. Koordinatöre ölü bildiren metin uyarısız "ilgisiz" görünüyordu.
+- "Meydan" adres türü değildi; dizinde "Cumhuriyet Meydanı" (Antakya) vardı ama aranmıyordu. Eklendi (sokak düzeyi, ±400 m).
+- "Ölü" kişi ve işaret olarak eklendi. Sonradan gelen sayı ("ölüler var 2 tane") yalnız "tane/adet" ile sayılıyor ("çocuk 5 yaşında" sayılmaz).
+- "öldü/ölmüş" özgün metinde ö harfiyle aranıyor: harfler sadeleşince "oldu/olmuş" (olmak) ile karışıyordu. "ö" yazılmamışsa yakalanmaz.
+- Model "ilgisiz" dediğinde metinde ağır işaret (ölü, enkaz altında, ses, yaralı, mahsur, çökme) varsa "Kontrol et" uyarısı çıkıyor. Karar değişmedi (J-111); kartta başlık "Model: afetle ilgisiz".
+- Sonra: "Cumhuriyet Meydanı, Hatay" (sokak), 2 ölü, uyarı. Ölçüm kümesinde gerileme yok (11/12, 10/12). `pytest -q` 107/107.
+
+**Açık kalan.**
+- Kategori kararı değiştirilmedi. Gerçek sınama kümesi D: sürücüsünde, bu makinede yok; değişiklik ölçülemezdi (J-111). Uyarılar yalnız koordinatöre "kontrol et" der.
+- 22 kayıtlık küme küçük ve sentetik; makaleye taşınacaksa gerçek ihbar metinleriyle yeniden ölçülmeli.
+- `apps/disaster_nlp/data/geocode_cache.json` artık kullanılmıyor ve eski adres sorgularını içeriyor; silinmesi kullanıcı kararı.
+- Adres dizini (`metin_analizi/veri/adres_dizini.json.gz`, 117 KB) depoya girmeli mi: kullanıcı kararı. Girmezse sunucuda `araclar_adres_dizini_kur.py` koşulmalı.
+- Bina numarası çözülmüyor; sokak noktası sokağın orta yeridir.
 
 ---
 
@@ -5955,3 +6020,5 @@ baktığı, ekip konum paylaşımı ve hash zinciri.
 | 17 Kasım 2026 | **J-167 Grup B** (güvenlik) düzeltildi: giriş denemesi sınırı (S-1, 6. hatalı denemede 429, sayaç SQLite'ta), hesap başına tek açık SOS ve dakikalık sınır (S-2, U-3), API belgeleri varsayılan kapalı (S-4), canlı akış oturumu 15 sn'de bir denetliyor (S-6). S-3 J-166'da, S-5 Grup D'ye bırakıldı. Yeni `tests/test_hiz_siniri.py` (11); `pytest -q` 87/87. Canlıda Nginx arkasında `QUAKEMIND_VEKIL_GUVENILIR=1` açılmalı. |
 | 17 Kasım 2026 | **J-167 Grup C** (saha ve giriş arayüzü) düzeltildi: saha adım düğmeleri telefonda yapışkan alt çubukta (U-1, "Yola çıktık" 375×812'de kaydırmadan görünüyor), giriş ekranı sunucu açılırken insan diliyle yazıyor (U-2) ve `/api/hazir` ucu (P-5), tatbikat lejantı varsayılan kapalı (U-4), afetzede kartları ve yer satırları ekran okuyucuya adlı (U-6). |
 | 17 Kasım 2026 | **J-169** kapatıldı: başarısız bir yazma açık işlem bırakıp veritabanını kilitliyordu; 14 yazma bloğu hata anında geri alıyor. `pytest -q` 89/89. |
+| 17 Kasım 2026 | **J-170** kapatıldı (kategori kararı hariç): metin analizinde adres yerel dizinden (metin dışarı gitmiyor), düzey ve sapma payıyla; model işçide; kişi, ihtiyaç, işaret çıkarımı ve kategori uyarısı. 22 metinlik kümede beklenen yer 7/12 → 11/12, 1,5 km içinde 5/12 → 10/12. Konsolda yazılı ihbar kuyruğu, vurgulu sonuç kartı ve haritada sapma çemberi; afetzede akışı iki adım. J-167 F-1, P-2, S-5 kapandı. `pytest -q` 104/104. |
+| 17 Kasım 2026 | **J-170** ek: "Cumhuriyet meydanında ölüler var 2 tane" ilgisiz ve adressiz çıkıyordu. Meydan adres türü, ölü işareti ve "N tane" sayımı eklendi; model ilgisiz dese de ağır işarette uyarı. `pytest -q` 107/107. |

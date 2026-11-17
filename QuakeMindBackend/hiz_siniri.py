@@ -38,6 +38,8 @@ SOS_HESAP_SINIRI = 6          # ayni hesaptan dakikada 6 SOS basisi (acik cagriy
 SOS_IP_SINIRI = 30            # ayni adresten dakikada 30 SOS
 KAYIT_PENCERE_SN = 60 * 60
 KAYIT_IP_SINIRI = 10          # ayni adresten saatte 10 yeni hesap (aile, ayni Wi-Fi payi)
+METIN_PENCERE_SN = 60
+METIN_HESAP_SINIRI = 30       # ayni hesaptan dakikada 30 metin analizi (model CPU'su)
 
 
 def istemci_ip(istek) -> Optional[str]:
@@ -114,6 +116,19 @@ def kayit_kontrol(ip: Optional[str]) -> None:
 def kayit_oldu(ip: Optional[str]) -> None:
     if ip:
         aktif_depo().sayac_ekle(f"kayit:ip:{ip}")
+
+
+# --- metin analizi ----------------------------------------------------------------
+
+def metin_kontrol(kullanici_id: str) -> None:
+    """J-170: metin analizi modeli CPU'da kosar; tek hesap onu tikamasin."""
+    depo = aktif_depo()
+    simdi = time.time()
+    n, ilk = depo.sayac(f"metin:k:{kullanici_id}", simdi - METIN_PENCERE_SN)
+    if n >= METIN_HESAP_SINIRI:
+        raise _dur(ilk + METIN_PENCERE_SN - simdi,
+                   "Çok sık analiz istendi. {sn} saniye sonra yeniden dene.")
+    depo.sayac_ekle(f"metin:k:{kullanici_id}")
 
 
 # --- SOS -------------------------------------------------------------------------

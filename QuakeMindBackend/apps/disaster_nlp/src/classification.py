@@ -187,7 +187,7 @@ class DisasterClassifier:
                    or (kategori == "Lojistik İhtiyaç Bildirimi" and _normalize_label(p["label"]) == "Lojistik")]
         return max(eslesen) if eslesen else 0.0
 
-    def classify_detay(self, text):
+    def classify_detay(self, text, predictions=None):
         """Sınıflandırmanın ayrıntısı: gösterilen kategori, KENDİ güveni, modelin
         ham (13 etiketli) en yüksek etiketi ve kararı kimin verdiği.
 
@@ -202,7 +202,10 @@ class DisasterClassifier:
         if not text or len(text.strip()) < 5:
             return {"kategori": "Alakasız", "guven": 0.0, "hamEtiket": None, "hamSkor": 0.0,
                     "kaynak": "kisa_metin"}
-        predictions = self.classifier(text[:512])[0]
+        # `predictions` verilirse model yeniden koşmaz (J-170: metin_analizi
+        # ham skorları ikinci olasılık için de kullanıyor). Karar mantığı aynı.
+        if predictions is None:
+            predictions = self.classifier(text[:512])[0]
         predictions = sorted(predictions, key=lambda item: item["score"], reverse=True)
         top = predictions[0]
         ham = _normalize_label(top["label"])

@@ -5,16 +5,20 @@ import { Rozet } from '@/kabuk/parcalar'
 import { dogruluk } from '@/lib/bicim'
 import { sn } from '@/lib/sinif'
 import type { Ihbar } from '@/veri/ihbar'
+import { IHTIYAC_ADI } from '@/veri/sorgular'
+import { DUZEY_ADI, belirsizlikMetni, konumYeterli } from '@/veri/metin'
 import { kusUcusuM, mesafeMetni, type EtkinKonum } from './konum'
 import { Adim, BIRINCIL, Gonderildi, IKINCIL, KonumSatiri } from './parcalar'
-import { konumAlanlari, useIhbarGonder, useMetinAnalizi } from './veri'
+import { konumAlanlari, useIhbarGonder, useMetinAnalizi, type MetinAnaliziYaniti } from './veri'
 
 /* ---------------------------------------------------------------------------
-   Yazılı ihbar (J-51). Afetzede ne olduğunu kendi cümlesiyle yazar; metin
-   modeli (BERTurk + adres çözümleme) kategoriyi, aciliyeti ve metindeki
-   adresi çıkarır. Afetzede modelin anladığını görür, ekibin nereye gideceğini
-   seçer (metindeki adres ya da kendi konumu) ve gönderir. Konsolda metin
-   modunda ve "Son ihbarlar"da anında görünür.
+   Yazılı ihbar (J-51, J-170). Afetzede ne olduğunu kendi cümlesiyle yazar;
+   sunucu kategoriyi, aciliyeti ve metindeki adresi çıkarır (adres yerel
+   dizinden; metin dışarı gitmez). İki adım: yaz → anladığımızı kontrol et ve
+   gönder. Ekibin gideceği yer adresin inceliğine göre önseçilir: sokak,
+   mahalle ya da köy bulunduysa metindeki adres; yalnız ilçe ya da il
+   bulunduysa afetzedenin kendi konumu (ilçe merkezi olayın yeri değildir).
+   Afetzede değiştirebilir.
 
    Model çalışmazsa ihbar kaybolmaz: "incelemeden gönder" metni modelsiz,
    kendi konumuyla iletir.
@@ -32,9 +36,7 @@ function hataMetni(e: unknown): string {
 export function MetinIhbari({ konum, konumAc }: { konum: EtkinKonum | null; konumAc: () => void }) {
   const kimlik = useId()
   const [metin, setMetin] = useState('')
-  // Varsayılan yok: model adresi çoğu zaman yalnız ilçe düzeyinde bulur
-  // ("Antakya, Hatay"); ekibi ilçe merkezine mi, afetzedenin yanına mı
-  // göndereceğine afetzede karar verir (J-51 önizlemesinde görüldü).
+  // Afetzedenin seçimi; seçmediyse adresin inceliğine göre önseçim (aşağıda).
   const [hedef, setHedef] = useState<'metin' | 'kendi' | null>(null)
   const [gonderilen, setGonderilen] = useState<Ihbar | null>(null)
   const analiz = useMetinAnalizi()
@@ -42,9 +44,10 @@ export function MetinIhbari({ konum, konumAc }: { konum: EtkinKonum | null; konu
 
   const sonuc = analiz.data
   const metindeKonum = sonuc?.konum ?? null
-  // Metinde adres yoksa ekip afetzedenin kendi konumuna gider; iki konum da
-  // varsa seçim afetzedenin.
-  const secilenHedef = metindeKonum ? (konum ? hedef : (hedef ?? 'metin')) : 'kendi'
+  // Metinde adres yoksa ekip afetzedenin kendi konumuna gider. Varsa: adres
+  // yeterince inceyse (sokak/mahalle/köy) ya da afetzedenin konumu yoksa metin.
+  const onerilen: 'metin' | 'kendi' = konumYeterli(sonuc?.konumDuzeyi) || !konum ? 'metin' : 'kendi'
+  const secilenHedef = metindeKonum ? (hedef ?? onerilen) : 'kendi'
   const gonderilebilir = secilenHedef === 'metin' || (secilenHedef === 'kendi' && !!konum)
   const uzaklik = metindeKonum && konum ? kusUcusuM(konum, metindeKonum) : null
 
@@ -115,12 +118,10 @@ export function MetinIhbari({ konum, konumAc }: { konum: EtkinKonum | null; konu
               className={sn(BIRINCIL, 'mt-2')}
             >
               <Sparkle size={18} aria-hidden />
-              {analiz.isPending ? 'Model inceliyor, adres aranıyor…' : 'Modele incelet'}
+              {analiz.isPending ? 'İnceleniyor…' : 'İncelet'}
             </button>
             <p className="mt-1.5 text-small text-ink-3">
-              {analiz.isPending
-                ? 'Adres araması 10–20 saniye sürebilir; ilk seferde model de yüklenir.'
-                : 'Metindeki adres, konuma çevrilmek için OpenStreetMap’in adres servisine (Nominatim) gider.'}
+              Sonucu görüp öyle gönderirsin. Adres telefonda değil sunucuda, kendi adres listemizden bulunur.
             </p>
           </>
         )}
@@ -143,44 +144,24 @@ export function MetinIhbari({ konum, konumAc }: { konum: EtkinKonum | null; konu
       </Adim>
 
       {sonuc && (
-        <Adim no={2} baslik="Modelin anladığı">
-          {sonuc.ilgisiz ? (
-            <p className="text-body text-ink">
-              Model bu metni afetle ilgili bulmadı. Yanıldığını düşünüyorsan yine de gönderebilirsin.
-            </p>
-          ) : (
-            <dl className="kilav-kv gap-x-3 gap-y-1.5 text-body">
-              <dt className="text-ink-3">Kategori</dt>
-              <dd className="text-ink">{sonuc.kategori ?? '—'}</dd>
-              <dt className="text-ink-3">Aciliyet</dt>
-              <dd>
-                {sonuc.aciliyet != null ? (
-                  <Rozet ton={ACILIYET_TONU(sonuc.aciliyet)}>{`${sonuc.aciliyet}/5`}</Rozet>
-                ) : (
-                  '—'
-                )}
-              </dd>
-              <dt className="text-ink-3">Adres</dt>
-              <dd className="text-ink">{sonuc.konumMetin ?? 'metinde adres bulunamadı'}</dd>
-              <dt className="text-ink-3">Model güveni</dt>
-              <dd className="text-ink">{sonuc.guven != null ? `%${Math.round(sonuc.guven * 100)}` : '—'}</dd>
-            </dl>
-          )}
-          <p className="mt-2 text-small text-ink-3">
-            Modelin tahminidir. Metni değiştirirsen yeniden inceletmen gerekir.
-          </p>
-        </Adim>
-      )}
-
-      {sonuc && (
-        <Adim no={3} baslik="Ekip nereye gitsin?">
+        <Adim no={2} baslik="Kontrol et ve gönder">
+          <Anladigimiz sonuc={sonuc} />
+          <p className="mt-3 mb-1.5 text-body text-ink">Ekip nereye gitsin?</p>
           {metindeKonum ? (
             <div role="radiogroup" aria-label="Ekibin gideceği yer" className="grid gap-1.5">
               <HedefSecenegi
                 secili={secilenHedef === 'metin'}
                 sec={() => setHedef('metin')}
                 baslik={`Metindeki adres: ${sonuc.konumMetin ?? 'model buldu'}`}
-                alt={`Modelin bulduğu yer; yaklaşıktır${uzaklik != null ? `, senden ${mesafeMetni(uzaklik)} uzakta` : ''}. Model çoğu zaman yalnız ilçeyi bulur.`}
+                alt={[
+                  sonuc.konumDuzeyi
+                    ? `${DUZEY_ADI[sonuc.konumDuzeyi]} düzeyinde, ${belirsizlikMetni(sonuc.belirsizlikM) ?? 'yaklaşık'}`
+                    : 'Yaklaşık',
+                  uzaklik != null ? `senden ${mesafeMetni(uzaklik)} uzakta` : null,
+                  konumYeterli(sonuc.konumDuzeyi) ? null : 'yalnız bölgeyi söyler, olayın yeri değildir',
+                ]
+                  .filter(Boolean)
+                  .join('; ') + '.'}
               />
               <HedefSecenegi
                 secili={secilenHedef === 'kendi'}
@@ -203,18 +184,16 @@ export function MetinIhbari({ konum, konumAc }: { konum: EtkinKonum | null; konu
           )}
           <button
             type="button"
-            disabled={gonder.isPending || secilenHedef === null}
+            disabled={gonder.isPending}
             onClick={() => (gonderilebilir ? ihbarEt() : konumAc())}
             className={sn(BIRINCIL, 'mt-2.5')}
           >
             <PaperPlaneTilt size={18} aria-hidden />
             {gonder.isPending
               ? 'Gönderiliyor…'
-              : secilenHedef === null
-                ? 'Önce ekibin gideceği yeri seç'
-                : gonderilebilir
-                  ? 'İhbarı gönder'
-                  : 'Önce konumunu seç'}
+              : gonderilebilir
+                ? 'İhbarı gönder'
+                : 'Önce konumunu seç'}
           </button>
           {gonder.isError && (
             <p role="alert" className="mt-2 text-small text-crit">
@@ -223,6 +202,62 @@ export function MetinIhbari({ konum, konumAc }: { konum: EtkinKonum | null; konu
           )}
         </Adim>
       )}
+    </div>
+  )
+}
+
+/** Modelin anladığı, tek kartta: afetzede yanlışı bir bakışta görsün. */
+function Anladigimiz({ sonuc }: { sonuc: MetinAnaliziYaniti }) {
+  if (sonuc.ilgisiz) {
+    return (
+      <p className="rounded-control border border-line-2 px-2.5 py-2 text-body text-ink">
+        Model bu metni afet ihbarı olarak anlamadı. Yanıldığını düşünüyorsan yine de gönderebilirsin.
+      </p>
+    )
+  }
+  const kisiler = (sonuc.kisiler ?? []).map((k) => `${k.sayi} ${k.ne}`)
+  const ihtiyaclar = [...new Set((sonuc.ihtiyaclar ?? []).map((i) => IHTIYAC_ADI[i.ihtiyac] ?? i.ihtiyac))]
+  const isaretler = [...new Set((sonuc.sinyaller ?? []).map((x) => x.ad))]
+  const d = sonuc.konumDuzeyi
+  return (
+    <div className="rounded-control border border-line-2 px-2.5 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-body font-semibold text-ink">{sonuc.kategori ?? 'Kategori belirsiz'}</p>
+        {sonuc.aciliyet != null && <Rozet ton={ACILIYET_TONU(sonuc.aciliyet)}>{`aciliyet ${sonuc.aciliyet}/5`}</Rozet>}
+      </div>
+      <dl className="kilav-kv mt-1.5 gap-x-3 gap-y-1 text-small">
+        <dt className="text-ink-3">Adres</dt>
+        <dd className="text-ink">
+          {sonuc.konumMetin ?? 'metinde bulunamadı'}
+          {d && <span className="text-ink-3">{` (${DUZEY_ADI[d].toLocaleLowerCase('tr')})`}</span>}
+        </dd>
+        {kisiler.length > 0 && (
+          <>
+            <dt className="text-ink-3">Kişi</dt>
+            <dd className="text-ink">{kisiler.join(', ')}</dd>
+          </>
+        )}
+        {isaretler.length > 0 && (
+          <>
+            <dt className="text-ink-3">Durum</dt>
+            <dd className="text-ink">{isaretler.join(', ')}</dd>
+          </>
+        )}
+        {ihtiyaclar.length > 0 && (
+          <>
+            <dt className="text-ink-3">İhtiyaç</dt>
+            <dd className="text-ink">{ihtiyaclar.join(', ')}</dd>
+          </>
+        )}
+      </dl>
+      {(sonuc.adresNotlari ?? []).slice(0, 2).map((n) => (
+        <p key={n} className="mt-1.5 text-small text-ink-3">
+          {n}
+        </p>
+      ))}
+      <p className="mt-1.5 text-small text-ink-3">
+        Modelin tahminidir; yanlışsa metni düzeltip yeniden inceletebilirsin.
+      </p>
     </div>
   )
 }

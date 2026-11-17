@@ -30,17 +30,22 @@ export const kisaAd = (ad: string) => ad.replace(/\s*\(.*\)\s*$/, '')
 
 export const kutuMerkezi = (k: Kutu): [number, number] => [(k[0] + k[2]) / 2, (k[1] + k[3]) / 2]
 
-/** Görünen alanla kesişen altlık bölgeleri (katalogdan). */
+/** Görünen alanla kesişen altlık bölgeleri (katalogdan). `ulke` paketi
+    (J-40 sınırı: il daireleri ve operasyon bölgeleri dışında zemin boştu)
+    zoom ve kesişimden bağımsız her zaman eklenir; detaylı paketler onun
+    üstüne çizilsin diye dizide ondan sonra gelir. */
 export function useGorunenAltlik() {
   const { gorunum } = useHarita()
   const katalog = useAltlikKatalogu()
-  const gorunen = useMemo(
-    () =>
-      gorunum && gorunum.zoom >= ALTLIK_EN_AZ_ZOOM
-        ? (katalog.data ?? []).filter((b) => kutularKesisir(b.kutu, gorunum.kutu))
-        : [],
-    [katalog.data, gorunum],
-  )
+  const gorunen = useMemo(() => {
+    if (!gorunum || !katalog.data) return []
+    const ulke = katalog.data.filter((b) => b.tur === 'ulke')
+    if (gorunum.zoom < ALTLIK_EN_AZ_ZOOM) return ulke
+    const digerleri = katalog.data.filter(
+      (b) => b.tur !== 'ulke' && kutularKesisir(b.kutu, gorunum.kutu),
+    )
+    return [...ulke, ...digerleri]
+  }, [katalog.data, gorunum])
   return { katalog, gorunum, gorunen }
 }
 
@@ -50,10 +55,12 @@ export function useAltlikGirdisi() {
   const altlik = useAltlikPaketleri(gorunen)
   const bolgeAdlari = useMemo<Etiket[]>(
     () =>
-      (katalog.data ?? []).map((b) => {
-        const [lon, lat] = kutuMerkezi(b.kutu)
-        return { ad: kisaAd(b.ad), lon, lat, aci: 0, oncelik: 100 }
-      }),
+      (katalog.data ?? [])
+        .filter((b) => b.tur !== 'ulke')
+        .map((b) => {
+          const [lon, lat] = kutuMerkezi(b.kutu)
+          return { ad: kisaAd(b.ad), lon, lat, aci: 0, oncelik: 100 }
+        }),
     [katalog.data],
   )
   return {

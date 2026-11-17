@@ -4,6 +4,15 @@ import { apiGet, apiPost } from './istemci'
 import { IHTIYAC_ADI, type Ihtiyac } from './sorgular'
 import type { SorguAraligi } from '@/durum/zamanDurumu'
 import type { Gorev } from './gorev'
+import type {
+  AdresEslesmesi,
+  IhtiyacBilgisi,
+  KategoriUyarisi,
+  KisiBilgisi,
+  KonumDuzeyi,
+  SinyalBilgisi,
+} from './metin'
+import { belirsizlikMetni } from './metin'
 
 /* ---------------------------------------------------------------------------
    Afetzede ihbarları (J-51): hasar fotoğrafı, yazılı ihbar, ihtiyaç talebi.
@@ -42,6 +51,18 @@ export type MetinAnalizi = {
   konum: { lat: number; lon: number } | null
   konumMetin: string | null
   adaylar: string[]
+  /* J-170 (eski ihbarlarda yok) */
+  konumDuzeyi?: KonumDuzeyi | null
+  belirsizlikM?: number | null
+  adres?: Record<string, string> | null
+  adresNotlari?: string[]
+  adresEslesmeleri?: AdresEslesmesi[]
+  kategoriKaynagi?: string | null
+  ikinciKategori?: { kategori: string; puan: number } | null
+  kategoriUyarilari?: KategoriUyarisi[]
+  kisiler?: KisiBilgisi[]
+  ihtiyaclar?: IhtiyacBilgisi[]
+  sinyaller?: SinyalBilgisi[]
 }
 
 export type Ihbar = {
@@ -161,7 +182,8 @@ export function ihbarBasligi(i: Ihbar): string {
 /** Konumun nereden geldiği, ekibin okuyacağı dille. */
 export function ihbarKonumu(i: Ihbar): string {
   if (i.konumKaynagi === 'metin') {
-    return `Metindeki adres: ${i.analiz?.konumMetin ?? 'model buldu'} (yaklaşık)`
+    const pay = belirsizlikMetni(i.analiz?.belirsizlikM) ?? 'yaklaşık'
+    return `Metindeki adres: ${i.analiz?.konumMetin ?? 'model buldu'} (${pay})`
   }
   if (i.konumKaynagi === 'mahalle') return `${i.mahalle ?? 'Mahalle'} merkezi (yaklaşık)`
   if (i.konumDogrulukM != null) return `Cihaz konumu, ±${Math.round(i.konumDogrulukM)} m`
