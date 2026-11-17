@@ -35,6 +35,15 @@ varsayimi sehir disinda baskadir (`arac_rotasi`).
     python araclar_arac_agi_uret.py                 # butun bolgeler
     python araclar_arac_agi_uret.py antakya maras   # yalniz bunlar
     python araclar_arac_agi_uret.py --genel         # bolgeler arasi ag (once bolgeler)
+    python araclar_arac_agi_uret.py --yasaklar      # donus yasaklari (J-171)
+
+Gobek ve donus yasaklari (J-171): her yolun gobek (`junction=roundabout`)
+isareti `yol_gobek` dizisine yazilir; rota motoru gobek icinde donus bedeli
+saymaz. OSM donus yasaklari (`type=restriction`: no_left_turn, only_straight_on
+...) `yasaklar.json`'a KOORDINATLA yazilir (gelen yolun, kavsagin ve giden
+yolun geometrisi): sehir aglari ve bolgeler arasi ag ayni listeyi kendi
+dugumlerine oturtur. Yalniz "yol - dugum - yol" bicimi okunur; kavsagi bir
+yol olan (via=way) yasaklar sayilir ama uygulanmaz.
 """
 import datetime
 import json
@@ -85,6 +94,10 @@ def yon(tip, other_tags, etiket):
     if tip in ("motorway", "motorway_link"):
         return "ileri"
     return "iki"
+
+
+def gobek_mu(other_tags, etiket) -> bool:
+    return (etiket(other_tags, "junction") or "").lower() in ("roundabout", "circular")
 
 
 def yasal_sinir(other_tags, etiket):
@@ -180,6 +193,7 @@ def ag_uret(df):
     yol_yeni[kullanilan] = np.arange(len(kullanilan))
     adlar = [str(x) if isinstance(x, str) else "" for x in df["name"].values[kullanilan]]
     tipler = [str(x) for x in df["highway"].values[kullanilan]]
+    gobek = np.array([gobek_mu(df["other_tags"].values[i], _etiket) for i in kullanilan], dtype=np.uint8)
     tek_yonlu = sum(1 for i in kullanilan if yonler[i] != "iki")
     t1 = time.perf_counter()
 
@@ -192,9 +206,11 @@ def ag_uret(df):
         "kenar_yol": yol_yeni[yol].astype(np.int32),
         "yol_adi": np.array(adlar, dtype=str), "yol_tipi": np.array(tipler, dtype=str),
         "yol_sinir": sinirlar[kullanilan].astype(np.float32),
+        "yol_gobek": gobek,
     }, {
         "sayilar": {"yol": int(len(kullanilan)), "tekYonluYol": int(tek_yonlu), "dugum": int(N),
                     "yonluKenar": int(len(a)), "gucluParca": int(parca_sayisi),
+                    "gobekYol": int(gobek.sum()),
                     "enBuyukParcaOrani": round(float(tut.mean()), 4),
                     "toplamKm": round(float(uzunluk.sum()) / 1000, 1)},
         "kurulumSn": round(t1 - t0, 1),
@@ -223,7 +239,7 @@ def genel_uret(pbf, kaynak):
              max(k[2] for k in kutular) + GENEL_PAY, max(k[3] for k in kutular) + GENEL_PAY)
     anahtar = {}
     lon, lat = [], []
-    yollar = []  # (ad, tip, sinir)
+    yollar = []  # (ad, tip, sinir, gobek)
     a_parca, c_parca, y_parca = [], [], []
 
     def dugum(kx, ky, x, y):
@@ -245,7 +261,8 @@ def genel_uret(pbf, kaynak):
         gid = np.array([dugum(i, j, x, y) for i, j, x, y in zip(kx, ky, xs.tolist(), ys.tolist())],
                        dtype=np.int64)
         ofset = len(yollar)
-        yollar.extend(zip(z["yol_adi"].tolist(), z["yol_tipi"].tolist(), z["yol_sinir"].tolist()))
+        gobek = z["yol_gobek"].tolist() if "yol_gobek" in z.files else [0] * len(z["yol_adi"])
+        yollar.extend(zip(z["yol_adi"].tolist(), z["yol_tipi"].tolist(), z["yol_sinir"].tolist(), gobek))
         a_parca.append(gid[z["kenar_u"]])
         c_parca.append(gid[z["kenar_v"]])
         y_parca.append(z["kenar_yol"].astype(np.int64) + ofset)
@@ -261,7 +278,8 @@ def genel_uret(pbf, kaynak):
     a_list, c_list, y_list = [], [], []
     for geom, tip, tags, ad in zip(df.geometry.values, df["highway"], df["other_tags"], df["name"]):
         yol_no = len(yollar)
-        yollar.append((ad if isinstance(ad, str) else "", str(tip), yasal_sinir(tags, _etiket)))
+        yollar.append((ad if isinstance(ad, str) else "", str(tip), yasal_sinir(tags, _etiket),
+                       int(gobek_mu(tags, _etiket))))
         yn = yon(tip, tags, _etiket)
         for dizi in cizgiler(geom):
             onceki = None
@@ -325,6 +343,7 @@ def genel_uret(pbf, kaynak):
     adlar = [str(yollar[i][0]) for i in kullanilan]
     tipler = [str(yollar[i][1]) for i in kullanilan]
     sinirlar = np.array([yollar[i][2] for i in kullanilan], dtype=np.float32)
+    gobekler = np.array([yollar[i][3] for i in kullanilan], dtype=np.uint8)
     t3 = time.perf_counter()
 
     diziler = {
@@ -337,6 +356,7 @@ def genel_uret(pbf, kaynak):
         "kenar_sehir": sehir.astype(np.uint8),
         "yol_adi": np.array(adlar, dtype=str), "yol_tipi": np.array(tipler, dtype=str),
         "yol_sinir": sinirlar,
+        "yol_gobek": gobekler,
     }
     cikti = CIKTI / "genel.npz"
     np.savez_compressed(cikti, **diziler)
@@ -353,6 +373,55 @@ def genel_uret(pbf, kaynak):
     }
     (CIKTI / "genel.json").write_text(json.dumps(bilgi, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"genel: {bilgi['sayilar']} | {cikti.stat().st_size / 1e6:.2f} MB | {bilgi['sure']}", flush=True)
+
+
+def yasaklar_uret(pbf, kaynak):
+    """OSM donus yasaklari -> yasaklar.json (koordinatla; bkz. dosya basi)."""
+    import re as _re
+
+    import pyogrio
+
+    from araclar_altlik_uret import BOLGELER
+    from araclar_yol_agi_uret import kutu_of
+
+    kutular = [kutu_of(b) for b in BOLGELER]
+    genel = (min(k[0] for k in kutular) - GENEL_PAY, min(k[1] for k in kutular) - GENEL_PAY,
+             max(k[2] for k in kutular) + GENEL_PAY, max(k[3] for k in kutular) + GENEL_PAY)
+    t0 = time.perf_counter()
+    df = pyogrio.read_dataframe(pbf, layer="other_relations", bbox=genel, columns=["type", "other_tags"],
+                                where="type = 'restriction'")
+    okuma = round(time.perf_counter() - t0, 1)
+
+    def etiket(tags, anahtar):
+        m = _re.search(r'"' + anahtar + r'"=>"([^"]*)"', tags or "")
+        return m.group(1) if m else None
+
+    yasaklar, atlanan = [], {}
+    for geom, tags in zip(df.geometry.values, df["other_tags"]):
+        tur = (etiket(tags, "restriction") or etiket(tags, "restriction:motorcar")
+               or etiket(tags, "restriction:motor_vehicle") or "")
+        istisna = etiket(tags, "except") or ""
+        if not (tur.startswith("no_") or tur.startswith("only_")):
+            atlanan["tur"] = atlanan.get("tur", 0) + 1
+            continue
+        if any(x in istisna for x in ("motorcar", "motor_vehicle", "emergency")):
+            atlanan["istisna"] = atlanan.get("istisna", 0) + 1
+            continue
+        parca = list(geom.geoms) if geom is not None and hasattr(geom, "geoms") else []
+        if [g.geom_type for g in parca] != ["LineString", "Point", "LineString"]:
+            atlanan["bicim"] = atlanan.get("bicim", 0) + 1  # via=way ya da eksik uye
+            continue
+        yasaklar.append({
+            "tur": tur,
+            "gelen": [[round(x, 7), round(y, 7)] for x, y in parca[0].coords],
+            "kavsak": [round(parca[1].x, 7), round(parca[1].y, 7)],
+            "giden": [[round(x, 7), round(y, 7)] for x, y in parca[2].coords],
+        })
+    bilgi = {"kaynak": kaynak, "kutu": [round(x, 5) for x in genel], "okumaSn": okuma,
+             "sayilar": {"yasak": len(yasaklar), "atlanan": atlanan},
+             "uretim": datetime.datetime.now().isoformat(timespec="seconds"), "yasaklar": yasaklar}
+    (CIKTI / "yasaklar.json").write_text(json.dumps(bilgi, ensure_ascii=False), encoding="utf-8")
+    print(f"yasaklar: {len(yasaklar)} | atlanan {atlanan} | okuma {okuma} sn", flush=True)
 
 
 def main(secilen):
@@ -376,6 +445,9 @@ def main(secilen):
     CIKTI.mkdir(parents=True, exist_ok=True)
     if "--genel" in secilen:
         genel_uret(str(pbf), kaynak)
+        return 0
+    if "--yasaklar" in secilen:
+        yasaklar_uret(str(pbf), kaynak)
         return 0
     bolgeler = [b for b in BOLGELER if not secilen or b["id"] in secilen]
     tur_listesi = ",".join(f"'{t}'" for t in sorted(ARAC_YOLU))

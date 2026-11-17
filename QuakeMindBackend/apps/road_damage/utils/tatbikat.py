@@ -1006,6 +1006,6 @@ def goruntu_eksik_mi(sonuc, alan_kunyesi, pay=0.7):
     if beklenen is None or gercek is None:
         return None
     if gercek < beklenen * pay:
-        return (f"Goruntu eksik indi: gecerli piksel %{gercek*100:.0f}, "
-                f"bu alanda olculen %{beklenen*100:.0f}. Kosu tekrarlanmali.")
+        return (f"Görüntü eksik indi: geçerli piksel %{gercek*100:.0f}, "
+                f"bu alanda ölçülen %{beklenen*100:.0f}. Koşu tekrarlanmalı.")
     return None

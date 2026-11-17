@@ -1771,6 +1771,24 @@ class SqliteDepo:
         kayit["fotograf_var"] = fotograf is not None
         return kayit
 
+    def olay_yogunlugu(self, baslangic: float, bitis: float, dilim_sn: float) -> dict[str, list[int]]:
+        """Zaman seridi (J-167 F-4): dilim basina SOS ve ihbar sayisi.
+
+        Sayim SQL'de (CLAUDE.md 10): satirlar Python'a cekilmez. Ikisi de zaman
+        indeksini kullanir (ix_sos_zaman_kapsar, ix_ihbar_zaman); tablo taranmaz
+        (EXPLAIN QUERY PLAN: tests/test_olay_yogunlugu.py)."""
+        adet = max(1, int(math.ceil((bitis - baslangic) / dilim_sn)))
+        sonuc = {"sos": [0] * adet, "ihbar": [0] * adet}
+        for tur, tablo in (("sos", "sos_cagrilari"), ("ihbar", "ihbarlar")):
+            for r in self._oku(
+                f"""SELECT CAST((zaman - ?) / ? AS INTEGER) AS d, COUNT(*) AS n FROM {tablo}
+                    WHERE zaman >= ? AND zaman < ? GROUP BY d""",
+                (baslangic, dilim_sn, baslangic, bitis),
+            ):
+                if 0 <= r["d"] < adet:
+                    sonuc[tur][r["d"]] = r["n"]
+        return sonuc
+
     def ihbar_listele(
         self,
         baslangic: float | None = None,

@@ -132,7 +132,8 @@ export function NereyeKarti(p: Props) {
                   {YER_TURLERI[t].harf}
                 </span>
                 {YER_TURLERI[t].cogul}
-                {n != null && <span className="text-ink-3">{n}</span>}
+                {/* 0 yerine "—": kayıt yokluğu yer yokluğu değildir (J-167 F-5). */}
+                {n != null && <span className="text-ink-3">{n === 0 ? '—' : n}</span>}
               </button>
             )
           })}
@@ -164,8 +165,10 @@ export function NereyeKarti(p: Props) {
               yakında olmadığı anlamına gelmez. Veri şu bölgelerde var: {kapsam?.bolgeler.join(', ') || '—'}.
             </p>
           ) : liste.length === 0 ? (
-            <p className="px-3.5 py-3 text-small text-ink-3">
-              {YAKIN_YARICAP_KM} km içinde kayıtlı {YER_TURLERI[p.tur].ad.toLocaleLowerCase('tr-TR')} yok.
+            <p className="px-3.5 py-3 text-small text-ink-2">
+              {YAKIN_YARICAP_KM} km içinde haritada (OpenStreetMap) kayıtlı{' '}
+              {YER_TURLERI[p.tur].ad.toLocaleLowerCase('tr-TR')} yok. Bu, yakında olmadığı anlamına
+              gelmez; harita verisi eksik olabilir. Acil durumda 112'yi ara.
             </p>
           ) : (
             <ol>

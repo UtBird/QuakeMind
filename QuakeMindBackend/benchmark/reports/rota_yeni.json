@@ -1,0 +1,42 @@
+{
+ "motor": "kenar tabanlı Dijkstra: tek yön, göbek, dönüş yasağı ve dönüş bedeli (J-171)",
+ "olcum": "2026-11-17 23:42",
+ "yasakUyumu": {
+  "denenen": 49,
+  "rotaYok": 0,
+  "kavsaktanGecmedi": 20,
+  "uydu": 29,
+  "ihlal": 0,
+  "ihlaller": []
+ },
+ "oturtma": {
+  "antakya": {
+   "nokta": 214,
+   "fazlaMOrtanca": -0.0,
+   "fazlaMYuzde95": 0.0,
+   "30mUstuOran": 0.0
+  },
+  "antep": {
+   "nokta": 233,
+   "fazlaMOrtanca": -0.0,
+   "fazlaMYuzde95": 0.0,
+   "30mUstuOran": 0.0
+  }
+ },
+ "hiz": {
+  "antakya": {
+   "istek": 40,
+   "rotaBulundu": 39,
+   "aramaMsOrtanca": 13.4,
+   "aramaMsEnCok": 19.6,
+   "rotaMsOrtanca": 1.5
+  },
+  "genel": {
+   "istek": 10,
+   "rotaBulundu": 10,
+   "aramaMsOrtanca": 91.2,
+   "aramaMsEnCok": 1432.1,
+   "rotaMsOrtanca": 8.8
+  }
+ }
+}

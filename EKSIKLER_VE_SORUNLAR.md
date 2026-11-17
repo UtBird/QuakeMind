@@ -5631,14 +5631,19 @@ baktığı, ekip konum paylaşımı ve hash zinciri.
   - Konsolda "Mahalle bilinmiyor", saha ekranında yalnız ham koordinat (`36.19250, 36.14150`) görünüyor.
   - Sunucu koordinattan mahalleyi bulabilir (altlıkta mahalle var).
 - **F-3 🟡 "Yol ve Rota" sayfası ölü.** "Rota ucu (A*) henüz bağlı değil" diyor, oysa görev ekranında rota var (J-162). Ya bağlanmalı ya menüden kalkmalı.
+  - ✅ Düzeltildi (18 Kasım, J-171): kullanıcı kararı "bağla". Sayfa rota motoruna bağlandı, motor da yenilendi.
 - **F-4 🟡 Zaman şeridi histogramı hiç yazılmamış.**
   - Şerit canlı bağlıyken ve 35 SOS varken de "canlı akış bağlanınca şerit dolacak" diyor (`konsol/src/kabuk/ZamanSeridi.tsx:114-119`).
   - Metin ya düzeltilmeli ya histogram yazılmalı.
+  - ✅ Düzeltildi (18 Kasım, J-171): `/api/olay-yogunlugu` (saat başına SOS ve ihbar, SQL'de sayım, zaman indeksiyle) ve şeritte yığılmış çubuklar. Yoklama yok; canlı akışla tazelenir.
 - **F-5 ⚪ Afetzede "Nereye" kartında İtfaiye 0, Polis 0.** Antakya merkezi, 5 km içinde. Yerel OSM kopyasında bu türler var mı bakılmalı; doğrulanmadı.
+  - ✅ Bakıldı (18 Kasım, J-171): yerel OSM kopyasında Antakya kutusunda polis ve itfaiye istasyonu **yok** (geniş aramada yalnız "Hatay Polis Evi" misafirhanesi). Çıkarım doğru, veri eksik. Kart artık "0" yerine "—" yazıyor ve "haritada kayıtlı yok; yakında olmadığı anlamına gelmez, acil durumda 112" diyor.
 - **F-6 ⚪ Tatbikat ilerleme metinlerinde Türkçe karakter yok.**
   - "Uydu goruntusu indiriliyor", "Analiz tamamlandi" gibi.
   - Drone katmanında da "Uydu" yazıyor.
+  - ✅ Düzeltildi (18 Kasım, J-171): `apps/road_damage/worker.py` ilerleme ve not metinleri, `utils/tatbikat.py` uyarısı Türkçe karakterle; drone kaynağında "Drone görüntüsü indiriliyor", tatbikat aşama adı "Görüntü (drone ya da uydu)".
 - **F-7 ⚪ Hasar sayfası kapsaması %0 olan görüntüleri de listeliyor.**
+  - ✅ Düzeltildi (18 Kasım, J-171): alanı kapsamayan görüntü listenin altında ve sönük; "%0" yerine "alanın dışında; seçersen alan bu görüntüye taşınır" yazıyor (seçilince alan taşındığı için listeden atılmadı).
 
 *Arayüz*
 - **U-1 🟠 Saha ekranının ana düğmesi telefonda ekranın dışında.**
@@ -5801,6 +5806,50 @@ baktığı, ekip konum paylaşımı ve hash zinciri.
 - `apps/disaster_nlp/data/geocode_cache.json` artık kullanılmıyor ve eski adres sorgularını içeriyor; silinmesi kullanıcı kararı.
 - Adres dizini (`metin_analizi/veri/adres_dizini.json.gz`, 117 KB) depoya girmeli mi: kullanıcı kararı. Girmezse sunucuda `araclar_adres_dizini_kur.py` koşulmalı.
 - Bina numarası çözülmüyor; sokak noktası sokağın orta yeridir.
+
+## J-171 🟠 Araç rotası dönüş yasaklarını çiğniyordu, "Yol ve Rota" sayfası ölüydü (J-167 Grup E)
+**Durum:** KAPALI · **Ölçüldü** · **İlgili:** J-55, J-162, J-167 (F-3…F-7)
+
+**Bulgu (17–18 Kasım).**
+- Araç rotası (`arac_rotasi.py`, sevk ve görev ekranları) düğüm tabanlı Dijkstra'ydı. Tek yön ve göbek (tek yön olarak) vardı; ama OSM dönüş yasakları (`type=restriction`) hiç okunmuyordu ve bu yapıda taşınamıyordu. Kavşakta dönüş bedeli yoktu.
+- Başlangıç ve hedef en yakın **düğüme** oturtuluyordu: tek yönlü caddenin ortasındaki olay yanlış yöndeki ya da paralel sokaktaki bir düğüme bağlanabiliyordu.
+- Konsolun "Yol ve rota" sayfası hiçbir şey hesaplamıyordu ("rota ucu (A*) henüz bağlı değil").
+
+**Yapılan.**
+- `araclar_arac_agi_uret.py`: her yol için göbek işareti (`yol_gobek`); `--yasaklar` OSM dönüş yasaklarını koordinatla `veri/yol_agi/arac/yasaklar.json`'a yazar (136 yasak; kavşağı bir yol olan 30'u uygulanamaz, sayılır).
+- `arac_rotasi.py` **kenar tabanlı** arama: durum "hangi yolun başındayım", geçiş ayrı adım.
+  - Yasaklı geçişler grafta yok (Antakya 7, bölgeler arası ağ 44 yasak oturdu).
+  - U dönüşü yalnız çıkmaz sokakta.
+  - Kavşakta (en az üç yol) dönüş bedeli: sola 9 sn, sağa 4 sn, keskin 14 sn, hafif 1 sn; göbek içinde 0, göbeğe giriş en çok 3 sn. **Varsayım [T], ölçülmedi.**
+  - Oturtma en yakın yol parçasına, yönüyle; otoyol ve devlet yolu yakında başka yol varsa seçilmez; nokta bir düğümün üstündeyse düğüme giren ve çıkan bütün yollar.
+  - Kavşak olmayan ardışık yollar tek "zincir" durumu: arama grafı Antakya'da 212 735 → 49 105, bölgeler arası ağda 1 004 496 → 277 127. 200 rastgele çiftte zincirli ve zincirsiz graf aynı mesafe ve süreyi verdi `[Ö]`.
+  - Dışa açık arayüz (`yoldan`, `hedef_aramasi`, `ekipten`) aynı: sevk, görev ve saha ekranları yeni motoru kendiliğinden kullanıyor.
+- Yeni uçlar `uclar/guzergah.py`: `/api/guzergah` (iki nokta, adım adım tarif), `/api/guzergah/en-yakin` (hastane: OSM; toplanma: AFAD; yoldan en çabuk üç yer), `/api/guzergah/kunye`. Koordinatör, yönetici ve saha.
+- Konsol "Yol ve rota" (`konsol/src/modlar/yol.tsx`): iki nokta arası (haritaya tıklayarak), ekipten olaya, en yakın hastane, en yakın toplanma alanı, kapalı yollar (analiz başına). Sağda süre, mesafe, kuş uçuşu, sola/sağa dönüş sayısı, kapanma ve hasar uyarısı, kaçınmanın bedeli (kaçınmasız rotayla kıyas), adım adım tarif. Haritada rota, kesik kıyas çizgisi, adaylar ve uçlar.
+- Grup E'nin geri kalanı: zaman şeridi histogramı (F-4), "Nereye" kartında "0" yerine "—" (F-5), Türkçe ilerleme metinleri (F-6), kapsamasız görüntüler altta (F-7).
+
+**Ölçüm** `[Ö]` (`araclar_rota_olc.py`; aynı araç, aynı örnek, tohum 42; eski motor `--motor` ile dosyadan; veritabanı kopyası):
+
+| | Eski | Yeni |
+|---|---|---|
+| Dönüş yasağı (kavşaktan geçen rotada) çiğnenen | 16 / 28 | 0 / 29 |
+| Oturtma: yoldan fazla sapma, en kötü %5 (Antakya / Antep) | 23,0 / 38,5 m | 0,0 / 0,0 m |
+| Oturtma: 30 m'den fazla sapan nokta (Antakya / Antep) | %3,7 / %7,3 | %0,0 / %0,0 |
+| Arama, ortanca: şehir / bölgeler arası | 22,9 / 129,5 ms | 13,4 / 91,2 ms |
+
+- Raporlar: `QuakeMindBackend/benchmark/reports/rota_taban.json`, `rota_yeni.json`.
+- Ölçüm aracının ilk hâli kavşağa 3 m'den yakın ara noktayı kavşak sanıyordu (yanlış ihlal); düzeltildi, taban o düzeltmeyle yeniden alındı.
+- Oturtma ölçümü yolun kendisinden 5–25 m kaydırılmış noktalarla yapıldı; gerçek ihbar konumlarıyla değil.
+- `tests/test_arac_rotasi.py` (8: tek yön, yasak, sağ/sol, göbek, oturtma, gerçek ağda OSM yasakları, uç yetkisi, Antakya rotası), `tests/test_olay_yogunlugu.py` (3: sayım, `EXPLAIN QUERY PLAN` ile indeks, yetki). `pytest -q` 118/118.
+- Tarayıcıda kopya veritabanıyla: iki nokta (~10 dk, 5,4 km), en yakın hastane (üçü süreye göre), ekipten olaya (AKUT 1, ~3 dk, arama 14 ms), kapalı yollar.
+
+**Canlıya alırken (Deha).** Yol ağı dosyaları git'te değil (`veri/yol_agi/`). Göbek ve dönüş yasağı için sunucuda bir kez:
+`python araclar_arac_agi_uret.py && python araclar_arac_agi_uret.py --genel && python araclar_arac_agi_uret.py --yasaklar` (bu makinede ~5 dk). Koşulmazsa motor eski dosyalarla da çalışır, ama göbek ve yasak olmadan.
+
+**Açık kalan.**
+- Dönüş bedeli ve hız değerleri varsayım; gerçek seyahat süreleriyle ölçülmedi. Trafik verisi yok.
+- OSM'de Türkiye'deki dönüş yasakları seyrek (Antakya'da 8); motor yalnız haritada olanı bilir.
+- Simülasyon (tatbikat) kendi rota motorunu kullanıyor (`apps/road_damage`); bu iş ona dokunmadı.
 
 ---
 
@@ -6022,3 +6071,4 @@ baktığı, ekip konum paylaşımı ve hash zinciri.
 | 17 Kasım 2026 | **J-169** kapatıldı: başarısız bir yazma açık işlem bırakıp veritabanını kilitliyordu; 14 yazma bloğu hata anında geri alıyor. `pytest -q` 89/89. |
 | 17 Kasım 2026 | **J-170** kapatıldı (kategori kararı hariç): metin analizinde adres yerel dizinden (metin dışarı gitmiyor), düzey ve sapma payıyla; model işçide; kişi, ihtiyaç, işaret çıkarımı ve kategori uyarısı. 22 metinlik kümede beklenen yer 7/12 → 11/12, 1,5 km içinde 5/12 → 10/12. Konsolda yazılı ihbar kuyruğu, vurgulu sonuç kartı ve haritada sapma çemberi; afetzede akışı iki adım. J-167 F-1, P-2, S-5 kapandı. `pytest -q` 104/104. |
 | 17 Kasım 2026 | **J-170** ek: "Cumhuriyet meydanında ölüler var 2 tane" ilgisiz ve adressiz çıkıyordu. Meydan adres türü, ölü işareti ve "N tane" sayımı eklendi; model ilgisiz dese de ağır işarette uyarı. `pytest -q` 107/107. |
+| 18 Kasım 2026 | **J-171** kapatıldı: araç rotası kenar tabanlı (dönüş yasağı, U dönüşü yalnız çıkmazda, dönüş bedeli, göbek, yola yönüyle oturtma, zincirle küçültülmüş graf). Dönüş yasağı ihlali 16 → 0; arama şehirde 22,9 → 13,4 ms. Konsol "Yol ve rota" bağlandı. J-167 Grup E (F-3…F-7) kapandı. `pytest -q` 118/118. |

@@ -512,12 +512,17 @@ export function HasarSol() {
 
             {!!oam.data?.length && (
               <ul className="mt-2 max-h-72 overflow-auto rounded-control border border-line-2">
-                {oam.data.map((g) => {
+                {/* Alanı kapsamayan görüntü (J-167 F-7) altta ve sönük: seçilince alan
+                    görüntünün üstüne taşındığı için listeden atılmaz. */}
+                {[...oam.data]
+                  .map((g) => ({ g, oran: kapsamaOrani(g.bbox, analizKutusu) }))
+                  .sort((a, b) => Number(a.oran < 0.01) - Number(b.oran < 0.01))
+                  .map(({ g, oran }) => {
                   const secili = oamSecili?.id === g.id
-                  const oran = kapsamaOrani(g.bbox, analizKutusu)
+                  const disarida = oran < 0.01
                   const gun = olaydanGun(g.date.slice(0, 10))
                   return (
-                    <li key={g.id} className="border-b border-line last:border-b-0">
+                    <li key={g.id} className={sn('border-b border-line last:border-b-0', disarida && !secili && 'opacity-60')}>
                       <button
                         type="button"
                         aria-pressed={secili}
@@ -535,7 +540,13 @@ export function HasarSol() {
                           {goruntuTuru(g)} · {g.provider} · {gunMetni(g.date.slice(0, 10))}
                           {gun >= 0 ? ` · depremden ${gun} gün sonra` : ' · deprem ÖNCESİ'}
                         </span>
-                        <KapsamaCubugu oran={oran} />
+                        {disarida ? (
+                          <span className="mt-1 block text-small text-ink-3">
+                            Analiz alanının dışında; seçersen alan bu görüntünün üstüne taşınır.
+                          </span>
+                        ) : (
+                          <KapsamaCubugu oran={oran} />
+                        )}
                       </button>
                     </li>
                   )

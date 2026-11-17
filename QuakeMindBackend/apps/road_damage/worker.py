@@ -202,7 +202,7 @@ def run_analysis_job(req: dict) -> dict:
     started_at = time.perf_counter()
     t0 = started_at
 
-    _report(analysis_id, 2, "Analiz hazirlaniyor...")
+    _report(analysis_id, 2, "Analiz hazırlanıyor…")
 
     bbox = None
     istek_kutusu_verildi = all(
@@ -221,7 +221,7 @@ def run_analysis_job(req: dict) -> dict:
     prov_code = "google"
     wayback_id = None
     custom_url = None
-    source_note = "Google uydu katmani kullanildi."
+    source_note = "Google uydu katmanı kullanıldı."
     satellite_tile_url = "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
     satellite_attribution = "Google"
     source_label = "Google Maps (Latest / High Res)"
@@ -230,7 +230,7 @@ def run_analysis_job(req: dict) -> dict:
         if req.get("waybackId"):
             prov_code = "esri"
             wayback_id = req["waybackId"]
-            source_note = f"Esri Wayback secildi (id={wayback_id})."
+            source_note = f"Esri Wayback seçildi (id={wayback_id})."
             satellite_tile_url = f"https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{wayback_id}/{{z}}/{{y}}/{{x}}"
             satellite_attribution = "Esri"
             source_label = "Esri Wayback (Historical)"
@@ -239,17 +239,17 @@ def run_analysis_job(req: dict) -> dict:
             if versions:
                 prov_code = "esri"
                 wayback_id = versions[0].get("id")
-                source_note = f"Esri Wayback secildi (id={wayback_id})."
+                source_note = f"Esri Wayback seçildi (id={wayback_id})."
                 satellite_tile_url = f"https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{wayback_id}/{{z}}/{{y}}/{{x}}"
                 satellite_attribution = "Esri"
                 source_label = "Esri Wayback (Historical)"
             else:
-                source_note = "Esri Wayback surumu bulunamadi, Google'a geri donuldu."
+                source_note = "Esri Wayback sürümü bulunamadı, Google'a geri dönüldü."
     elif "oam" in source_text or "openaerial" in source_text:
         if req.get("oamTileUrl"):
             prov_code = "custom"
             custom_url = req["oamTileUrl"]
-            source_note = "OpenAerialMap (secilen goruntu) kullanildi."
+            source_note = "OpenAerialMap (seçilen görüntü) kullanıldı."
             satellite_tile_url = req["oamTileUrl"]
             satellite_attribution = "OpenAerialMap"
             source_label = "OpenAerialMap (Event Specific)"
@@ -339,14 +339,14 @@ def run_analysis_job(req: dict) -> dict:
                 if "{x}" in tms_url and "{y}" in tms_url:
                     prov_code = "custom"
                     custom_url = tms_url
-                    source_note = f"OpenAerialMap secildi: {selected_oam.get('title', 'isimsiz goruntu')}"
+                    source_note = f"OpenAerialMap seçildi: {selected_oam.get('title', 'adsız görüntü')}"
                     satellite_tile_url = tms_url
                     satellite_attribution = "OpenAerialMap"
                     source_label = "OpenAerialMap (Event Specific)"
                 else:
-                    source_note = "OpenAerialMap tms URL formati uyumsuz, Google'a geri donuldu."
+                    source_note = "OpenAerialMap TMS adresi uyumsuz, Google'a geri dönüldü."
             else:
-                source_note = "OpenAerialMap kaydi bulunamadi, Google'a geri donuldu."
+                source_note = "OpenAerialMap kaydı bulunamadı, Google'a geri dönüldü."
 
     # Yakinlastirma ANALIZ EDILECEK KUTUDAN secilir, istekteki radiusKm'den
     # degil. Onceki halde istemci kucuk bir alan cizse bile radiusKm 2,5
@@ -372,7 +372,7 @@ def run_analysis_job(req: dict) -> dict:
         _boy_km = (bbox[3] - bbox[1]) * 111.32
         etkin_yaricap_km = max(_en_km, _boy_km) / 2.0
 
-    _report(analysis_id, 5, "Uydu goruntusu indiriliyor...")
+    _report(analysis_id, 5, "Drone görüntüsü indiriliyor…" if prov_code == "custom" else "Uydu görüntüsü indiriliyor…")
     img, bounds = fetch_satellite_area(
         lat=latitude,
         lon=longitude,
@@ -386,9 +386,9 @@ def run_analysis_job(req: dict) -> dict:
     t1 = time.perf_counter()
 
     if img is None:
-        raise ValueError("Uydu goruntusu indirilemedi. Farkli bir kaynak veya konum deneyin.")
+        raise ValueError("Görüntü indirilemedi. Farklı bir kaynak ya da konum deneyin.")
 
-    _report(analysis_id, 20, "OSM yol agi cikariliyor...")
+    _report(analysis_id, 20, "OSM yol ağı çıkarılıyor…")
     w, h = img.size
 
     # Kunye: goruntu gercekte hangi yakinlastirmada ve ne zaman cekildi (J-35).
@@ -412,9 +412,9 @@ def run_analysis_job(req: dict) -> dict:
         ) * ((bbox[3] - bbox[1]) * 111.32)
         if istenen_alan_km2 > analiz_alani_km2 * 1.05:
             imagery_notes.append(
-                f"Secilen alan {istenen_alan_km2:.2f} km2; standart cozunurlukte "
+                f"Seçilen alan {istenen_alan_km2:.2f} km²; standart çözünürlükte "
                 f"({gsd_of_zoom(used_zoom, latitude):.2f} m/piksel) tek kosuya "
-                f"{analiz_alani_km2:.2f} km2 sigdi, merkezden kirpildi."
+                f"{analiz_alani_km2:.2f} km² sığdı, merkezden kırpıldı."
             )
     if used_zoom != requested_zoom and prov_code == "custom":
         # J-160: OpenAerialMap/drone goruntusunde istenen yakinlastirmada karo
@@ -425,12 +425,12 @@ def run_analysis_job(req: dict) -> dict:
         # "0 kapali yol" cikti. Standart cozunurluk kurali (J-76) bozulmasin,
         # sessiz yanlis sonuc uretilmesin: kosu durur, sebep yazilir.
         raise ValueError(
-            "Secilen goruntu analiz alaninin merkezinde yok: istenen cozunurlukte "
-            f"(z{requested_zoom}) karo bulunamadi. Analiz alanini goruntunun ustune tasi "
-            "(Hasar analizi > goruntu listesi > 'Alani goruntuye tasi') ve yeniden baslat."
+            "Seçilen görüntü analiz alanının merkezinde yok: istenen çözünürlükte "
+            f"(z{requested_zoom}) karo bulunamadı. Analiz alanını görüntünün üstüne taşı "
+            "(Hasar analizi > görüntü listesi > 'Alanı görüntüye taşı') ve yeniden başlat."
         )
     if used_zoom != requested_zoom:
-        imagery_notes.append(f"Istenen z{requested_zoom}'de karo yok, z{used_zoom} kullanildi")
+        imagery_notes.append(f"İstenen z{requested_zoom}'de karo yok, z{used_zoom} kullanıldı")
     # ONCESI GORUNTUSU (kullanici istegi, 26 Eylul): ayni kutu, ayni
     # yakinlastirma, deprem ONCESI cekim. Boylece oncesi / sonrasi / etiketli
     # ucu birebir hizali olur. Wayback surumu CEKIM tarihine gore secilir,
@@ -477,20 +477,20 @@ def run_analysis_job(req: dict) -> dict:
                         "saglayici": "Esri Wayback",
                     }
                     imagery_notes.append(
-                        f"Oncesi goruntusu: Esri Wayback surum {oncesi_surum['surumId']}, "
-                        f"cekim {oncesi_surum.get('cekimTarihi')}"
+                        f"Öncesi görüntüsü: Esri Wayback sürüm {oncesi_surum['surumId']}, "
+                        f"çekim {oncesi_surum.get('cekimTarihi')}"
                     )
             else:
-                imagery_notes.append("Oncesi goruntusu yok: bu alanda deprem oncesi cekim bulunamadi.")
+                imagery_notes.append("Öncesi görüntüsü yok: bu alanda deprem öncesi çekim bulunamadı.")
         except Exception as e:
-            imagery_notes.append(f"Oncesi goruntusu alinamadi: {type(e).__name__}")
+            imagery_notes.append(f"Öncesi görüntüsü alınamadı: {type(e).__name__}")
 
     imagery_captures = []
     if prov_code == "esri" and wayback_id:
         try:
             imagery_captures = wayback.alan_cekimleri(str(wayback_id), bounds, used_zoom)
         except Exception as e:
-            imagery_notes.append(f"Goruntu cekim tarihi okunamadi: {e}")
+            imagery_notes.append(f"Görüntü çekim tarihi okunamadı: {e}")
     imagery_event_timing = (
         wayback.olay_iliskisi([c["cekimTarihi"] for c in imagery_captures])
         if imagery_captures else "unknown"
@@ -503,19 +503,19 @@ def run_analysis_job(req: dict) -> dict:
         "gsdUyarisi": model_kunyesi.gsd_uyarisi(kunye, used_gsd_m),
     }
     imagery_notes.append(
-        f"Model: {kunye['ad']} ({kunye['agirlik']['sha256'][:12]}), esik {threshold}, "
-        f"guclendirme {damage_booster}, son isleme {post_process_level}"
+        f"Model: {kunye['ad']} ({kunye['agirlik']['sha256'][:12]}), eşik {threshold}, "
+        f"güçlendirme {damage_booster}, son işleme {post_process_level}"
     )
     if model_summary["gsdUyarisi"]:
         gsd = kunye["girdi"]["egitimGsdM"]
         imagery_notes.append(
-            f"Uyari: goruntu {used_gsd_m:.2f} m/piksel, model {gsd[0]}-{gsd[1]} m/piksel ile egitildi (J-20)"
+            f"Uyarı: görüntü {used_gsd_m:.2f} m/piksel, model {gsd[0]}-{gsd[1]} m/piksel ile eğitildi (J-20)"
         )
     if imagery_captures:
         tarihler = ", ".join(sorted({c["cekimTarihi"] or "?" for c in imagery_captures}))
         iliski = {"pre": "deprem oncesi", "post": "deprem sonrasi", "mixed": "karisik",
                   "unknown": "bilinmiyor"}[imagery_event_timing]
-        imagery_notes.append(f"Goruntu cekim tarihi: {tarihler} ({iliski})")
+        imagery_notes.append(f"Görüntü çekim tarihi: {tarihler} ({iliski})")
     # HIZALAMA. Goruntu kaynagi OSM ile oturmuyorsa hasar noktasi komsu sokaga,
     # kapanma yanlis yola yaziliyor. Kayma sahne basina BIR KEZ olculur ve
     # `utils/hizalama.py` tablosundan OKUNUR -- calisma aninda referans goruntu
@@ -541,9 +541,9 @@ def run_analysis_job(req: dict) -> dict:
             "olcum": _kayit["olcum"],
         }
         imagery_notes.append(
-            f"Hizalama: olculen kayma {_buyukluk_m:.1f} m "
-            + (f"uygulandi ({_kayit['ad']})." if _uygula
-               else f"esigin ({hizalama.ESIK_M} m) altinda, uygulanmadi.")
+            f"Hizalama: ölçülen kayma {_buyukluk_m:.1f} m "
+            + (f"uygulandı ({_kayit['ad']})." if _uygula
+               else f"eşiğin ({hizalama.ESIK_M} m) altında, uygulanmadı.")
         )
 
     # Yol bandinin genisligi METREYLE tanimlidir. Once sabit 6 pikseldi; bu,
@@ -561,8 +561,8 @@ def run_analysis_job(req: dict) -> dict:
     yol_katmani_yok = int(road_mask_binary.sum()) == 0
     if yol_katmani_yok:
         imagery_notes.append(
-            "UYARI: OSM yol katmani alinamadi (Overpass); yol kesisimi ve "
-            "'kapali yol' sayilari bu kosuda ANLAMSIZDIR"
+            "UYARI: OSM yol katmanı alınamadı (Overpass); yol kesişimi ve "
+            "'kapalı yol' sayıları bu koşuda ANLAMSIZDIR"
         )
     overpass_ms = (time.perf_counter() - t1) * 1000.0
     t2 = time.perf_counter()
@@ -570,14 +570,14 @@ def run_analysis_job(req: dict) -> dict:
     # Inference dominates the runtime (measured: ~267s of a ~296s job), so it
     # gets the widest slice of the progress bar and is the only stage able to
     # report sub-stage progress -- patch by patch.
-    _report(analysis_id, 25, "Segformer AI modeli calisiyor...")
+    _report(analysis_id, 25, "SegFormer modeli koşuyor…")
     _last_inference_pct = [25]
 
     def _on_inference_patch(done, total):
         pct = 25 + int(65 * done / max(1, total))
         if pct > _last_inference_pct[0]:
             _last_inference_pct[0] = pct
-            _report(analysis_id, pct, f"Segformer AI modeli calisiyor ({done}/{total} parca)")
+            _report(analysis_id, pct, f"SegFormer modeli koşuyor ({done}/{total} parça)")
 
     raw_probs, boosted_probs, pred_mask_binary, intersection, img_np = run_inference(
         img, road_mask_binary, model, device,
@@ -677,15 +677,15 @@ def run_analysis_job(req: dict) -> dict:
         print(f"damage_points insert (road_damage) hatasi: {e}")
 
     log_lines = [
-        "1/4 Uydu goruntusu indirildi",
+        "1/4 Görüntü indirildi",
         source_note,
         *imagery_notes,
-        f"2/4 OSM yol agi cikarildi ({road_pixels} piksel)",
-        "3/4 Segformer modeli ile inference tamamlandi",
-        f"4/4 Analiz tamamlandi - hasar orani: %{damage_rate * 100:.1f}",
+        f"2/4 OSM yol ağı çıkarıldı ({road_pixels} piksel)",
+        "3/4 SegFormer çıkarımı tamamlandı",
+        f"4/4 Analiz tamamlandı, hasar oranı: %{damage_rate * 100:.1f}",
     ]
 
-    _report(analysis_id, 90, "Lojistik / rota analizi yapiliyor...")
+    _report(analysis_id, 90, "Lojistik ve rota analizi yapılıyor…")
     safe_count = 0
     blocked_count = 0
     safe_segments = []
@@ -768,7 +768,7 @@ def run_analysis_job(req: dict) -> dict:
         recommended = ("Bu görüntüde yolu kapatan hasar bulunmadı. Model hasarı eksik bulabilir; "
                        "sahadan doğrulanmadan bölge açık sayılmamalı.")
 
-    _report(analysis_id, 97, "Sonuc gorselleri hazirlaniyor...")
+    _report(analysis_id, 97, "Sonuç görselleri hazırlanıyor…")
     try:
         damage_overlay = build_damage_overlay(img_np, road_mask_binary, pred_mask_binary, intersection)
         segmentation_overlay = build_segmentation_overlay(img_np, pred_mask_binary)

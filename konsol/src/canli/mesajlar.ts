@@ -106,7 +106,7 @@ export function tazelenecekler(m: CanliMesaj): string[][] {
     case 'ihbar':
       return m.hasarKaynagi
         ? [['ihbar'], ['hasar'], ['ozet'], ['isi', m.hasarKaynagi]]
-        : [['ihbar']]
+        : [['ihbar'], ['ozet', 'yogunluk']]
     case 'is-durumu':
       return [['isler']]
     case 'yeni-analiz':

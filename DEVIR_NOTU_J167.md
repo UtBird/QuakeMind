@@ -31,7 +31,10 @@ altında "✅ Düzeltildi" satırıyla.
 dizini, model işçide, metin ekranları yeniden. Kategori kararı gerçek sınama kümesi olmadan
 değiştirilmedi. Ayrıntı ve açık kalanlar `EKSIKLER_VE_SORUNLAR.md` J-170'te.
 
-**Sıradaki iş: Grup E**, sonra F, G. Aşağıdaki sıra geçerli.
+**Grup E yapıldı (18 Kasım, J-171; `rota-ve-grup-e` dalı):** Yol ve rota bağlandı, araç rotası
+kenar tabanlı; zaman şeridi, Nereye kartı, Türkçe metinler, kapsamasız görüntüler.
+
+**Sıradaki iş: Grup F**, sonra G. Aşağıdaki sıra geçerli.
 
 Commit durumu: A, B ve C, J-165 ve J-166 ile birlikte `kamera-analiz-gelistirme` dalında,
 **commit edilmedi** (kullanıcı söyleyince).
@@ -185,7 +188,7 @@ bak (bağımlıysa kırma).
 mahalleyi (nokta-çokgen) bulup kayda eklesin. Konsol ve saha ekranı ham koordinat yerine
 mahalle adını göstersin (koordinat ikincil).
 
-### Grup E — Ölü ve yanıltıcı ekranlar
+### Grup E — Ölü ve yanıltıcı ekranlar — ✅ J-171
 
 **F-3 "Yol ve Rota" sayfası ölü.** Görev ekranındaki rota (J-162) zaten var.
 Ya o ucu bu sayfaya bağla ya da sayfayı menüden kaldır. Hangisi olacağını **kullanıcıya sor**.

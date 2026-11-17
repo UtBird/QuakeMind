@@ -279,7 +279,7 @@ function IlerlemeBolumu() {
 
 /** Ucun aşama adları (sözleşmede yok; ekranda Türkçe yazılır). */
 const ASAMA_ADI: Record<string, string> = {
-  satellite: 'Uydu görüntüsü',
+  satellite: 'Görüntü (drone ya da uydu)',
   roads: 'Yol ağı',
   inference: 'Model çıkarımı',
   logistics: 'Lojistik',

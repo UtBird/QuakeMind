@@ -11,6 +11,7 @@ import { useEkipler, useHasarNoktalari, useIsiIzgarasi, useSosCagrilari } from '
 import { useIhbarlar, type IhbarTuru } from '@/veri/ihbar'
 import { belirsizlikMetni, duzeyAciklamasi, ihbarBelirsizligi, type BelirsizlikCemberi } from '@/veri/metin'
 import { useCozumleme } from '@/durum/cozumlemeDurumu'
+import { haritadanNokta, useRota } from '@/durum/rotaDurumu'
 import { useDepremler, useFaylar, useKapanmalar, useToplanmaAlanlari } from '@/veri/katman'
 import { useSimAlanlar, useSimMaske, useSimSonuc } from '@/veri/simulasyon'
 import { useSimulasyon } from '@/durum/simulasyonDurumu'
@@ -349,6 +350,8 @@ function KatmanKopru() {
   useEffect(() => {
     if (!hazir) return
     tiklamaYaz((bilgi) => {
+      // Yol ve rota modunda nokta seçimi açıksa tıklama noktayı seçer (J-171).
+      if (bilgi.coordinate && haritadanNokta(bilgi.coordinate[0], bilgi.coordinate[1])) return
       const nesne = bilgi.object as { id?: string; lon?: number; lat?: number } | undefined
       const katman = bilgi.layer?.id
       if (!nesne || nesne.lon == null || nesne.lat == null) return
@@ -414,6 +417,28 @@ function KatmanKopru() {
     return null
   }, [seciliKayit, ihbar.data, deneme, tanim.id])
 
+  // Yol ve rota (J-171): yalnız o modda çizilir.
+  const rotaBas = useRota((d) => d.bas)
+  const rotaHedef = useRota((d) => d.hedef)
+  const rotaSonuc = useRota((d) => d.sonuc)
+  const rotaKiyas = useRota((d) => d.kiyas)
+  const rotaAdaylar = useRota((d) => d.adaylar)
+  const guzergah = useMemo(() => {
+    if (tanim.id !== 'yol') return null
+    const seciliRota = rotaSonuc?.rota ?? null
+    return {
+      ana: seciliRota,
+      kiyas: rotaKiyas && rotaKiyas.mesafeM !== rotaSonuc?.mesafeM ? rotaKiyas.rota : null,
+      adaylar: (rotaAdaylar ?? []).map((a) => a.rota).filter((r) => r !== seciliRota),
+      bas: rotaBas ? ([rotaBas.lon, rotaBas.lat] as [number, number]) : null,
+      hedef: rotaHedef
+        ? ([rotaHedef.lon, rotaHedef.lat] as [number, number])
+        : rotaSonuc && rotaAdaylar
+          ? (rotaSonuc.rota[rotaSonuc.rota.length - 1] ?? null)
+          : null,
+    }
+  }, [tanim.id, rotaBas, rotaHedef, rotaSonuc, rotaKiyas, rotaAdaylar])
+
   const deckKatmanlari = useMemo(
     () =>
       katmanlariKur({
@@ -431,6 +456,7 @@ function KatmanKopru() {
         ihbarTurleri: MOD_IHBARLARI[tanim.id],
         seciliIhbar: seciliKayit?.tip === 'ihbar' ? seciliKayit.id : null,
         belirsizlik,
+        guzergah,
         secim: { kutu: secimKutusu, cokgen: secimCokgeni, taslak: secimTaslagi },
         goruntu: analizKarosu,
         analiz: segmentler.data ?? null,
@@ -456,6 +482,7 @@ function KatmanKopru() {
       ekipler.data,
       seciliKayit,
       belirsizlik,
+      guzergah,
       secimKutusu,
       secimCokgeni,
       secimTaslagi,

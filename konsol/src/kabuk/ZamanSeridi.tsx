@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Amac, HazirSecenekler, SuAn } from './Panel'
 import { Micro } from './parcalar'
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/durum/zamanDurumu'
 import { sure, tarihSaat } from '@/lib/bicim'
 import { sn } from '@/lib/sinif'
+import { useOlayYogunlugu } from '@/veri/yogunluk'
 
 /* Zaman şeridi — ARAYUZ §10.
    Pencere HER ŞEYİ süzer. Varsayılan canlı; şerit geri çekilince geçmişe düşer;
@@ -33,6 +34,7 @@ export function ZamanSeridi() {
 
   const seritBaslangic = simdi - SERIT_UZUNLUGU
   const oran = (t: number) => ((t - seritBaslangic) / SERIT_UZUNLUGU) * 100
+  const yogunluk = useOlayYogunlugu(seritBaslangic)
 
   // Oynat: yalnız geçmiş modunda ilerler.
   useEffect(() => {
@@ -111,12 +113,22 @@ export function ZamanSeridi() {
         }}
         className="relative min-h-0 flex-1 cursor-ew-resize touch-none rounded-badge bg-sunken"
       >
-        {/* Histogram burada çizilecek: saat başına olay sayısı.
-            Veri yok, bu yüzden boş çizgi ve açık bir not bırakılıyor (kural 1). */}
+        {/* Saat başına SOS ve ihbar sayısı (J-167 F-4). */}
         <div aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-line-2" />
-        <span className="pointer-events-none absolute inset-0 grid place-items-center text-small text-ink-3">
-          Olay yoğunluğu için veri yok — canlı akış bağlanınca şerit dolacak.
-        </span>
+        <Histogram veri={yogunluk.data} seritBaslangic={seritBaslangic} />
+        {yogunluk.isError ? (
+          <span className="pointer-events-none absolute inset-0 grid place-items-center text-small text-ink-3">
+            Olay yoğunluğu alınamadı.
+          </span>
+        ) : (
+          yogunluk.data &&
+          !yogunluk.data.sos.some(Boolean) &&
+          !yogunluk.data.ihbar.some(Boolean) && (
+            <span className="pointer-events-none absolute inset-0 grid place-items-center text-small text-ink-3">
+              Son 30 günde SOS ya da ihbar yok.
+            </span>
+          )
+        )}
         <div
           aria-hidden
           className={sn(
@@ -130,7 +142,11 @@ export function ZamanSeridi() {
       </div>
 
       <div className="flex items-baseline justify-between gap-3">
-        <Amac>Şeridi geri çekince geçmişe bakarsın; bıraktığında canlıya dönmek tek tıktır.</Amac>
+        <Amac>
+          Şeridi geri çekince geçmişe bakarsın; bıraktığında canlıya dönmek tek tıktır. Çubuklar saat
+          başına{' '}
+          <span className="text-ihbar-sos">SOS</span> ve <span className="text-ink-2">ihbar</span> sayısı.
+        </Amac>
         <SuAn>
           {canli
             ? `Canlı: son ${sure(uzunluk)} gösteriliyor, pencere saatle birlikte kayıyor.`
@@ -138,5 +154,48 @@ export function ZamanSeridi() {
         </SuAn>
       </div>
     </section>
+  )
+}
+
+/** Saat başına yığılmış çubuklar: altta SOS, üstte ihbar. En yoğun saat şeridi doldurur. */
+function Histogram({
+  veri,
+  seritBaslangic,
+}: {
+  veri: { baslangic: number; dilimSn: number; sos: number[]; ihbar: number[] } | undefined
+  seritBaslangic: number
+}) {
+  const cubuklar = useMemo(() => {
+    if (!veri) return null
+    const enCok = Math.max(1, ...veri.sos.map((s, i) => s + (veri.ihbar[i] ?? 0)))
+    const dilimMs = veri.dilimSn * 1000
+    return veri.sos.map((s, i) => {
+      const x = ((veri.baslangic * 1000 + i * dilimMs - seritBaslangic) / SERIT_UZUNLUGU) * 1000
+      // Saatlik çubuk ~2 px; en az ~4 px çizilir ki tek saatlik olay görünsün.
+      const w = Math.max((dilimMs / SERIT_UZUNLUGU) * 1000, 3)
+      const hs = (s / enCok) * 100
+      const hi = ((veri.ihbar[i] ?? 0) / enCok) * 100
+      return { x, w, hs, hi, i }
+    })
+  }, [veri, seritBaslangic])
+  if (!cubuklar) return null
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 1000 100"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-0 h-full w-full"
+    >
+      {cubuklar.map((c) =>
+        c.hs + c.hi > 0 ? (
+          <g key={c.i}>
+            {c.hs > 0 && <rect x={c.x} width={c.w} y={100 - c.hs} height={c.hs} fill="var(--color-ihbar-sos)" />}
+            {c.hi > 0 && (
+              <rect x={c.x} width={c.w} y={100 - c.hs - c.hi} height={c.hi} fill="var(--color-ink-3)" />
+            )}
+          </g>
+        ) : null,
+      )}
+    </svg>
   )
 }

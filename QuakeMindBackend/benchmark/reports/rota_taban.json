@@ -1,0 +1,155 @@
+{
+ "motor": "dugum tabanli Dijkstra (J-55)",
+ "olcum": "2026-11-17 23:38",
+ "yasakUyumu": {
+  "denenen": 49,
+  "rotaYok": 0,
+  "kavsaktanGecmedi": 21,
+  "uydu": 12,
+  "ihlal": 16,
+  "ihlaller": [
+   {
+    "tur": "no_left_turn",
+    "kavsak": [
+     37.3516824,
+     37.0825852
+    ]
+   },
+   {
+    "tur": "no_right_turn",
+    "kavsak": [
+     38.2742242,
+     38.3448664
+    ]
+   },
+   {
+    "tur": "no_left_turn",
+    "kavsak": [
+     38.2743438,
+     38.3445252
+    ]
+   },
+   {
+    "tur": "no_left_turn",
+    "kavsak": [
+     38.2745093,
+     38.3445681
+    ]
+   },
+   {
+    "tur": "no_right_turn",
+    "kavsak": [
+     38.2742648,
+     38.3447163
+    ]
+   },
+   {
+    "tur": "no_left_turn",
+    "kavsak": [
+     38.2744952,
+     38.3449302
+    ]
+   },
+   {
+    "tur": "no_left_turn",
+    "kavsak": [
+     38.2745113,
+     38.3447086
+    ]
+   },
+   {
+    "tur": "no_right_turn",
+    "kavsak": [
+     36.1488271,
+     36.1722473
+    ]
+   },
+   {
+    "tur": "no_right_turn",
+    "kavsak": [
+     37.3952356,
+     37.0735109
+    ]
+   },
+   {
+    "tur": "no_left_turn",
+    "kavsak": [
+     37.3809085,
+     37.0474012
+    ]
+   },
+   {
+    "tur": "no_left_turn",
+    "kavsak": [
+     38.2742648,
+     38.3447163
+    ]
+   },
+   {
+    "tur": "no_left_turn",
+    "kavsak": [
+     38.2742242,
+     38.3448664
+    ]
+   },
+   {
+    "tur": "no_right_turn",
+    "kavsak": [
+     38.2556462,
+     38.3402359
+    ]
+   },
+   {
+    "tur": "no_left_turn",
+    "kavsak": [
+     36.159694,
+     36.2109636
+    ]
+   },
+   {
+    "tur": "no_left_turn",
+    "kavsak": [
+     36.1595686,
+     36.210919
+    ]
+   },
+   {
+    "tur": "no_left_turn",
+    "kavsak": [
+     36.159694,
+     36.2109636
+    ]
+   }
+  ]
+ },
+ "oturtma": {
+  "antakya": {
+   "nokta": 214,
+   "fazlaMOrtanca": 4.2,
+   "fazlaMYuzde95": 23.0,
+   "30mUstuOran": 0.037
+  },
+  "antep": {
+   "nokta": 233,
+   "fazlaMOrtanca": 3.9,
+   "fazlaMYuzde95": 38.5,
+   "30mUstuOran": 0.073
+  }
+ },
+ "hiz": {
+  "antakya": {
+   "istek": 40,
+   "rotaBulundu": 39,
+   "aramaMsOrtanca": 22.9,
+   "aramaMsEnCok": 33.3,
+   "rotaMsOrtanca": 1.5
+  },
+  "genel": {
+   "istek": 10,
+   "rotaBulundu": 10,
+   "aramaMsOrtanca": 129.5,
+   "aramaMsEnCok": 1534.4,
+   "rotaMsOrtanca": 9.1
+  }
+ }
+}

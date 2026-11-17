@@ -219,6 +219,14 @@ export type KatmanGirdisi = {
       cihaz konumunun sapabileceği alan. `nokta`: kayıt haritada başka katmanda
       yoksa (konsoldaki deneme analizi) merkezi de çizilir. */
   belirsizlik?: KonumBelirsizligi | null
+  /** Yol ve rota modu (J-171): seçilen rota, kaçınmadan kıyası, öteki adaylar ve uçlar. [boylam, enlem] */
+  guzergah?: {
+    ana: [number, number][] | null
+    kiyas: [number, number][] | null
+    adaylar: [number, number][][]
+    bas: [number, number] | null
+    hedef: [number, number] | null
+  } | null
   /** Soldan seçilen görüntü kaynağının karosu (Hasar analizi modu). */
   goruntu?: { url: string; kunye: string; ortuculuk?: number } | null
   /** Bitmiş hasar analizinin yol geometrisi. */
@@ -601,6 +609,86 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
       pickable: true,
     }),
   )
+
+  // Rota (J-171): kaçınmasız kıyas kesik ve sönük, öteki adaylar sönük, seçilen
+  // rota koyu kenarlı vurgu çizgisi; uçlar en üstte.
+  const gz = g.guzergah
+  if (gz) {
+    const vurgu = tokenRenk('--color-accent')
+    const soluk = tokenRenk('--color-ink-3')
+    const zemin = tokenRenk('--color-ground')
+    if (gz.kiyas?.length) {
+      L.push(
+        new PathLayer<{ p: [number, number][] }, { getDashArray: [number, number] }>({
+          id: 'guzergah-kiyas',
+          data: [{ p: gz.kiyas }],
+          getPath: (d) => d.p,
+          getColor: [...soluk, 200],
+          getWidth: 3,
+          widthUnits: 'pixels',
+          getDashArray: [5, 4],
+          extensions: [KESIK],
+        }),
+      )
+    }
+    if (gz.adaylar.length) {
+      L.push(
+        new PathLayer<{ p: [number, number][] }>({
+          id: 'guzergah-adaylar',
+          data: gz.adaylar.map((p) => ({ p })),
+          getPath: (d) => d.p,
+          getColor: [...soluk, 150],
+          getWidth: 3,
+          widthUnits: 'pixels',
+          capRounded: true,
+          jointRounded: true,
+        }),
+      )
+    }
+    if (gz.ana?.length) {
+      L.push(
+        new PathLayer<{ p: [number, number][] }>({
+          id: 'guzergah-kenar',
+          data: [{ p: gz.ana }],
+          getPath: (d) => d.p,
+          getColor: [...zemin, 230],
+          getWidth: 8,
+          widthUnits: 'pixels',
+          capRounded: true,
+          jointRounded: true,
+        }),
+        new PathLayer<{ p: [number, number][] }>({
+          id: 'guzergah',
+          data: [{ p: gz.ana }],
+          getPath: (d) => d.p,
+          getColor: [...vurgu, 255],
+          getWidth: 4.5,
+          widthUnits: 'pixels',
+          capRounded: true,
+          jointRounded: true,
+        }),
+      )
+    }
+    const uclar = [
+      ...(gz.bas ? [{ p: gz.bas, bas: true }] : []),
+      ...(gz.hedef ? [{ p: gz.hedef, bas: false }] : []),
+    ]
+    if (uclar.length) {
+      L.push(
+        new ScatterplotLayer<{ p: [number, number]; bas: boolean }>({
+          id: 'guzergah-uclari',
+          data: uclar,
+          getPosition: (d) => d.p,
+          getRadius: 8,
+          radiusUnits: 'pixels',
+          getFillColor: (d) => (d.bas ? [...vurgu, 255] : [232, 236, 244, 255]),
+          stroked: true,
+          lineWidthMinPixels: 2,
+          getLineColor: [...zemin, 255],
+        }),
+      )
+    }
+  }
 
   // Seçim şekilleri en üstte: veri katmanlarını gizlemesin diye içi çok soluk,
   // kenarı vurgu renginde.

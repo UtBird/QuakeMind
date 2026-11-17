@@ -27,6 +27,7 @@ from uclar import (
     genel,
     gorev,
     goruntu,
+    guzergah,
     hasar_analiz,
     ihbar,
     islem,
@@ -40,6 +41,7 @@ from uclar import (
     simulasyon,
     sozlesme,
     yerler,
+    zaman,
 )
 
 # API belgeleri (/docs, /redoc, /openapi.json) varsayilan KAPALI (J-167 S-4):
@@ -80,6 +82,8 @@ for modul in (
     simulasyon,
     goruntu,
     islem,
+    guzergah,
+    zaman,
 ):
     app.include_router(modul.yonlendirici)
 
