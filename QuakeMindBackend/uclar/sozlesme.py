@@ -19,7 +19,7 @@ import json
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 import canli_yayin
@@ -94,6 +94,9 @@ def _sos_cikti(k: dict) -> dict:
         "konumDogrulukM": ek.get("konumDogrulukM"),
         # False: afetzede durum secmeden SOS'a basti (tek dokunus, J-50).
         "durumSecildi": ek.get("durumSecildi"),
+        # Acik cagri yeniden gonderildiyse (J-167 S-2): kac kez, en son ne zaman.
+        "guncellemeSayisi": ek.get("guncellemeSayisi") or 0,
+        "sonGuncelleme": _ms(ek["sonGuncelleme"]) if ek.get("sonGuncelleme") else None,
     }
 
 
@@ -152,6 +155,9 @@ def sos_listesi(
     kayitlar = aktif_depo().sos_listele(
         baslangic=_sn(baslangic), bitis=_sn(bitis), durum=durum, kullanici_id=kendi
     )
+    import islem_kaydi
+
+    islem_kaydi.goruntuleme(kul, "sos_listesi", ayrinti={"kayitSayisi": len(kayitlar), "durum": durum})
     # Hangi ekip, kac kisiyle, hangi asamada (J-54). Afetzede kendi cagrisina
     # giden ekibin adini, kisi sayisini ve gorev acikken konumunu gorur; kimin
     # atadigini ve ic notu gormez.
@@ -159,7 +165,15 @@ def sos_listesi(
 
 
 @yonlendirici.post("/sos", status_code=201)
-def sos_ac(istek: SosIstegi, kul: dict = Depends(kimlik.kullanici)):
+def sos_ac(
+    istek: SosIstegi,
+    yanit: Response,
+    http: Request,
+    kul: dict = Depends(kimlik.kullanici),
+):
+    """Hesap basina tek acik SOS (J-167 S-2): acik cagrin varken yeniden basarsan
+    yeni satir acilmaz, o cagri guncellenir ve 200 doner (yeni cagri 201).
+    Ayrica hesap ve adres basina dakikalik sinir (429)."""
     if not (-90.0 <= istek.lat <= 90.0) or not (-180.0 <= istek.lon <= 180.0):
         raise HTTPException(status_code=422, detail="Gecersiz koordinat.")
     if istek.oncelik not in ("kritik", "yuksek", "orta"):
@@ -176,8 +190,11 @@ def sos_ac(istek: SosIstegi, kul: dict = Depends(kimlik.kullanici)):
         "durumSecildi": istek.durumSecildi,
     }.items() if v is not None}
 
+    import hiz_siniri
+
+    hiz_siniri.sos_kontrol(kul["id"], hiz_siniri.istemci_ip(http))
     depo = aktif_depo()
-    kayit = depo.sos_ekle(
+    kayit, guncellendi = depo.sos_ac_ya_da_guncelle(
         lon=istek.lon,
         lat=istek.lat,
         oncelik=istek.oncelik,
@@ -187,6 +204,12 @@ def sos_ac(istek: SosIstegi, kul: dict = Depends(kimlik.kullanici)):
         kanal=istek.kanal,
         ek=ek or None,
     )
+    if guncellendi:
+        # Isi haritasi ve kuyruk kisiyi bir kez sayar: yeni nokta yazilmaz.
+        yanit.status_code = 200
+        canli_yayin.yayinla("yeni-sos", id=kayit["id"], durum=kayit["durum"])
+        cikti = gorevleri_ekle("sos", [kayit], [_sos_cikti(kayit)], afetzede=kul["rol"] == "afetzede")[0]
+        return {**cikti, "guncellendi": True}
     # Cagri ayni zamanda ortak sozlesmeye bir nokta olarak duser: birlesik isi
     # haritasinin "SOS" kanali bu noktalardan beslenir.
     depo.hasar_ekle(
@@ -246,6 +269,9 @@ def sos_ata(
     except GorevHatasi as h:
         raise hata_http(h) from h
     gorev_yayinla(g)
+    from uclar.gorev import _gorev_kaydi
+
+    _gorev_kaydi(kul, "sevk", g, "ekip gönderildi (eski atama ucu)")
     return _sos_tam(depo.sos_bul(sos_id))
 
 
@@ -262,6 +288,18 @@ def sos_kapat(sos_id: str, kul: dict = Depends(kimlik.rol_gerektir(*SAHA_VE_USTU
     canli_yayin.yayinla("yeni-sos", id=sos_id, durum="kapandi")
     for gorev_id in biten:
         gorev_yayinla(depo.gorev_bul(gorev_id), "kapandi")
+    import islem_kaydi
+
+    cagri = depo.sos_bul(sos_id) or {}
+    islem_kaydi.kaydet(
+        kul,
+        "sos_kapatildi",
+        f"SOS kapatıldı: {cagri.get('mahalle') or 'mahalle bilinmiyor'}"
+        + (f", {len(biten)} açık görev bitti" if biten else ""),
+        hedef_tur="sos",
+        hedef_id=sos_id,
+        ayrinti={"bitenGorevler": biten, "oncelik": cagri.get("oncelik")},
+    )
     return _sos_tam(depo.sos_bul(sos_id))
 
 
@@ -285,6 +323,32 @@ def en_yakin_ekip(sos_id: str, _kul: dict = Depends(kimlik.rol_gerektir(*SAHA_VE
 
 # --- ekipler ---------------------------------------------------------------
 
+EKIP_ALAN_ADI = {"ad": "ad", "kurum": "kurum", "tur": "tür", "kisi_sayisi": "kişi sayısı", "durum": "durum"}
+
+
+def _ekip_degisti_kaydi(kul: dict, ekip_id: str, onceki: Optional[dict], sonra: Optional[dict]) -> None:
+    """Yalniz degisen alanlar yazilir; hicbiri degismediyse kayit yok (J-165)."""
+    import islem_kaydi
+
+    if sonra is None:
+        return
+    if onceki is None:
+        islem_kaydi.kaydet(
+            kul, "ekip_eklendi", f"Ekip eklendi: {sonra['ad']}",
+            hedef_tur="ekip", hedef_id=ekip_id,
+            ayrinti={k: sonra.get(k) for k in EKIP_ALAN_ADI},
+        )
+        return
+    farklar = {k: [onceki.get(k), sonra.get(k)] for k in EKIP_ALAN_ADI if onceki.get(k) != sonra.get(k)}
+    if not farklar:
+        return
+    metin = ", ".join(f"{EKIP_ALAN_ADI[k]} {a if a is not None else '—'} → {b if b is not None else '—'}" for k, (a, b) in farklar.items())
+    islem_kaydi.kaydet(
+        kul, "ekip_degisti", f"{sonra['ad']} güncellendi: {metin}",
+        hedef_tur="ekip", hedef_id=ekip_id, ayrinti={"degisen": farklar},
+    )
+
+
 class EkipIstegi(BaseModel):
     """Ekip tanimi (J-54). Kurum, tur ve kisi sayisi sevkte "kac kisi, hangi
     ekip" sorusunun cevabidir. `id` yalniz eski PUT cagrilari icin var."""
@@ -302,6 +366,8 @@ class EkipIstegi(BaseModel):
 class KonumIstegi(BaseModel):
     lon: float
     lat: float
+    # Telefonun bildirdigi dogruluk (m); gecmiste saklanir (J-166).
+    dogrulukM: Optional[float] = Field(None, ge=0, le=100000)
 
 
 class UyelerIstegi(BaseModel):
@@ -333,7 +399,7 @@ def ekipler(_kul: dict = Depends(kimlik.rol_gerektir(*SAHA_VE_USTU))):
 
 
 @yonlendirici.post("/ekipler", status_code=201)
-def ekip_ekle(istek: EkipIstegi, _kul: dict = Depends(kimlik.rol_gerektir(*KOORDINASYON))):
+def ekip_ekle(istek: EkipIstegi, kul: dict = Depends(kimlik.rol_gerektir(*KOORDINASYON))):
     _ekip_dogrula(istek)
     kayit = aktif_depo().ekip_olustur(
         ad=istek.ad.strip(),
@@ -344,6 +410,14 @@ def ekip_ekle(istek: EkipIstegi, _kul: dict = Depends(kimlik.rol_gerektir(*KOORD
         lat=istek.lat,
     )
     canli_yayin.yayinla("ekip-konumu", ekipId=kayit["id"], lon=kayit["lon"], lat=kayit["lat"])
+    import islem_kaydi
+
+    islem_kaydi.kaydet(
+        kul, "ekip_eklendi",
+        f"Ekip eklendi: {kayit['ad']}" + (f" ({kayit.get('kurum')})" if kayit.get("kurum") else ""),
+        hedef_tur="ekip", hedef_id=kayit["id"],
+        ayrinti={k: kayit.get(k) for k in ("ad", "kurum", "tur", "kisi_sayisi", "durum")},
+    )
     return _tek_ekip(kayit["id"])
 
 
@@ -360,12 +434,13 @@ def uye_adaylari(_kul: dict = Depends(kimlik.rol_gerektir(*KOORDINASYON))):
 def ekip_kaydet(
     ekip_id: str,
     istek: EkipIstegi,
-    _kul: dict = Depends(kimlik.rol_gerektir(*KOORDINASYON)),
+    kul: dict = Depends(kimlik.rol_gerektir(*KOORDINASYON)),
 ):
     """Ekibi acar ya da gunceller. Konum verilmezse eski konum korunur.
     Gorevdeki ekip hizmet disi yapilamaz: once gorev bitmeli."""
     _ekip_dogrula(istek)
     depo = aktif_depo()
+    onceki = depo.ekip_bul(ekip_id)
     if istek.durum == "hizmet-disi" and depo.ekibin_acik_gorevi(ekip_id) is not None:
         raise HTTPException(
             status_code=409, detail="Ekip görevde; önce görevi bitir ya da iptal et."
@@ -381,6 +456,7 @@ def ekip_kaydet(
         kisi_sayisi=istek.kisiSayisi,
     )
     canli_yayin.yayinla("ekip-konumu", ekipId=ekip_id, lon=istek.lon, lat=istek.lat)
+    _ekip_degisti_kaydi(kul, ekip_id, onceki, depo.ekip_bul(ekip_id))
     return _tek_ekip(ekip_id)
 
 
@@ -388,7 +464,7 @@ def ekip_kaydet(
 def ekip_uyeleri(
     ekip_id: str,
     istek: UyelerIstegi,
-    _kul: dict = Depends(kimlik.rol_gerektir(*KOORDINASYON)),
+    kul: dict = Depends(kimlik.rol_gerektir(*KOORDINASYON)),
 ):
     """Saha hesaplarini ekibe baglar: bagli kisi o ekibin gorevini kendi
     telefonundan gunceller. Baska ekipteki kisi oradan cikar."""
@@ -398,8 +474,26 @@ def ekip_uyeleri(
     saha = {u["id"] for u in depo.saha_kullanicilari()}
     if any(k not in saha for k in istek.kullaniciIdleri):
         raise HTTPException(status_code=422, detail="Yalnız saha ekibi hesapları ekibe bağlanır.")
+    saha_hesaplari = depo.saha_kullanicilari()
+    onceki_uyeler = {u["id"] for u in saha_hesaplari if u.get("ekip_id") == ekip_id}
+    adlar = {u["id"]: u.get("ad_soyad") or u.get("eposta") for u in saha_hesaplari}
     depo.ekip_uyelerini_ayarla(ekip_id, list(dict.fromkeys(istek.kullaniciIdleri)))
     canli_yayin.yayinla("ekip-konumu", ekipId=ekip_id)
+    yeni_uyeler = set(istek.kullaniciIdleri)
+    eklenen, cikan = sorted(yeni_uyeler - onceki_uyeler), sorted(onceki_uyeler - yeni_uyeler)
+    if eklenen or cikan:
+        import islem_kaydi
+
+        ekip = depo.ekip_bul(ekip_id) or {}
+        parcalar = []
+        if eklenen:
+            parcalar.append("eklendi: " + ", ".join(adlar.get(k) or k for k in eklenen))
+        if cikan:
+            parcalar.append("çıkarıldı: " + ", ".join(adlar.get(k) or k for k in cikan))
+        islem_kaydi.kaydet(
+            kul, "ekip_uyeleri", f"{ekip.get('ad') or ekip_id} hesapları · " + "; ".join(parcalar),
+            hedef_tur="ekip", hedef_id=ekip_id, ayrinti={"eklenen": eklenen, "cikan": cikan},
+        )
     return _tek_ekip(ekip_id)
 
 
@@ -419,9 +513,55 @@ def ekip_konum(
     if not (-90.0 <= istek.lat <= 90.0 and -180.0 <= istek.lon <= 180.0):
         raise HTTPException(status_code=422, detail="Gecersiz koordinat.")
     _yetki(kul, ekip_id)
-    depo.ekip_konum(ekip_id, istek.lon, istek.lat)
+    # J-166: her nokta silinmeyen konum gecmisine de yazilir, gonderenle.
+    onceki = depo.ekip_konum(ekip_id, istek.lon, istek.lat, gonderen=kul, dogruluk_m=istek.dogrulukM)
+    # Islem kaydina her nokta degil, paylasimin basladigi an duser.
+    if onceki is None or time.time() - onceki > PAYLASIM_ARASI_SN:
+        import islem_kaydi
+
+        ekip = depo.ekip_bul(ekip_id) or {}
+        islem_kaydi.kaydet(
+            kul,
+            "konum_paylasimi_basladi",
+            f"{ekip.get('ad') or ekip_id}: konum paylaşımı başladı",
+            hedef_tur="ekip",
+            hedef_id=ekip_id,
+            ayrinti={"oncekiNoktaDk": None if onceki is None else round((time.time() - onceki) / 60)},
+        )
     canli_yayin.yayinla("ekip-konumu", ekipId=ekip_id, lon=istek.lon, lat=istek.lat)
     return _tek_ekip(ekip_id)
+
+
+#: Bu sureden uzun ara verilen konum paylasimi yeniden "basladi" sayilir.
+PAYLASIM_ARASI_SN = 15 * 60
+
+
+@yonlendirici.get("/ekipler/{ekip_id}/konum-gecmisi")
+def ekip_konum_gecmisi(
+    ekip_id: str,
+    baslangic: Optional[float] = None,
+    bitis: Optional[float] = None,
+    sinir: int = 5000,
+    kul: dict = Depends(kimlik.rol_gerektir(*KOORDINASYON)),
+):
+    """Ekibin bildirdigi konumlar, eskiden yeniye (J-166). Zaman ms."""
+    import islem_kaydi
+
+    depo = aktif_depo()
+    if depo.ekip_bul(ekip_id) is None:
+        raise HTTPException(status_code=404, detail="Ekip bulunamadi.")
+    noktalar = depo.ekip_konum_gecmisi(
+        ekip_id, baslangic=_sn(baslangic), bitis=_sn(bitis), sinir=max(1, min(sinir, 20000))
+    )
+    islem_kaydi.goruntuleme(kul, "konum_gecmisi", hedef_tur="ekip", hedef_id=ekip_id,
+                            ayrinti={"noktaSayisi": len(noktalar)})
+    return [
+        {
+            "lon": n["lon"], "lat": n["lat"], "dogrulukM": n["dogruluk_m"],
+            "zaman": _ms(n["zaman"]), "gonderenAd": n["gonderen_ad"], "gonderenRol": n["gonderen_rol"],
+        }
+        for n in noktalar
+    ]
 
 
 # --- ozet ------------------------------------------------------------------

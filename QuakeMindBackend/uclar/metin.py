@@ -41,16 +41,42 @@ yonlendirici = APIRouter()
 
 
 @yonlendirici.post("/api/nlp/analyze")
-def analyze_nlp(req: ck.NLPRequest, _kul: dict = Depends(kimlik.rol_gerektir("saha", "koordinator", "yonetici"))):
+def analyze_nlp(req: ck.NLPRequest, kul: dict = Depends(kimlik.rol_gerektir("saha", "koordinator", "yonetici"))):
+    import islem_kaydi
+
     pipeline = ck._get_nlp_pipeline()
     if not pipeline:
         raise HTTPException(status_code=503, detail="NLP model is not loaded.")
 
     try:
+        t0 = time.perf_counter()
         with ck.temporary_sys_path(ck.NLP_ROOT), ck.temporary_cwd(ck.NLP_ROOT):
             result = pipeline.process_tweet(req.text)
+        sure_ms = round((time.perf_counter() - t0) * 1000)
+        # Islem kaydi (J-165): metnin ilk 500 karakteri ve modelin karari.
         if not result:
+            islem_kaydi.kaydet(
+                kul, "metin_analizi", "Metin analizi: afetle ilgisiz bulundu",
+                ayrinti={"metin": req.text[:500], "ilgili": False, "sureMs": sure_ms},
+            )
             return {"status": "ignored", "reason": "Not related to disaster"}
+        islem_kaydi.kaydet(
+            kul,
+            "metin_analizi",
+            f"Metin analizi: {result.get('kategori') or 'kategori yok'}"
+            + (f", aciliyet {result.get('aciliyet')}" if result.get("aciliyet") is not None else "")
+            + (f", konum: {result.get('konum_metin')}" if result.get("konum_metin") else ", konum bulunamadı"),
+            ayrinti={
+                "metin": req.text[:500],
+                "ilgili": True,
+                "kategori": result.get("kategori"),
+                "aciliyet": result.get("aciliyet"),
+                "guven": result.get("guven_skoru"),
+                "konumMetin": result.get("konum_metin"),
+                "konum": result.get("konum"),
+                "sureMs": sure_ms,
+            },
+        )
 
         konum = result.get("konum")
         if konum and len(konum) == 2:

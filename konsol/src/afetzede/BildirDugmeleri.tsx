@@ -23,6 +23,8 @@ export function BildirDugmeleri({ ac }: { ac: (tur: IhbarTuru) => void }) {
           <button
             key={d.tur}
             type="button"
+            // Ekran okuyucuya açık ad (J-167 U-6): kart içinde birkaç metin parçası var.
+            aria-label={`${d.baslik}: ${d.alt}`}
             onClick={() => ac(d.tur)}
             className={sn(
               'group flex min-h-20 items-center gap-3 rounded-panel border border-line border-l-4 bg-panel px-3 py-2.5 text-left hover:bg-raised',

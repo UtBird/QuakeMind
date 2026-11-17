@@ -154,8 +154,13 @@ def road_damage_oam_search(
     return {"images": images}
 
 
+def _yapan(kul: dict) -> dict:
+    """Is kaydinda saklanacak kadari: kimlik, ad, rol (sifre ozeti degil)."""
+    return {"id": kul.get("id"), "ad_soyad": kul.get("ad_soyad"), "rol": kul.get("rol")}
+
+
 @yonlendirici.post("/api/road_damage/analyze", status_code=202)
-def analyze_road_damage(req: ck.RoadDamageRequest, _kul: dict = Depends(kimlik.rol_gerektir("saha", "koordinator", "yonetici"))):
+def analyze_road_damage(req: ck.RoadDamageRequest, kul: dict = Depends(kimlik.rol_gerektir("saha", "koordinator", "yonetici"))):
     """Kicks off a road-damage analysis on the dedicated ProcessPoolExecutor
     and returns immediately with a job id -- the actual Segformer inference
     (CPU-bound, can take minutes) used to run inline here and freeze every
@@ -180,7 +185,29 @@ def analyze_road_damage(req: ck.RoadDamageRequest, _kul: dict = Depends(kimlik.r
         "createdAt": time.time(),
         "progress": 0,
         "progressMessage": "Sirada bekliyor...",
+        # Bitince _on_road_damage_job_done kim baslattiysa onun adina yazar (J-165).
+        "islemKaydi": {"onek": "hasar_analizi", "yapan": _yapan(kul)},
     })
+
+    import islem_kaydi
+
+    bbox = [req.bboxWest, req.bboxSouth, req.bboxEast, req.bboxNorth]
+    islem_kaydi.kaydet(
+        kul,
+        "hasar_analizi_basladi",
+        f"Hasar analizi başladı: {req.city}"
+        + (f", görüntü: {req.oamPreferredTitle}" if req.oamPreferredTitle else f", kaynak: {req.source}"),
+        hedef_tur="analiz",
+        hedef_id=analysis_id,
+        ayrinti={
+            "sehir": req.city,
+            "kaynak": req.source,
+            "goruntu": req.oamPreferredTitle,
+            "kutu": bbox if all(v is not None for v in bbox) else None,
+            "model": req.modelAdi,
+            "yakinCekim": getattr(req, "yakinCekim", False),
+        },
+    )
 
     future = ck.road_damage_pool.submit(road_damage_worker.run_analysis_job, req_dict)
     future.add_done_callback(functools.partial(ck._on_road_damage_job_done, analysis_id))

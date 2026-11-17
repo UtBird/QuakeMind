@@ -14,10 +14,12 @@ from __future__ import annotations
 import secrets
 from typing import Optional
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 import canli_yayin
+import hiz_siniri
+import islem_kaydi
 import kimlik
 from depo import aktif_depo
 
@@ -83,18 +85,43 @@ def _profil(kayit: dict) -> dict:
 
 
 @yonlendirici.post("/kayit", status_code=201)
-def kayit(istek: KayitIstegi, yanit: Response):
+def kayit(istek: KayitIstegi, yanit: Response, http: Request):
+    ip = hiz_siniri.istemci_ip(http)
+    hiz_siniri.kayit_kontrol(ip)  # J-167 S-2: hesap acarak sel
     kayit_edilen = kimlik.kullanici_kaydet(istek.eposta, istek.adSoyad, istek.sifre)
+    hiz_siniri.kayit_oldu(ip)
     # Kayit ayni zamanda ilk giristir; yazilmazsa liste "hic girmedi" der.
     aktif_depo().giris_isle(kayit_edilen["id"])
     erisim = kimlik.oturum_baslat(kayit_edilen, yanit)
+    islem_kaydi.kaydet(
+        kayit_edilen, "kayit_oldu", f"Hesap açtı ve giriş yaptı: {kayit_edilen.get('eposta')}",
+        hedef_tur="kullanici", hedef_id=kayit_edilen["id"], ayrinti=islem_kaydi.istemci_bilgisi(http),
+    )
     return {"erisimJetonu": erisim, "kullanici": _profil(kayit_edilen)}
 
 
 @yonlendirici.post("/giris")
-def giris(istek: GirisIstegi, yanit: Response):
-    kayit_edilen = kimlik.giris_yap(istek.eposta, istek.sifre, istek.kapi)
+def giris(istek: GirisIstegi, yanit: Response, http: Request):
+    ip = hiz_siniri.istemci_ip(http)
+    try:
+        # J-167 S-1: kilitliyken sifre hic denenmez, dogru sifre de 429 alir.
+        hiz_siniri.giris_kontrol(istek.eposta, ip)
+        kayit_edilen = kimlik.giris_yap(istek.eposta, istek.sifre, istek.kapi)
+    except HTTPException as h:
+        if h.status_code == 401:
+            hiz_siniri.giris_basarisiz(istek.eposta, ip)
+        _basarisiz_giris_kaydi(istek, h, http)
+        raise
+    hiz_siniri.giris_basarili(istek.eposta)
     erisim = kimlik.oturum_baslat(kayit_edilen, yanit)
+    islem_kaydi.kaydet(
+        kayit_edilen,
+        "giris_basarili",
+        f"Giriş yaptı ({istek.kapi or 'kapı seçilmedi'})",
+        hedef_tur="kullanici",
+        hedef_id=kayit_edilen["id"],
+        ayrinti={"kapi": istek.kapi, **islem_kaydi.istemci_bilgisi(http)},
+    )
     return {"erisimJetonu": erisim, "kullanici": _profil(kayit_edilen)}
 
 
@@ -110,15 +137,53 @@ def yenile(
 @yonlendirici.post("/cikis")
 def cikis(
     yanit: Response,
+    http: Request,
     qm_yenileme: Optional[str] = Cookie(default=None, alias=kimlik.YENILEME_CEREZI),
 ):
+    # Kim cikti: cerez kapanmadan once bulunur (J-166).
+    sahip = kimlik.cerezden_kullanici(qm_yenileme)
     kimlik.oturum_kapat(yanit, qm_yenileme)
+    if sahip:
+        tam = aktif_depo().kullanici_id(sahip["id"]) or sahip
+        islem_kaydi.kaydet(
+            tam, "cikis", "Çıkış yaptı", hedef_tur="kullanici", hedef_id=sahip["id"],
+            ayrinti=islem_kaydi.istemci_bilgisi(http),
+        )
     return {"durum": "kapandi"}
 
 
 @yonlendirici.get("/ben")
 def ben(kul: dict = Depends(kimlik.kullanici_sifre_serbest)):
     return {"kullanici": _profil(kul)}
+
+
+#: Basarisiz girisin nedeni (J-166). Kayitta yazilir; istemciye giden ileti
+#: degismez (hesabin var olup olmadigi disari sizmaz).
+def _basarisiz_giris_kaydi(istek: GirisIstegi, h: HTTPException, http: Request) -> None:
+    hesap = aktif_depo().kullanici_eposta(istek.eposta)
+    if h.status_code == 429:
+        neden = "deneme sınırı aşıldı"
+    elif h.status_code == 401:
+        neden = "şifre hatalı" if hesap else "böyle bir hesap yok"
+    elif "askı" in str(h.detail).lower():
+        neden = "hesap askıda"
+    elif h.status_code == 403:
+        neden = "yanlış giriş kapısı"
+    else:
+        neden = f"HTTP {h.status_code}"
+    islem_kaydi.kaydet(
+        hesap,
+        "giris_basarisiz",
+        f"Başarısız giriş: {neden}",
+        hedef_tur="kullanici" if hesap else None,
+        hedef_id=hesap["id"] if hesap else None,
+        ayrinti={
+            "neden": neden,
+            "eposta": istek.eposta.strip().lower()[:120],
+            "kapi": istek.kapi,
+            **islem_kaydi.istemci_bilgisi(http),
+        },
+    )
 
 
 #: Kim hangi rolleri verebilir (J-155). Koordinator saha ekibini kurar: kayit
@@ -154,8 +219,10 @@ def _kullanici_satiri(k: dict) -> dict:
 def kullanicilar(kul: dict = Depends(kimlik.rol_gerektir("koordinator", "yonetici"))):
     """Rol yonetimi ekrani (J-155): hesaplar ve cagiranin verebilecegi roller.
     Sifre ozeti hicbir zaman donmez."""
+    satirlar = aktif_depo().kullanici_listele()
+    islem_kaydi.goruntuleme(kul, "kullanici_listesi", ayrinti={"hesapSayisi": len(satirlar)})
     return {
-        "kullanicilar": [_kullanici_satiri(k) for k in aktif_depo().kullanici_listele()],
+        "kullanicilar": [_kullanici_satiri(k) for k in satirlar],
         "verebilecegiRoller": sorted(_verebilecegi_roller(kul["rol"])),
         "benimId": kul["id"],
     }
@@ -356,6 +423,8 @@ def hesap_kayitlari(
 ):
     """Kayit defteri (J-157): kim, kime, ne zaman, ne yapti. Silinmez."""
     sinir = max(1, min(sinir, 500))
+    islem_kaydi.goruntuleme(_kul, "hesap_defteri", hedef_tur="kullanici" if kullaniciId else None,
+                            hedef_id=kullaniciId)
     return [
         {
             "id": k["id"],

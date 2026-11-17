@@ -81,7 +81,9 @@ function Isaret({ renk, bicim }: { renk: string; bicim: Bicim }) {
 
 export function HaritaGostergesi() {
   const isId = useSimulasyon((d) => d.isId)
-  const [acik, setAcik] = useState(true)
+  // Varsayılan KAPALI (J-167 U-4): açıkken haritanın yaklaşık üçte birini
+  // kapatıyordu. Başlık ("Haritada ne var") her zaman görünür, tek tıkla açılır.
+  const [acik, setAcik] = useState(false)
   if (!isId) return null
 
   return (

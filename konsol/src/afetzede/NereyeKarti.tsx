@@ -219,6 +219,15 @@ function YerSatiri({ y, ...p }: Props & { y: YakinYer }) {
       <button
         type="button"
         aria-expanded={secili}
+        // Ekran okuyucuya açık ad (J-167 U-6): tür, ad, uzaklık, yön tek cümlede.
+        aria-label={[
+          YER_TURLERI[y.tur].ad ?? null,
+          yerAdi(y),
+          `${yuruyerek ? 'yürüyerek' : 'kuş uçuşu'} ${mesafeMetni(yuruyerek ? (y.yuruyusM as number) : y.mesafeM)}`,
+          y2 ? `yön ${y2.ad}` : null,
+        ]
+          .filter(Boolean)
+          .join(', ')}
         onClick={() => p.sec(secili ? null : y)}
         className="flex w-full items-start gap-2.5 px-3.5 py-2 text-left hover:bg-hover"
       >

@@ -21,30 +21,46 @@ type CozumlemeDurumu = {
   riskBolgeSec: (id: string) => void
 }
 
-/** Kamera tespitleri — sunucu biçimi: güven yüzde (0-100), severity metni. */
+/** Kamera tespitleri — sunucu biçimi: güven yüzde (0-100).
+    `siddet` bina modelinin sınıfından gelir; çatlak modelinin tek sınıfı
+    derece taşımaz ("belirsiz", J-165). `severity` eski istemciler içindir. */
 export type KameraTespiti = {
   label: string
+  sinif: string
   confidence: number
   model: string
   box: number[]
-  severity: 'CRITICAL' | 'SAFE'
+  siddet: 'agir' | 'orta' | 'yok' | 'belirsiz'
+  severity: 'CRITICAL' | 'SAFE' | 'UNRATED'
 }
 
 export type KameraSonucu = {
-  status: string
+  status: 'CRITICAL_EVACUATE' | 'CRACK_FOUND' | 'SAFE_SURFACE' | 'NO_DETECTION' | string
   modelType: string
   activeModels: string[]
   detections: KameraTespiti[]
+  /** Eski istemciler için sunucunun işaretlediği resim; konsol kutuları kendi çizer. */
   annotatedImage: string | null
   advice: string
+  imageWidth: number | null
+  imageHeight: number | null
+  sureMs?: number
   timestamp: string
 }
 
-type KameraDurumu = { sonuc: KameraSonucu | null; yaz: (s: KameraSonucu) => void }
+/** Son analiz: sonuç + gönderilen fotoğraf (kutular tarayıcıda bunun üstüne çizilir). */
+type KameraDurumu = {
+  sonuc: KameraSonucu | null
+  gorsel: string | null
+  dosyaAdi: string | null
+  yaz: (s: KameraSonucu, gorsel: string, dosyaAdi: string) => void
+}
 
 export const useKameraCozumleme = create<KameraDurumu>((set) => ({
   sonuc: null,
-  yaz: (sonuc) => set({ sonuc }),
+  gorsel: null,
+  dosyaAdi: null,
+  yaz: (sonuc, gorsel, dosyaAdi) => set({ sonuc, gorsel, dosyaAdi }),
 }))
 
 export const useCozumleme = create<CozumlemeDurumu>((set) => ({

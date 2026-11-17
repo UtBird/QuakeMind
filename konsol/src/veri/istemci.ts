@@ -99,11 +99,16 @@ async function apiGonder<T>(yontem: 'POST' | 'PUT' | 'PATCH', yol: string, govde
 
 export async function apiGet<T>(
   yol: string,
-  params?: Record<string, string | number | null | undefined>,
+  params?: Record<string, string | number | readonly string[] | null | undefined>,
 ): Promise<T> {
   const url = new URL(yol, window.location.origin)
-  // Boş değer adrese yazılmaz: "bitis=undefined" sunucuda 422 olur.
-  for (const [k, v] of Object.entries(params ?? {})) if (v != null) url.searchParams.set(k, String(v))
+  // Boş değer adrese yazılmaz: "bitis=undefined" sunucuda 422 olur. Dizi
+  // tekrar eden parametre olur: tur=a&tur=b (FastAPI list[str]).
+  for (const [k, v] of Object.entries(params ?? {})) {
+    if (v == null) continue
+    if (Array.isArray(v)) for (const x of v) url.searchParams.append(k, String(x))
+    else url.searchParams.set(k, String(v))
+  }
   let y = await fetch(url, { credentials: 'same-origin', headers: basliklar() })
 
   // Erişim jetonu kısa ömürlü: 401 gelirse bir kez yenileyip tekrar dener.

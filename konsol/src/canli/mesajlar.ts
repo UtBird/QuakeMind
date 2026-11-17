@@ -63,6 +63,8 @@ export type CanliMesaj =
     }
   /** Bir hesap açıldı ya da değişti (J-157); yalnız konsol rollerine gider. */
   | { tip: 'hesap'; kullaniciId: string }
+  /** İşlem kaydına satır eklendi (J-165). Yalnız tür gelir; afetzedeye gitmez. */
+  | { tip: 'islem-kaydi'; tur: string }
   /** Koordinasyonun yayınladığı acil durum bildirimi (herkese gider). */
   | { tip: 'bildirim'; id: string; baslik: string; onem: string; zaman: number; durum?: 'yayinda' | 'kaldirildi' }
   /** Afetzede ihbarı (J-51): yeni ihbar ya da durum değişikliği. Afetzedeye
@@ -91,6 +93,7 @@ export const MESAJ_TIPLERI: CanliMesaj['tip'][] = [
   'gorev',
   'simulasyon-katman',
   'hesap',
+  'islem-kaydi',
 ]
 
 /** Mesaj → tazelenecek sorgu anahtarları. Yalnız değişen şey tazelenir: yeni
@@ -129,6 +132,8 @@ export function tazelenecekler(m: CanliMesaj): string[][] {
       return [['bildirimler']]
     case 'hesap':
       return [['kullanicilar'], ['hesap-kayitlari'], ['uye-adaylari']]
+    case 'islem-kaydi':
+      return [['islem-kayitlari']]
     case 'simulasyon-katman':
       // Yalnız o koşunun sonucu; başka hiçbir sorgu etkilenmez. Sunucu
       // katmanları sırayla bitirdiği için sonuç her mesajda bir parça daha
@@ -153,6 +158,7 @@ export const AKIS_ANAHTARLARI: string[][] = [
   ['ekibim'],
   ['kullanicilar'],
   ['hesap-kayitlari'],
+  ['islem-kayitlari'],
   // Fay, deprem ve toplanma katmanları değişmez; yalnız kapanmalar tazelenir.
   ['katman', 'kapanmalar'],
 ]

@@ -4,6 +4,18 @@ import { useOturum } from './oturum'
 import { GIRIS_KAPILARI, acilisYolu, type GirisKapisi } from './roller'
 import { Marka } from '@/kabuk/Marka'
 import { sn } from '@/lib/sinif'
+import { ApiHatasi } from '@/veri/istemci'
+
+/** Ham "HTTP 500" yerine insan dili (J-167 U-2). Sunucu açılırken (~30 sn)
+    geliştirme vekili 500, canlıda Nginx 502/503 döner; ağ kopuksa TypeError. */
+function girisHatasi(err: unknown, kayit: boolean): string {
+  if (err instanceof ApiHatasi && err.durum >= 500) {
+    return 'Sunucu şu an yanıt vermiyor; açılıyor olabilir (yaklaşık 30 sn). Birkaç saniye sonra yeniden dene.'
+  }
+  if (err instanceof TypeError) return 'Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.'
+  if (err instanceof Error) return err.message
+  return kayit ? 'Hesap açılamadı.' : 'Giriş yapılamadı.'
+}
 
 /* ---------------------------------------------------------------------------
    Giriş ve hesap açma (J-156).
@@ -94,7 +106,7 @@ export function GirisEkrani() {
       kapiyiKaydet(kapi)
       git(acilisYolu(yeni), { replace: true })
     } catch (err) {
-      setHata(err instanceof Error ? err.message : kayit ? 'Hesap açılamadı.' : 'Giriş yapılamadı.')
+      setHata(girisHatasi(err, kayit))
     } finally {
       setGonderiliyor(false)
     }

@@ -364,8 +364,9 @@ export function useUyeleriAyarla() {
 
 export function useEkipKonumu() {
   return useMutation({
-    mutationFn: ({ ekipId, lon, lat }: { ekipId: string; lon: number; lat: number }) =>
-      apiPost<Ekip>(`/api/ekipler/${ekipId}/konum`, { lon, lat }),
+    // dogrulukM: telefonun bildirdiği doğruluk; konum geçmişinde saklanır (J-166).
+    mutationFn: ({ ekipId, lon, lat, dogrulukM }: { ekipId: string; lon: number; lat: number; dogrulukM?: number }) =>
+      apiPost<Ekip>(`/api/ekipler/${ekipId}/konum`, { lon, lat, dogrulukM }),
   })
 }
 

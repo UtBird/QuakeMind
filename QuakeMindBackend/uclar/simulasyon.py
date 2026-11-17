@@ -272,7 +272,7 @@ def simulasyon_modelleri(_kul: dict = Depends(kimlik.rol_gerektir("saha", "koord
 @yonlendirici.post("/api/simulasyon/kos", status_code=202)
 def simulasyon_kos(
     istek: SimulasyonIstegi,
-    _kul: dict = Depends(kimlik.rol_gerektir("koordinator", "yonetici")),
+    kul: dict = Depends(kimlik.rol_gerektir("koordinator", "yonetici")),
 ):
     """Tatbikatı başlatır. 202 + iş kimliği döner; çıkarım istek yolunda koşmaz.
 
@@ -328,7 +328,18 @@ def simulasyon_kos(
     ck._store_road_damage_job(is_id, {
         "status": "queued", "createdAt": time.time(), "progress": 0,
         "progressMessage": "Sırada bekliyor...",
+        "islemKaydi": {"onek": "tatbikat", "yapan": {"id": kul.get("id"), "ad_soyad": kul.get("ad_soyad"), "rol": kul.get("rol")}},
     })
+    import islem_kaydi
+
+    islem_kaydi.kaydet(
+        kul,
+        "tatbikat_basladi",
+        f"Tatbikat başladı: {alan.get('ad') or istek.alanId} · {kunye['ad']}",
+        hedef_tur="analiz",
+        hedef_id=is_id,
+        ayrinti={"alan": istek.alanId, "katman": katman.get("id"), "model": kunye["ad"], "esik": esik},
+    )
     _is_sakla(is_id, {
         "isId": is_id, "parmakIzi": izi, "durum": "kuyrukta", "baslangic": time.time(),
         "istek": istek.model_dump(), "alan": alan, "katman": katman,
@@ -635,7 +646,7 @@ def _maske_oku(is_id):
 @yonlendirici.post("/api/simulasyon/bitir")
 def simulasyon_bitir(
     istek: SimulasyonBitirIstegi,
-    _kul: dict = Depends(kimlik.rol_gerektir("koordinator", "yonetici")),
+    kul: dict = Depends(kimlik.rol_gerektir("koordinator", "yonetici")),
 ):
     """Tatbikatı bitirir: konsol normal akışa döner.
 
@@ -665,6 +676,12 @@ def simulasyon_bitir(
 
     canli_yayin.yayinla("is-durumu", isId=istek.isId, isTipi="simulasyon",
                         durum="iptal", mesaj="Tatbikat bitirildi.")
+    import islem_kaydi
+
+    islem_kaydi.kaydet(
+        kul, "tatbikat_kapatildi", f"Tatbikat kapatıldı: {silinen} tatbikat hasar noktası silindi",
+        hedef_tur="analiz", hedef_id=istek.isId, ayrinti={"silinenHasarNoktasi": silinen},
+    )
     # Isı haritası ve genel durum ekranı tazelensin.
     canli_yayin.yayinla("yeni-analiz", kaynak="uydu", isId=istek.isId)
     return {"isId": istek.isId, "durum": "bitti", "silinenHasarNoktasi": silinen}

@@ -38,6 +38,11 @@
     display: grid;
     grid-template-columns: 1fr 48px;
   }
+  /* Telefonda alta yapışan düğme çubuğu (J-167 U-1): iPhone'un ev çubuğu
+     (güvenli alan) düğmenin üstüne binmesin. viewport-fit=cover ile çalışır. */
+  .alt-guvenli {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
 }
 
 /* Uzun ekran (yükseklik ≥ 860 px): afetzede ekranında ek yönlendirme kutusu

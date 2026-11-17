@@ -20,6 +20,7 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 import fastapi_app  # noqa: E402
+import kimlik  # noqa: E402
 from utils.postgis_manager import postgis_engine  # noqa: E402
 
 
@@ -37,7 +38,26 @@ def postgis_offline(monkeypatch):
     monkeypatch.setenv("QUAKEMIND_ESKI_UCLAR", "1")
 
 
-def test_heatmap_offline_fallback_returns_200(client):
+@pytest.fixture
+def koordinator_oturumu():
+    """Gercek veritabanina hesap yazmadan oturumlu cagri: kimlik bagimliligi
+    sahte bir koordinatorle degistirilir, test bitince geri alinir."""
+    fastapi_app.app.dependency_overrides[kimlik.kullanici] = lambda: {
+        "id": "test-koordinator", "rol": "koordinator", "ad_soyad": "Test", "ekip_id": None,
+    }
+    yield
+    fastapi_app.app.dependency_overrides.pop(kimlik.kullanici, None)
+
+
+def test_heatmap_oturumsuz_401(client):
+    resp = client.get(
+        "/api/road_damage/heatmap",
+        params={"latitude": 36.20, "longitude": 36.16, "radiusKm": 5.0},
+    )
+    assert resp.status_code == 401
+
+
+def test_heatmap_offline_fallback_returns_200(client, koordinator_oturumu):
     resp = client.get(
         "/api/road_damage/heatmap",
         params={"latitude": 36.20, "longitude": 36.16, "radiusKm": 5.0},
@@ -45,7 +65,8 @@ def test_heatmap_offline_fallback_returns_200(client):
     assert resp.status_code == 200
     body = resp.json()
     assert isinstance(body["points"], list)
-    assert body["generatedFrom"]["source"] == "offline_fallback"
+    # PostGIS yokken kalici yerel depo (SQLite) okunur; uydurma nokta uretilmez.
+    assert body["generatedFrom"]["source"] == "yerel_depo"
 
 
 def test_nearest_debris_offline_fallback_returns_200(client):

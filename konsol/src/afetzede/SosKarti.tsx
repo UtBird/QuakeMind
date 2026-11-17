@@ -235,6 +235,12 @@ function SosFormu({
       )}
 
       {vazgec && (
+        <p className="text-small text-ink-3">
+          Açık çağrın var: yeniden gönderirsen yeni çağrı açılmaz, aynı çağrının konumu ve bilgileri
+          güncellenir.
+        </p>
+      )}
+      {vazgec && (
         <button
           type="button"
           onClick={vazgec}
@@ -266,6 +272,12 @@ function CagriDurumu({ c, yeniCagri }: { c: SosCagrisi; yeniCagri: () => void })
     <div className="flex flex-col gap-3" aria-live="polite">
       <div className={sn('rounded-panel border-2 px-3.5 py-2.5', kenar)}>
         <p className="text-small text-ink-2">Çağrın alındı · {saat(c.zaman)}</p>
+        {!!c.guncellemeSayisi && (
+          <p className="mt-0.5 text-small text-ink-2">
+            Çağrın zaten iletilmişti; yeniden gönderince yenisi açılmadı, konumun ve bilgilerin
+            güncellendi ({sayi(c.guncellemeSayisi)} kez).
+          </p>
+        )}
         <p className="mt-0.5 text-title text-ink">{d.baslik}</p>
         <p className="mt-0.5 text-body text-ink-2">{d.aciklama}</p>
       </div>

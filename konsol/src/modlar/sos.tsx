@@ -141,6 +141,9 @@ export function SosSag() {
                     <span className="truncate text-small text-ink">
                       {c.mahalle ?? 'Mahalle bilinmiyor'}
                       <span className="text-ink-3"> · {tarihSaat(c.zaman)}</span>
+                      {!!c.guncellemeSayisi && (
+                        <span className="text-ink-3"> · {sayi(c.guncellemeSayisi)} kez yeniden gönderdi</span>
+                      )}
                     </span>
                     <Rozet ton={c.durum === 'kapandi' ? 'nötr' : ONCELIK_TON[c.oncelik]}>
                       {c.durum === 'kapandi' ? 'Kapandı' : ONCELIK_ADI[c.oncelik]}
@@ -247,6 +250,16 @@ export function SosDetayi({ cagri: c }: { cagri: SosCagrisi }) {
           </dd>
           <dt className="text-ink-3">Geldi</dt>
           <dd className="font-mono text-ink">{tarihSaat(c.zaman)}</dd>
+          {!!c.guncellemeSayisi && (
+            <>
+              <dt className="text-ink-3">Yeniden gönderdi</dt>
+              <dd className="text-ink">
+                {sayi(c.guncellemeSayisi)} kez
+                {c.sonGuncelleme ? <span className="font-mono"> · son {tarihSaat(c.sonGuncelleme)}</span> : null}
+                <span className="block text-small text-ink-3">Yeni çağrı açılmadı; konum ve bilgiler güncellendi.</span>
+              </dd>
+            </>
+          )}
         </dl>
 
         <div className="mt-3 flex gap-2">

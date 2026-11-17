@@ -132,6 +132,16 @@ export function canliAkisBaslat(qc: QueryClient, secenek: AkisSecenek = {}): () 
     kaynak.addEventListener('nabiz', () => {
       sonSinyal = Date.now()
     })
+    // Sunucu oturumu geçersiz buldu (askıya alma, çıkış, rol değişikliği; J-167
+    // S-6): yeniden bağlanmak yalnız 401 üretir. Akış kapanır; sonraki API
+    // isteği oturumu düşürüp giriş ekranına götürür.
+    kaynak.addEventListener('oturum-bitti', () => {
+      kapandi = true
+      window.clearInterval(bekci)
+      kaynak?.close()
+      kaynak = null
+      useCanliAkisDurumu.setState({ durum: 'kapali', sonrakiDenemeMs: null })
+    })
     kaynak.onerror = koptu
   }
 

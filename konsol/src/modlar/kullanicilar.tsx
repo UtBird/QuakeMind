@@ -18,6 +18,7 @@ import {
 } from '@/veri/kullanici'
 import { sayi, tarihSaatYilli } from '@/lib/bicim'
 import { sn } from '@/lib/sinif'
+import { IslemKaydiGorunumu } from './islemKaydi'
 
 /* ---------------------------------------------------------------------------
    Hesap yönetimi — tam sayfa (J-155, J-156, J-157).
@@ -95,7 +96,7 @@ type Cekmece = { tur: 'yeni' } | { tur: 'duzenle'; id: string } | null
 export function HesapYonetimi() {
   const liste = useKullanicilar()
   const ekipler = useEkipler()
-  const [sekme, setSekme] = useState<'hesaplar' | 'defter'>('hesaplar')
+  const [sekme, setSekme] = useState<'hesaplar' | 'defter' | 'islem'>('hesaplar')
   const [grup, setGrup] = useState<GrupId>('hepsi')
   const [arama, setArama] = useState('')
   const [cekmece, setCekmece] = useState<Cekmece>(null)
@@ -149,7 +150,9 @@ export function HesapYonetimi() {
         {(
           [
             ['hesaplar', `Hesaplar · ${sayac(tumu.length)}`],
-            ['defter', 'Kayıt defteri'],
+            ['defter', 'Hesap defteri'],
+            // J-165: analizler, sevk, SOS/ihbar, ekip ve bildirim işlemleri.
+            ['islem', 'İşlem kaydı'],
           ] as const
         ).map(([id, etiket]) => (
           <button
@@ -168,7 +171,9 @@ export function HesapYonetimi() {
         ))}
       </div>
 
-      {sekme === 'defter' ? (
+      {sekme === 'islem' ? (
+        <IslemKaydiGorunumu />
+      ) : sekme === 'defter' ? (
         <KayitDefteri ekipAdi={ekipAdi} />
       ) : yetkisiz ? (
         <div className="mt-4">

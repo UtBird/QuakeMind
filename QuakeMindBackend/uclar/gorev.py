@@ -74,6 +74,30 @@ def _yetki(kul: dict, ekip_id: str) -> None:
     raise HTTPException(status_code=403, detail="Yalnız kendi ekibin adına işlem yapabilirsin.")
 
 
+GOREV_DURUM_ADI = {
+    "yolda": "yola çıktı",
+    "olay-yerinde": "olay yerine vardı",
+    "tamamlandi": "görevi tamamladı",
+    "iptal": "gelemedi (iptal)",
+}
+
+
+def _gorev_kaydi(kul: dict, tur: str, g: dict, ne: str) -> None:
+    """Sevk ve gorev adimi islem kaydina (J-165). Ayrintili adimlar zaten
+    `gorev_adimlari`nda; burasi bütün islemleri tek listede gosterir."""
+    import islem_kaydi
+
+    ekip = aktif_depo().ekip_bul(g["ekip_id"]) or {}
+    islem_kaydi.kaydet(
+        kul,
+        tur,
+        f"{ekip.get('ad') or g['ekip_id']} → {g['hedef_tur'].upper() if g['hedef_tur'] == 'sos' else 'ihbar'}: {ne}",
+        hedef_tur=g["hedef_tur"],
+        hedef_id=g["hedef_id"],
+        ayrinti={"gorevId": g["id"], "ekipId": g["ekip_id"], "durum": g.get("durum"), "kisiSayisi": g.get("kisi_sayisi")},
+    )
+
+
 def _tam_cikti(g: dict) -> dict:
     hedef = hedef_bul(g["hedef_tur"], g["hedef_id"])
     adimlar = aktif_depo().gorev_adimlari([g["id"]]).get(g["id"], [])
@@ -178,6 +202,8 @@ def sevk_et(istek: SevkIstegi, kul: dict = Depends(kimlik.rol_gerektir(*KOORDINA
     except GorevHatasi as h:
         raise hata_http(h) from h
     gorev_yayinla(g)
+    _gorev_kaydi(kul, "sevk", g, f"{istek.kisiSayisi or g.get('kisi_sayisi') or '?'} kişi gönderildi"
+                 + (" (ek destek)" if istek.ekDestek else ""))
     return _tam_cikti(g)
 
 
@@ -218,6 +244,12 @@ def gorev_durumu(
     except GorevHatasi as h:
         raise hata_http(h) from h
     gorev_yayinla(g, hedef_durumu)
+    _gorev_kaydi(
+        kul, "gorev_durumu", g,
+        GOREV_DURUM_ADI.get(istek.durum, istek.durum)
+        + (" · olay sürüyor" if istek.olaySuruyor else "")
+        + (f" · {not_metni}" if not_metni else ""),
+    )
     return _tam_cikti(g)
 
 

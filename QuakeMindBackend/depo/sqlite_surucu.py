@@ -13,6 +13,7 @@ guvenle paylasir.
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 import math
 import sqlite3
 import time
@@ -236,10 +237,108 @@ CREATE TABLE IF NOT EXISTS ihbar_fotograflari (
     en        INTEGER NOT NULL,
     boy       INTEGER NOT NULL
 );
+
+-- Islem kaydi (J-165): kim, ne zaman, ne yapti. Analizler (kamera, metin, hasar,
+-- tatbikat), sevk ve gorev adimlari, SOS kapatma, ihbar durumu, ekip tanimi ve
+-- bildirimler tek yerde. Fotograf saklanmaz, yalniz sonucun ozeti. Kayit
+-- degistirilemez ve silinemez: tetikleyiciler UPDATE/DELETE'i reddeder.
+CREATE TABLE IF NOT EXISTS islem_kayitlari (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    zaman       REAL NOT NULL,
+    yapan_id    TEXT,
+    yapan_ad    TEXT,
+    yapan_rol   TEXT,
+    tur         TEXT NOT NULL,
+    hedef_tur   TEXT,
+    hedef_id    TEXT,
+    ozet        TEXT NOT NULL,
+    ayrinti     TEXT,
+    -- Hash zinciri (J-166): her satir bir oncekinin ozetini tasir. Arada bir
+    -- satir degistirilir ya da silinirse sonraki butun ozetler tutmaz.
+    onceki_hash TEXT,
+    hash        TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_islem_tur ON islem_kayitlari(tur);
+CREATE INDEX IF NOT EXISTS ix_islem_hedef ON islem_kayitlari(hedef_tur, hedef_id);
+CREATE INDEX IF NOT EXISTS ix_islem_yapan ON islem_kayitlari(yapan_id);
+CREATE TRIGGER IF NOT EXISTS islem_kaydi_degismez BEFORE UPDATE ON islem_kayitlari
+BEGIN SELECT RAISE(ABORT, 'islem kaydi degistirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS islem_kaydi_silinmez BEFORE DELETE ON islem_kayitlari
+BEGIN SELECT RAISE(ABORT, 'islem kaydi silinemez'); END;
+
+-- Ekip konum gecmisi (J-166): ekip telefonunun ya da koordinasyonun bildirdigi
+-- her konum. `ekipler` tablosu yalniz son konumu tutar; gecmis burada. Konum
+-- sik geldigi icin (en sik ~30 sn) islem kaydina degil buraya yazilir; islem
+-- kaydina yalniz paylasimin basladigi an duser. Degistirilemez, silinemez.
+CREATE TABLE IF NOT EXISTS ekip_konum_gecmisi (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    ekip_id       TEXT NOT NULL,
+    lon           REAL NOT NULL,
+    lat           REAL NOT NULL,
+    dogruluk_m    REAL,
+    zaman         REAL NOT NULL,
+    gonderen_id   TEXT,
+    gonderen_ad   TEXT,
+    gonderen_rol  TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_konum_ekip_zaman ON ekip_konum_gecmisi(ekip_id, zaman);
+CREATE TRIGGER IF NOT EXISTS konum_gecmisi_degismez BEFORE UPDATE ON ekip_konum_gecmisi
+BEGIN SELECT RAISE(ABORT, 'konum gecmisi degistirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS konum_gecmisi_silinmez BEFORE DELETE ON ekip_konum_gecmisi
+BEGIN SELECT RAISE(ABORT, 'konum gecmisi silinemez'); END;
+
+-- Zincir denetimleri (J-166): her dogrulamanin sonucu. Artimli dogrulama son
+-- saglam denetimin kaldigi yerden devam eder. Degistirilemez, silinemez.
+CREATE TABLE IF NOT EXISTS islem_zinciri_denetimleri (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    zaman       REAL NOT NULL,
+    yapan_id    TEXT,
+    yapan_ad    TEXT,
+    kapsam      TEXT NOT NULL CHECK (kapsam IN ('tam','artimli')),
+    saglam      INTEGER NOT NULL,
+    dogrulanan  INTEGER NOT NULL,
+    son_id      INTEGER,
+    son_hash    TEXT,
+    bozuk_id    INTEGER,
+    neden       TEXT,
+    sure_ms     INTEGER
+);
+CREATE TRIGGER IF NOT EXISTS zincir_denetimi_degismez BEFORE UPDATE ON islem_zinciri_denetimleri
+BEGIN SELECT RAISE(ABORT, 'zincir denetimi degistirilemez'); END;
+CREATE TRIGGER IF NOT EXISTS zincir_denetimi_silinmez BEFORE DELETE ON islem_zinciri_denetimleri
+BEGIN SELECT RAISE(ABORT, 'zincir denetimi silinemez'); END;
+
+-- Hiz sinirlari (J-167 S-1, S-2): hatali giris, SOS ve kayit denemeleri.
+-- Bellekte degil burada: sunucu yeniden baslasa da kilit surer, ileride birden
+-- cok worker'a gecilse de ortak kalir. Kayit defteri degildir; bir gunden eski
+-- satirlar silinir (islem kaydi ayri ve silinmez).
+CREATE TABLE IF NOT EXISTS hiz_sayaclari (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    anahtar  TEXT NOT NULL,
+    zaman    REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_hiz_anahtar_zaman ON hiz_sayaclari(anahtar, zaman);
 """
 
 
 # Sevk gorevi (J-54). Acik gorev: ekip yolda ya da olay yerinde, is bitmedi.
+# Islem kaydi hash zinciri (J-166). Ilk satirin "onceki"si sabittir.
+ZINCIR_BASI = "0" * 64
+
+
+def islem_hash(onceki: str, zaman, yapan_id, yapan_ad, yapan_rol, tur, hedef_tur, hedef_id, ozet, ayrinti) -> str:
+    """SHA-256(onceki ozet + satirin alanlari). Alanlar JSON dizisi olarak
+    kanonik yazilir; zaman `repr` ile (SQLite REAL -> Python float geri ayni)."""
+    import hashlib
+
+    govde = json.dumps(
+        [onceki, repr(float(zaman)), yapan_id, yapan_ad, yapan_rol, tur, hedef_tur, hedef_id, ozet, ayrinti],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(govde.encode("utf-8")).hexdigest()
+
+
 ACIK_GOREV = ("atandi", "yolda", "olay-yerinde")
 ACIK_GOREV_SQL = "('atandi','yolda','olay-yerinde')"
 GOREV_SIRASI = {"atandi": 0, "yolda": 1, "olay-yerinde": 2, "tamamlandi": 3}
@@ -290,7 +389,7 @@ class SqliteDepo:
         self._baglanti.execute("PRAGMA synchronous=NORMAL")
         self._baglanti.execute("PRAGMA foreign_keys=ON")
         self._baglanti.execute("PRAGMA busy_timeout=5000")
-        with self._kilit:
+        with self._yazma():
             self._baglanti.executescript(SEMA)
             self._sutunlari_tamamla()
             self._baglanti.commit()
@@ -328,6 +427,13 @@ class SqliteDepo:
             ("kisi_sayisi", "INTEGER"),
             ("konum_zamani", "REAL"),
         ),
+        # J-166: hash zinciri. Zincirden onceki satirlarda bos kalir; dogrulama
+        # bunlari "zincir oncesi" diye ayri sayar (tetikleyici geriye donuk
+        # doldurmaya izin vermez, bilerek).
+        "islem_kayitlari": (
+            ("onceki_hash", "TEXT"),
+            ("hash", "TEXT"),
+        ),
     }
 
     def _sutunlari_tamamla(self) -> None:
@@ -339,8 +445,25 @@ class SqliteDepo:
 
     # ---- genel yardimcilar ------------------------------------------------
 
-    def _yaz(self, sql: str, parametreler: tuple = ()) -> None:
+    @contextmanager
+    def _yazma(self):
+        """Tek yazma baglantisinin kilidi + hata aninda geri alma.
+
+        Eskiden yazma hata verince (kisit, tetikleyici, disk) acik islem
+        kaliyordu: baglanti RESERVED kilidi tutmaya devam ediyor, ayni dosyaya
+        yazan baska baglantilar ve surecler "database is locked" aliyordu;
+        sonraki yazmalar da o yarim islemin icine giriyordu (J-167 testlerinde
+        bulundu)."""
         with self._kilit:
+            try:
+                yield
+            except BaseException:
+                if self._baglanti.in_transaction:
+                    self._baglanti.rollback()
+                raise
+
+    def _yaz(self, sql: str, parametreler: tuple = ()) -> None:
+        with self._yazma():
             self._baglanti.execute(sql, parametreler)
             self._baglanti.commit()
 
@@ -359,7 +482,7 @@ class SqliteDepo:
                 except sqlite3.Error:
                     pass
             self._okuma_baglantilari.clear()
-        with self._kilit:
+        with self._yazma():
             self._baglanti.close()
 
     # ---- kullanicilar -----------------------------------------------------
@@ -469,6 +592,169 @@ class SqliteDepo:
             satirlar = self._oku(
                 "SELECT * FROM hesap_kayitlari ORDER BY zaman DESC, id DESC LIMIT ?", (sinir,)
             )
+        for s in satirlar:
+            s["ayrinti"] = json.loads(s["ayrinti"]) if s.get("ayrinti") else None
+        return satirlar
+
+    # ---- islem kaydi (J-165) ----------------------------------------------
+
+    def islem_kaydi_ekle(
+        self,
+        yapan: Optional[dict],
+        tur: str,
+        ozet: str,
+        hedef_tur: Optional[str] = None,
+        hedef_id: Optional[str] = None,
+        ayrinti: Optional[dict] = None,
+    ) -> int:
+        sql = (
+            """INSERT INTO islem_kayitlari
+               (zaman, yapan_id, yapan_ad, yapan_rol, tur, hedef_tur, hedef_id, ozet, ayrinti,
+                onceki_hash, hash)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)"""
+        )
+        degerler = (
+            time.time(),
+            yapan.get("id") if yapan else None,
+            yapan.get("ad_soyad") if yapan else None,
+            yapan.get("rol") if yapan else None,
+            tur,
+            hedef_tur,
+            hedef_id,
+            ozet,
+            json.dumps(ayrinti, ensure_ascii=False) if ayrinti else None,
+        )
+        with self._yazma():
+            # Tek yazma baglantisi + kilit: zincirin sirasi yazma sirasidir.
+            son = self._baglanti.execute(
+                "SELECT hash FROM islem_kayitlari WHERE hash IS NOT NULL ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            onceki = son[0] if son else ZINCIR_BASI
+            ozet_hash = islem_hash(onceki, *degerler)
+            imlec = self._baglanti.execute(sql, (*degerler, onceki, ozet_hash))
+            self._baglanti.commit()
+            return int(imlec.lastrowid)
+
+    def islem_zinciri_dogrula(self, baslangic: Optional[tuple[int, str]] = None) -> dict:
+        """Zincirin ozetlerini yeniden hesaplar (J-166).
+
+        `baslangic` yoksa bastan sona (tam). Varsa (son sağlam kimlik, ozeti):
+        once o satirin hala ayni ozeti tasidigina bakar (kuyruktan silme ya da
+        degistirme yakalanir), sonra yalniz ondan sonrakileri hesaplar (artimli).
+        Artimli dogrulama denetim noktasindan ONCEKI satirlara bakmaz; onun icin
+        tam dogrulama gerekir.
+
+        Satirlari Python'a cekmek burada sayim icin degil: her satirin ozeti
+        yeniden hesaplanmadan degisiklik anlasilmaz. Okuma baglantisinda,
+        imlecle akar; bellege toplu alinmaz."""
+        okuma = self._okuma_baglantisi()
+        zincir_oncesi = dogrulanan = 0
+        beklenen = ZINCIR_BASI
+        son_id: Optional[int] = None
+
+        def bozuk(kimlik_no, neden):
+            return {"saglam": False, "bozukId": kimlik_no, "neden": neden, "dogrulanan": dogrulanan,
+                    "zincirOncesi": zincir_oncesi, "sonHash": beklenen, "sonId": son_id}
+
+        if baslangic is not None:
+            nokta_id, nokta_hash = baslangic
+            satir = okuma.execute("SELECT hash FROM islem_kayitlari WHERE id = ?", (nokta_id,)).fetchone()
+            if satir is None or satir["hash"] != nokta_hash:
+                return bozuk(nokta_id, "denetim noktasındaki kayıt silinmiş ya da değişmiş")
+            beklenen, son_id = nokta_hash, nokta_id
+            imlec = okuma.execute(
+                """SELECT id, zaman, yapan_id, yapan_ad, yapan_rol, tur, hedef_tur, hedef_id,
+                          ozet, ayrinti, onceki_hash, hash
+                   FROM islem_kayitlari WHERE id > ? ORDER BY id""",
+                (nokta_id,),
+            )
+        else:
+            imlec = okuma.execute(
+                """SELECT id, zaman, yapan_id, yapan_ad, yapan_rol, tur, hedef_tur, hedef_id,
+                          ozet, ayrinti, onceki_hash, hash
+                   FROM islem_kayitlari ORDER BY id"""
+            )
+        for r in imlec:
+            if r["hash"] is None:
+                if dogrulanan or baslangic is not None:
+                    return bozuk(r["id"], "zincirin ortasında özetsiz kayıt")
+                zincir_oncesi += 1
+                continue
+            if r["onceki_hash"] != beklenen:
+                return bozuk(r["id"], "önceki özet tutmuyor (araya kayıt girmiş ya da silinmiş)")
+            hesap = islem_hash(
+                r["onceki_hash"], r["zaman"], r["yapan_id"], r["yapan_ad"], r["yapan_rol"],
+                r["tur"], r["hedef_tur"], r["hedef_id"], r["ozet"], r["ayrinti"],
+            )
+            if hesap != r["hash"]:
+                return bozuk(r["id"], "kaydın içeriği değişmiş")
+            beklenen = r["hash"]
+            son_id = r["id"]
+            dogrulanan += 1
+        return {"saglam": True, "bozukId": None, "neden": None, "dogrulanan": dogrulanan,
+                "zincirOncesi": zincir_oncesi, "sonHash": beklenen if son_id else None, "sonId": son_id}
+
+    def zincir_denetimi_ekle(self, yapan: Optional[dict], kapsam: str, sonuc: dict, sure_ms: int) -> None:
+        """Her dogrulamanin sonucu silinmeyen denetim tablosuna (J-166)."""
+        self._yaz(
+            """INSERT INTO islem_zinciri_denetimleri
+               (zaman, yapan_id, yapan_ad, kapsam, saglam, dogrulanan, son_id, son_hash, bozuk_id, neden, sure_ms)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                time.time(),
+                yapan.get("id") if yapan else None,
+                yapan.get("ad_soyad") if yapan else None,
+                kapsam,
+                1 if sonuc["saglam"] else 0,
+                sonuc["dogrulanan"],
+                sonuc.get("sonId"),
+                sonuc.get("sonHash"),
+                sonuc.get("bozukId"),
+                sonuc.get("neden"),
+                sure_ms,
+            ),
+        )
+
+    def son_saglam_denetim(self) -> Optional[dict]:
+        return self._tek(
+            """SELECT * FROM islem_zinciri_denetimleri
+               WHERE saglam = 1 AND son_id IS NOT NULL ORDER BY id DESC LIMIT 1"""
+        )
+
+    def son_denetim(self) -> Optional[dict]:
+        return self._tek("SELECT * FROM islem_zinciri_denetimleri ORDER BY id DESC LIMIT 1")
+
+    def islem_kayitlari(
+        self,
+        turler: Optional[list[str]] = None,
+        hedef_tur: Optional[str] = None,
+        hedef_id: Optional[str] = None,
+        yapan_id: Optional[str] = None,
+        once_id: Optional[int] = None,
+        sinir: int = 100,
+    ) -> list[dict]:
+        """Yeniden eskiye. `once_id`: sayfalama imleci (bu kimlikten eskiler)."""
+        kosullar, parametreler = [], []
+        if turler:
+            kosullar.append(f"tur IN ({','.join('?' * len(turler))})")
+            parametreler += list(turler)
+        if hedef_tur:
+            kosullar.append("hedef_tur = ?")
+            parametreler.append(hedef_tur)
+        if hedef_id:
+            kosullar.append("hedef_id = ?")
+            parametreler.append(hedef_id)
+        if yapan_id:
+            kosullar.append("yapan_id = ?")
+            parametreler.append(yapan_id)
+        if once_id:
+            kosullar.append("id < ?")
+            parametreler.append(int(once_id))
+        nerede = f"WHERE {' AND '.join(kosullar)}" if kosullar else ""
+        satirlar = self._oku(
+            f"SELECT * FROM islem_kayitlari {nerede} ORDER BY id DESC LIMIT ?",
+            (*parametreler, int(sinir)),
+        )
         for s in satirlar:
             s["ayrinti"] = json.loads(s["ayrinti"]) if s.get("ayrinti") else None
         return satirlar
@@ -650,6 +936,116 @@ class SqliteDepo:
             (*parametreler, sinir),
         )
 
+    def sos_ac_ya_da_guncelle(
+        self,
+        lon: float,
+        lat: float,
+        oncelik: str,
+        kullanici_id: str,
+        metin: str | None = None,
+        mahalle: str | None = None,
+        kanal: str | None = None,
+        ek: dict | None = None,
+    ) -> tuple[dict, bool]:
+        """Hesap basina tek acik SOS (J-167 S-2).
+
+        Kisinin kapanmamis cagrisi varsa yenisi acilmaz, o guncellenir: konum,
+        not, kisi sayisi; oncelik yalniz daha acile cikar; ihtiyaclar birlesir.
+        Bekleme suresi bozulmasin diye `zaman` (cagrinin geldigi an) DEGISMEZ;
+        guncelleme sayisi ve zamani `ek`te tutulur. Kontrol ve yazma ayni
+        kilitte: ayni anda gelen iki basis iki satir acamaz.
+        Doner: (kayit, guncellendi_mi)."""
+        sira = {"kritik": 0, "yuksek": 1, "orta": 2}
+        with self._yazma():
+            acik = self._baglanti.execute(
+                """SELECT * FROM sos_cagrilari
+                   WHERE kullanici_id = ? AND durum != 'kapandi'
+                   ORDER BY zaman DESC LIMIT 1""",
+                (kullanici_id,),
+            ).fetchone()
+            if acik is None:
+                kayit = {
+                    "id": f"sos-{uuid.uuid4().hex[:16]}",
+                    "lon": float(lon),
+                    "lat": float(lat),
+                    "oncelik": oncelik,
+                    "durum": "bekliyor",
+                    "zaman": time.time(),
+                    "mahalle": mahalle,
+                    "metin": metin,
+                    "kullanici_id": kullanici_id,
+                    "ekip_id": None,
+                    "atama_zamani": None,
+                    "kapanma_zamani": None,
+                    "kanal": kanal,
+                    "ek": json.dumps(ek, ensure_ascii=False) if ek else None,
+                }
+                self._baglanti.execute(
+                    """INSERT INTO sos_cagrilari
+                       (id, lon, lat, oncelik, durum, zaman, mahalle, metin, kullanici_id,
+                        ekip_id, atama_zamani, kapanma_zamani, kanal, ek)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    tuple(kayit.values()),
+                )
+                self._baglanti.commit()
+                return kayit, False
+
+            eski = dict(acik)
+            try:
+                eski_ek = json.loads(eski["ek"]) if eski.get("ek") else {}
+            except (TypeError, ValueError):
+                eski_ek = {}
+            yeni_ek = {**eski_ek, **(ek or {})}
+            if eski_ek.get("ihtiyaclar") or (ek or {}).get("ihtiyaclar"):
+                yeni_ek["ihtiyaclar"] = sorted(set(eski_ek.get("ihtiyaclar") or []) | set((ek or {}).get("ihtiyaclar") or []))
+            yeni_ek["durumSecildi"] = bool(eski_ek.get("durumSecildi")) or bool((ek or {}).get("durumSecildi"))
+            yeni_ek["guncellemeSayisi"] = int(eski_ek.get("guncellemeSayisi") or 0) + 1
+            yeni_ek["sonGuncelleme"] = time.time()
+            yeni_oncelik = oncelik if sira.get(oncelik, 9) < sira.get(eski["oncelik"], 9) else eski["oncelik"]
+            self._baglanti.execute(
+                """UPDATE sos_cagrilari
+                   SET lon = ?, lat = ?, oncelik = ?, metin = ?, mahalle = ?, ek = ?
+                   WHERE id = ?""",
+                (
+                    float(lon), float(lat), yeni_oncelik,
+                    metin if metin else eski.get("metin"),
+                    mahalle if mahalle else eski.get("mahalle"),
+                    json.dumps(yeni_ek, ensure_ascii=False),
+                    eski["id"],
+                ),
+            )
+            self._baglanti.commit()
+        return self.sos_bul(eski["id"]), True
+
+    # ---- hiz sinirlari (J-167 S-1, S-2) ---------------------------------
+
+    _sayac_yazimi = 0
+
+    def sayac_ekle(self, *anahtarlar: str) -> None:
+        simdi = time.time()
+        with self._yazma():
+            self._baglanti.executemany(
+                "INSERT INTO hiz_sayaclari (anahtar, zaman) VALUES (?, ?)",
+                [(a, simdi) for a in anahtarlar],
+            )
+            self._sayac_yazimi += 1
+            # Ara sira eskiler atilir; en uzun pencere 1 saat.
+            if self._sayac_yazimi % 500 == 0:
+                self._baglanti.execute("DELETE FROM hiz_sayaclari WHERE zaman < ?", (simdi - 86400,))
+            self._baglanti.commit()
+
+    def sayac(self, anahtar: str, baslangic: float) -> tuple[int, Optional[float]]:
+        """Penceredeki deneme sayisi ve en eskisinin zamani; (anahtar, zaman) indeksinden."""
+        satir = self._tek(
+            "SELECT COUNT(*) AS n, MIN(zaman) AS ilk FROM hiz_sayaclari WHERE anahtar = ? AND zaman >= ?",
+            (anahtar, baslangic),
+        )
+        return int(satir["n"]), satir["ilk"]
+
+    def sayac_son(self, anahtar: str) -> Optional[float]:
+        satir = self._tek("SELECT MAX(zaman) AS son FROM hiz_sayaclari WHERE anahtar = ?", (anahtar,))
+        return satir["son"] if satir else None
+
     def sos_bul(self, sos_id: str) -> Optional[dict]:
         return self._tek("SELECT * FROM sos_cagrilari WHERE id = ?", (sos_id,))
 
@@ -659,7 +1055,7 @@ class SqliteDepo:
         """Cagriyi kapatir; acik gorevleri de bitirir ki ekip "gorevde" asili
         kalmasin (J-54). Doner: (kapandi mi, biten gorevlerin kimlikleri)."""
         simdi = time.time()
-        with self._kilit:
+        with self._yazma():
             imlec = self._baglanti.execute(
                 """UPDATE sos_cagrilari
                    SET durum = 'kapandi', kapanma_zamani = ?
@@ -752,11 +1148,61 @@ class SqliteDepo:
             )
         return self.ekip_bul(ekip_id)
 
-    def ekip_konum(self, ekip_id: str, lon: float, lat: float) -> None:
+    def ekip_konum(
+        self,
+        ekip_id: str,
+        lon: float,
+        lat: float,
+        gonderen: Optional[dict] = None,
+        dogruluk_m: Optional[float] = None,
+    ) -> Optional[float]:
+        """Son konumu gunceller VE gecmise ekler (J-166), tek islemde.
+        Doner: bu ekibin bir onceki konum zamani (yoksa None); paylasimin yeni
+        basladigini anlamak icin."""
         simdi = time.time()
-        self._yaz(
-            "UPDATE ekipler SET lon = ?, lat = ?, konum_zamani = ?, guncellendi = ? WHERE id = ?",
-            (lon, lat, simdi, simdi, ekip_id),
+        with self._yazma():
+            onceki = self._baglanti.execute(
+                "SELECT MAX(zaman) FROM ekip_konum_gecmisi WHERE ekip_id = ?", (ekip_id,)
+            ).fetchone()[0]
+            self._baglanti.execute(
+                "UPDATE ekipler SET lon = ?, lat = ?, konum_zamani = ?, guncellendi = ? WHERE id = ?",
+                (lon, lat, simdi, simdi, ekip_id),
+            )
+            self._baglanti.execute(
+                """INSERT INTO ekip_konum_gecmisi
+                   (ekip_id, lon, lat, dogruluk_m, zaman, gonderen_id, gonderen_ad, gonderen_rol)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (
+                    ekip_id, lon, lat, dogruluk_m, simdi,
+                    gonderen.get("id") if gonderen else None,
+                    gonderen.get("ad_soyad") if gonderen else None,
+                    gonderen.get("rol") if gonderen else None,
+                ),
+            )
+            self._baglanti.commit()
+        return onceki
+
+    def ekip_konum_gecmisi(
+        self,
+        ekip_id: str,
+        baslangic: Optional[float] = None,
+        bitis: Optional[float] = None,
+        sinir: int = 5000,
+    ) -> list[dict]:
+        """Eskiden yeniye; (ekip_id, zaman) indeksinden okunur."""
+        kosul, prm = ["ekip_id = ?"], [ekip_id]
+        if baslangic is not None:
+            kosul.append("zaman >= ?")
+            prm.append(baslangic)
+        if bitis is not None:
+            kosul.append("zaman <= ?")
+            prm.append(bitis)
+        return self._oku(
+            f"""SELECT * FROM (
+                   SELECT * FROM ekip_konum_gecmisi WHERE {' AND '.join(kosul)}
+                   ORDER BY zaman DESC LIMIT ?
+               ) ORDER BY zaman""",
+            (*prm, int(sinir)),
         )
 
     def ekip_listele(self) -> list[dict]:
@@ -775,7 +1221,7 @@ class SqliteDepo:
     def ekip_uyelerini_ayarla(self, ekip_id: str, kullanici_idler: list[str]) -> None:
         """Ekibin uyelerini verilen listeyle degistirir. Bir kisi tek ekipte
         olur: baska ekipteyse oradan cikar."""
-        with self._kilit:
+        with self._yazma():
             self._baglanti.execute(
                 "UPDATE kullanicilar SET ekip_id = NULL WHERE ekip_id = ?", (ekip_id,)
             )
@@ -853,7 +1299,7 @@ class SqliteDepo:
           - giden kisi sayisi ekibin kayitli sayisini gecemez.
         Olay 'bekliyor' ise 'atandi' olur (ihbar 'yeni' ise 'goruldu')."""
         simdi = time.time()
-        with self._kilit:
+        with self._yazma():
             try:
                 hedef = self._hedef_oku(hedef_tur, hedef_id)
                 if hedef is None:
@@ -960,7 +1406,7 @@ class SqliteDepo:
             raise GorevHatasi("gecersiz-durum", f"Bilinmeyen görev durumu: {durum}")
         simdi = time.time()
         hedef_durumu: Optional[str] = None
-        with self._kilit:
+        with self._yazma():
             try:
                 g = self._kilitsiz_tek("SELECT * FROM gorevler WHERE id = ?", (gorev_id,))
                 if g is None:
@@ -1246,7 +1692,7 @@ class SqliteDepo:
 
     def bildirim_kaldir(self, bildirim_id: str, kaldiran_id: str, kaldiran_ad: str) -> bool:
         """Yayindaki bildirimi geri ceker; zaten cekilmisse False."""
-        with self._kilit:
+        with self._yazma():
             imlec = self._baglanti.execute(
                 """UPDATE bildirimler
                    SET kaldirildi = ?, kaldiran_id = ?, kaldiran_ad = ?
@@ -1303,7 +1749,7 @@ class SqliteDepo:
             "isleyen_ad": None,
             "guncellendi": None,
         }
-        with self._kilit:
+        with self._yazma():
             try:
                 self._baglanti.execute(
                     """INSERT INTO ihbarlar
@@ -1375,7 +1821,7 @@ class SqliteDepo:
         if durum not in ("goruldu", "kapandi"):
             raise ValueError(f"Gecersiz ihbar durumu: {durum}")
         simdi = time.time()
-        with self._kilit:
+        with self._yazma():
             imlec = self._baglanti.execute(
                 """UPDATE ihbarlar
                    SET durum = ?, isleyen_id = ?, isleyen_ad = ?, guncellendi = ?

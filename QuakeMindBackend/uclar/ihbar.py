@@ -483,6 +483,9 @@ def ihbar_listesi(
         kullanici_id=kul["id"] if afetzede else None,
         sinir=sinir,
     )
+    import islem_kaydi
+
+    islem_kaydi.goruntuleme(kul, "ihbar_listesi", ayrinti={"kayitSayisi": len(kayitlar), "tur": tur})
     # Ihbara giden ekip (J-54); afetzede kendi ihbarininkini gorur.
     return gorevleri_ekle("ihbar", kayitlar, [_cikti(k, afetzede) for k in kayitlar], afetzede)
 
@@ -501,6 +504,9 @@ def ihbar_fotografi(ihbar_id: str, kul: dict = Depends(kimlik.kullanici)):
     foto = depo.ihbar_fotografi(ihbar_id)
     if foto is None:
         raise HTTPException(status_code=404, detail="Bu ihbarın fotoğrafı yok.")
+    import islem_kaydi
+
+    islem_kaydi.goruntuleme(kul, "ihbar_fotografi", hedef_tur="ihbar", hedef_id=ihbar_id)
     return {
         "veri": "data:image/jpeg;base64," + base64.b64encode(foto["veri"]).decode("ascii"),
         "en": foto["en"],
@@ -532,4 +538,17 @@ def ihbar_durumu(
     _yayinla(kayit)
     for gorev_id in biten:
         gorev_yayinla(depo.gorev_bul(gorev_id), "kapandi")
+    import islem_kaydi
+
+    tur_adi = {"fotograf": "Fotoğraf", "metin": "Yazılı", "ihtiyac": "İhtiyaç"}.get(kayit["tur"], kayit["tur"])
+    islem_kaydi.kaydet(
+        kul,
+        "ihbar_durumu",
+        f"{tur_adi} ihbarı {'görüldü' if istek.durum == 'goruldu' else 'kapatıldı'}: "
+        f"{kayit.get('mahalle') or kayit.get('etiket') or 'konum'}"
+        + (f", {len(biten)} açık görev bitti" if biten else ""),
+        hedef_tur="ihbar",
+        hedef_id=ihbar_id,
+        ayrinti={"durum": istek.durum, "tur": kayit["tur"], "bitenGorevler": biten},
+    )
     return gorevleri_ekle("ihbar", [kayit], [_cikti(kayit)])[0]

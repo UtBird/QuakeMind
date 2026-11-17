@@ -46,6 +46,19 @@ def _kendi_olayi(hedef_tur: str, hedef_id: str, kullanici_id: str) -> bool:
     return bool(kayit) and kayit.get("kullanici_id") == kullanici_id
 
 
+#: Acik akista oturumun hala gecerli oldugu bu aralikla yeniden denetlenir
+#: (J-167 S-6). Eskiden yalniz baglanirken bakiliyordu: askiya alinan ya da
+#: rolu dusurulen hesabin acik akisi SOS konumlarini almayi surduruyordu.
+OTURUM_DENETIM_SN = 15.0
+NABIZ_SN = 20.0
+
+
+def _akis_suruyor_mu(cerez: Optional[str], ilk: dict) -> bool:
+    """Oturum gecerli ve rol ayni mi (askida hesap, kapanan oturum, degisen rol: hayir)."""
+    guncel = kimlik.cerezden_kullanici(cerez)
+    return guncel is not None and guncel["id"] == ilk["id"] and guncel["rol"] == ilk["rol"]
+
+
 def _afetzede_icin(mesaj: dict, kullanici_id: str):
     """Afetzedeye giden akis (J-42): yalniz KENDI cagrisinin ve ihbarinin durum
     degisikligi ve acil bildirimler. Baskasinin cagri konumu ve analiz olaylari
@@ -123,11 +136,20 @@ async def canli_akis(
             # Akis acilir acilmaz bir kare gonderilir: istemci "bagli" durumuna
             # boylece hemen gecer, ilk olayi beklemez.
             yield ": akis acildi\n\n"
+            son_denetim = time.monotonic()
             while True:
                 if await request.is_disconnected():
                     return
+                if time.monotonic() - son_denetim >= OTURUM_DENETIM_SN:
+                    son_denetim = time.monotonic()
+                    if not _akis_suruyor_mu(cerez, kul):
+                        # Istemci bu olayda yeniden baglanmayi birakir.
+                        yield 'event: oturum-bitti\ndata: {"tip":"oturum-bitti"}\n\n'
+                        return
                 try:
-                    mesaj = await asyncio.wait_for(kuyruk.get(), timeout=20.0)
+                    mesaj = await asyncio.wait_for(
+                        kuyruk.get(), timeout=min(NABIZ_SN, OTURUM_DENETIM_SN)
+                    )
                 except asyncio.TimeoutError:
                     yield 'event: nabiz\ndata: {"tip":"nabiz"}\n\n'
                     continue

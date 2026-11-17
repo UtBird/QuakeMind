@@ -75,6 +75,12 @@ export type SosCagrisi = {
   durumSecildi?: boolean | null
   /** Çağrıya giden ekipler, yeniden eskiye (J-54). */
   gorevler?: Gorev[]
+  /** Hesap başına tek açık çağrı (J-167 S-2): açıkken yeniden basınca aynı çağrı
+      güncellenir. Kaç kez ve en son ne zaman; `zaman` ilk geldiği andır. */
+  guncellemeSayisi?: number
+  sonGuncelleme?: number | null
+  /** Yalnız gönderme yanıtında: bu basış yeni çağrı açmadı, var olanı güncelledi. */
+  guncellendi?: boolean
 }
 
 /**

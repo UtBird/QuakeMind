@@ -131,6 +131,13 @@ def bildirim_yayinla(
         gonderen_ad=kul.get("ad_soyad"),
     )
     _yayinla(kayit, "yayinda")
+    import islem_kaydi
+
+    islem_kaydi.kaydet(
+        kul, "bildirim_yayinlandi", f"Bildirim yayınlandı ({istek.onem}): {baslik}",
+        hedef_tur="bildirim", hedef_id=kayit["id"],
+        ayrinti={"onem": istek.onem, "baslik": baslik, "metin": metin[:500]},
+    )
     return _bildirim_cikti(kayit, ayrintili=True)
 
 
@@ -144,6 +151,12 @@ def bildirim_kaldir(bildirim_id: str, kul: dict = Depends(kimlik.rol_gerektir(*Y
         raise HTTPException(status_code=409, detail="Bildirim zaten geri cekilmis.")
     kayit = depo.bildirim_bul(bildirim_id)
     _yayinla(kayit, "kaldirildi")
+    import islem_kaydi
+
+    islem_kaydi.kaydet(
+        kul, "bildirim_geri_cekildi", f"Bildirim geri çekildi: {kayit.get('baslik')}",
+        hedef_tur="bildirim", hedef_id=bildirim_id,
+    )
     return _bildirim_cikti(kayit, ayrintili=True)
 
 

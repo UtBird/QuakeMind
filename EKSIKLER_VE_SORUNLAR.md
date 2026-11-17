@@ -5317,6 +5317,426 @@ görünür, `/api/sos/{id}/kapat` saha ve üstüne açık kalır; değişiklik y
 - Yeniden yüklemede sayaçlar önce "Hesaplar · — | Tümü · —", sonra "17".
 - `npx tsc -b`, `npm run kontrol:token` temiz.
 
+
+## J-165 🟠 Kamera tespiti çatlağa "binayı boşaltın" diyordu; analizlerin ve bazı işlemlerin kaydı tutulmuyordu
+**Durum:** KAPALI · **Görüldü** · **İlgili:** J-50, J-51, J-54, J-157, B-03, CLAUDE.md §1
+
+**Bulgu (17 Kasım, kullanıcı kamera ekranından bildirdi).**
+- **Çatlak uyarısı uydurmaydı.**
+  - `catlak.pt`'nin tek sınıfı var: `crack`. Çatlağın derin mi yüzeysel mi, taşıyıcı elemanda mı
+    olduğunu ayırt etmiyor.
+  - Uç ise güven %45'i geçince tespiti `CRITICAL` sayıyor ve "TAŞIYICI ELEMANDA DERİN YAPISAL
+    ÇATLAK… BİNAYI DERHAL BOŞALTIN" yazıyordu. Güven oranı şiddet değildir.
+  - Kullanıcının denediği fotoğraf yakın çekim bir beton çatlağı (stok görsel). Model neredeyse
+    bütün resmi kaplayan bir kutu çizdi (%75) ve üçünü de "KRİTİK" işaretledi.
+- **Resimdeki etiketler bozuktu.** OpenCV'nin yazı tipi Türkçe harf çizmiyor:
+  "Duvar/Kolon ??atla????". Ayrıca "Duvar/Kolon" da modelin bilmediği bir iddia.
+- **Ölçüm (13 gerçek deprem fotoğrafı, `tatbikat_foto/`, Wikimedia):**
+  - 47 çatlak kutusu, hiçbiri resmin yarısından büyük değil (ortanca ≈ %0–1).
+  - Yani bütün resmi kaplayan kutu yakın çekim beton dokusunda çıkıyor; sahadan gelen fotoğrafta
+    çatlak kutuları küçük.
+  - Bina modelinin sınıfları: `0_NoDamage`, `1_ModerateDamage`, `2_VeryHeavyDamage`.
+- **Kayıt tutma taraması.**
+  - Tutulanlar:
+    - görev adımları (`gorev_adimlari`: kim, hangi adım, ne zaman);
+    - hesap işlemleri (`hesap_kayitlari`, J-157);
+    - bildirimin gönderen ve geri çekeni;
+    - afetzede ihbarının model sonucu.
+  - Tutulmayanlar:
+    - konsoldaki kamera, metin ve hasar analizi (kim, ne zaman, hangi model, ne buldu);
+    - tatbikatı kimin başlattığı;
+    - SOS'u kimin kapattığı (yalnız zamanı vardı);
+    - ekip tanımını ve ekibe bağlı hesapları kimin değiştirdiği.
+  - İhbar durumunda yalnız son işleyen kalıyordu.
+
+**Kararlar (kullanıcı, 17 Kasım).**
+- Çatlak için dürüst metin: "kritik" ve "boşaltın" yok. Ağır/orta derece yalnız bina modelinin
+  sınıfından gelir.
+- Kayıt: analizler ve eksik işlemlerin hepsi tek, silinmeyen işlem kaydına.
+
+**Yapılan: sunucu.**
+- `uclar/kamera.py`:
+  - Her tespitte `siddet` var: `agir` / `orta` / `yok` bina modelinin sınıfından, çatlakta
+    `belirsiz`. `severity` eski istemciler için duruyor; çatlakta `UNRATED`.
+  - Yeni durum `CRACK_FOUND`. Tavsiye metinleri bina hakkında karar vermez, uzman
+    değerlendirmesine yönlendirir.
+  - Resme numara ve model sınıfı yazılır (ASCII). Tespitler güvene göre sıralı.
+  - Yanıta fotoğraf ölçüsü ve süre eklendi.
+- `islem_kayitlari` tablosu (`depo/sqlite_surucu.py`):
+  - kim (ad, rol), ne zaman, tür, hedef, tek cümlelik özet, ayrıntı (JSON);
+  - tetikleyiciler UPDATE ve DELETE'i reddeder;
+  - fotoğraf saklanmaz.
+- `islem_kaydi.kaydet` (`islem_kaydi.py`): kayıt yazılamazsa asıl iş durmaz, hata günlüğe gider.
+  Açık konsollara yalnız türü taşıyan `islem-kaydi` mesajı gider; afetzedeye gitmez.
+- Kayda bağlanan 18 tür:
+  - analizler: kamera, metin, hasar analizi (başladı / bitti / hata), tatbikat (başladı / bitti /
+    hata / kapatıldı);
+  - sevk ve görev adımı;
+  - SOS kapatma, ihbar durumu;
+  - ekip ekleme, ekip değişikliği (yalnız değişen alanlar), ekibe bağlı hesaplar;
+  - bildirim yayınlama ve geri çekme.
+- Analiz bitişi işçi sürecinden döner; kayıt, başlatan kişinin adına iş kaydı kilidinin dışında
+  yazılır.
+- `GET /api/islem-kayitlari`: yalnız koordinatör ve yönetici; tür süzgeci, sayfalama (`once`).
+
+**Yapılan: konsol.**
+- **Kamera sağ paneli:**
+  - en üstte tek cümlelik sonuç (rozet + tavsiye);
+  - gönderilen fotoğrafın üstüne tarayıcıda numaralı kutular;
+  - listede satıra gelince kutu öne çıkar;
+  - künye: model, en yüksek güven, süre, ölçü.
+  - Kendi analizin varsa afetzede fotoğraflarının üstünde durur.
+- **Tam ekran inceleme (`kabuk/FotoInceleme.tsx`):**
+  - yakınlaştırma 1–4×, kutuya ya da satıra tıklayınca seçim;
+  - ← → ile gezinme;
+  - ince ayar en altta: güven süzgeci, kutuları kapat.
+  - Afetzede ihbar fotoğraflarında da var.
+- **Kullanıcılar sayfasında "İşlem kaydı" sekmesi:**
+  - hazır süzgeçler: Analizler, Sevk ve görev, SOS ve ihbar, Ekip tanımı, Bildirimler;
+  - satır açılınca ayrıntı;
+  - "Daha eski kayıtlar".
+  - Eski "Kayıt defteri" sekmesinin adı "Hesap defteri" oldu.
+- Kamera Teknik notu güncellendi: modellerin bilinen tek sayısı eğitim doğrulama mAP@50'dir
+  (çatlak 0,731 · bina 0,592), bağımsız sınama değildir. "mAP henüz ölçülmedi" cümlesi eskiydi.
+
+**Doğrulama.**
+- `tests/test_islem_kaydi.py` (10 test):
+  - kayıt değiştirilemez ve silinemez;
+  - okuma yalnız koordinasyonda;
+  - sevk, görev adımı, SOS kapatma, ekip ekleme / değiştirme / üyeler, ihbar, bildirim ve
+    analiz bitişi kaydediliyor;
+  - kamerada çatlak "boşalt" demiyor, fotoğraf kayda girmiyor;
+  - sayfalama çalışıyor.
+- Önceki yetki testleriyle birlikte **48/48** geçti. `tsc -b` ve `kontrol:token` temiz.
+- Gerçek modelle: Hatay fotoğrafında 7 çatlak, hepsi `belirsiz`, durum `CRACK_FOUND`.
+- Tarayıcıda koordinatörle:
+  - Hatay hasar fotoğrafı "İkisi birden": 6 işaret (2 ağır, 1 orta, 3 çatlak), 1 385 ms;
+  - büyütme penceresinde seçim, → tuşu, 2× yakınlaştırma ve %60 süzgeci (6 → 2 kutu) çalıştı;
+  - işlem kaydında satır ve ayrıntısı göründü.
+
+**Etkisi.**
+- Eski web ve Flutter `severity == "CRITICAL"` bakıyorsa çatlak tek başına artık kritik
+  görünmez. Etiket "Duvar/Kolon Çatlağı" → "Çatlak". Bina etiketleri afetzede ekranıyla aynı.
+- `araclar_kanal_olc.py`'nin rapordaki `kritik` alanı eski kuralla üretildi; yeniden koşulursa
+  çatlak tek başına kritik sayılmaz.
+
+**Açık.**
+- Hasar analizi ve tatbikat kayıtları tarayıcıda uçtan uca koşulmadı; birim testle sınandı.
+- Afetzede ihbar fotoğrafının büyütme penceresi tarayıcıda açılmadı. Yerel ihbarlar Eylül'den,
+  30 günlük pencerenin dışında kalıyor.
+- Kayıt süresizdir; saklama süresi ve dışa aktarma ayrı karar.
+
+## J-166 🟠 İşlem kaydı kurcalanmaya açıktı; girişler, kişisel veri görüntüleme ve ekip konum geçmişi tutulmuyordu
+**Durum:** KAPALI · **Görüldü** · **İlgili:** J-165, J-167 (S-3, P-6, T-1), J-157, CLAUDE.md §1, §3, §5
+
+**Karar (kullanıcı, 17 Kasım).** J-165'teki işlem kaydına dört ek: giriş geçmişi, kimin neye
+baktığı, ekip konum paylaşımı ve hash zinciri.
+
+**Yapılan.**
+- **Hash zinciri.**
+  - `islem_kayitlari` her satırda `onceki_hash` ve `hash` (SHA-256) taşıyor. Satırın alanları
+    kanonik JSON'a yazılır (`depo/sqlite_surucu.py`, `islem_hash`).
+  - Sıra tek yazma bağlantısı ve kilitle korunur.
+  - Bu sürümden önceki satırlar özetsizdir; doğrulama onları "zincir öncesi" diye ayrı sayar.
+    Tetikleyici güncellemeye izin vermediği için geriye dönük doldurulmadı (bilerek).
+- **Doğrulama, artımlı (J-167 P-6).**
+  - `GET /api/islem-kayitlari/dogrula`: son sağlam denetimden devam eder. Önce o noktadaki satırın
+    özeti hâlâ aynı mı diye bakar; kuyruktan silme de yakalanır. `?tam=true` baştan sona tarar.
+  - Her sonuç silinmeyen `islem_zinciri_denetimleri` tablosuna yazılır.
+  - `GET /api/islem-kayitlari/son-denetim` doğrulama yapmadan son sonucu verir.
+  - Ölçüm `[Ö]` (bu makine, geçici SQLite, satır başına 6 tespitli kamera ayrıntısı):
+
+    | Kayıt sayısı | Tam doğrulama | Artımlı doğrulama |
+    |---|---|---|
+    | 10 000 | 0,14 sn | — |
+    | 100 000 | 3,08–3,36 sn | 100 yeni kayıt: 2,9 ms |
+
+  - Yazma: satır başına 0,11 ms (10 bin) → 0,26 ms (100 bin).
+- **Giriş geçmişi** (`uclar/oturum.py`):
+  - kayıt türleri: `giris_basarili`, `giris_basarisiz`, `cikis`, `kayit_oldu`;
+  - başarısız girişin nedeni: şifre hatalı, böyle bir hesap yok, yanlış kapı, hesap askıda;
+  - denenen e-posta, bağlanan adres, tarayıcı ve vekilin ilettiği adres (doğrulanmamış diye
+    işaretli) yazılır;
+  - şifre yazılmaz; istemciye giden ileti değişmez (hesabın varlığı sızmaz).
+- **Görüntüleme kaydı** (`islem_kaydi.goruntuleme`):
+  - kayıt altındaki ekranlar: SOS listesi, ihbar listesi, ihbar fotoğrafı, kullanıcı listesi,
+    hesap defteri, işlem kaydının kendisi, ekip konum geçmişi;
+  - aynı kişi aynı şeyi 10 dakikada bir kez yazılır (sayaç süreç içi);
+  - afetzedenin kendi kaydına bakması yazılmaz.
+- **Ekip konum geçmişi:**
+  - her konum noktası silinmeyen `ekip_konum_gecmisi` tablosuna gönderen ve telefonun bildirdiği
+    doğrulukla yazılır;
+  - işlem kaydına yalnız paylaşımın başladığı an düşer (15 dakikadan uzun aradan sonra);
+  - `GET /api/ekipler/{id}/konum-gecmisi` yalnız koordinasyonda;
+  - ekip ekranı artık doğruluğu da gönderiyor.
+- **Konsol, İşlem kaydı sekmesi:**
+  - "Kayıt zinciri" paneli: sağlam ya da bozuk, kaç kayıt, son özet, zincir öncesi kayıt sayısı;
+    "Yeni kayıtları doğrula" ve "Baştan doğrula" düğmeleri. Doğrulama kendiliğinden koşmaz;
+  - "Girişler" ve "Görüntülemeler" süzgeçleri, "Ekip ve konum" grubu;
+  - ayrıntıda zincir özeti.
+- **Kamera ucu (J-167 S-3):**
+  - bilinmeyen `modelType` artık 422 alıyor;
+  - model dosyası yoksa 503 dönüyor ("tespit yok" denmiyor);
+  - çözülemeyen fotoğraf 422;
+  - `activeModels` yalnız gerçekten koşan modelleri yazıyor.
+- **Testler (J-167 T-1):**
+  - `test_konum_gecmisi_tutulur` kendi ekibini ve hesabını kuruyor;
+  - heatmap testi sahte koordinatörle oturumlu çağırıyor (gerçek veritabanına hesap yazmadan),
+    uç PostGIS yokken `yerel_depo` dönüyor;
+  - oturumsuz çağrının 401 aldığı ayrı testle sabitlendi.
+
+**Doğrulama.**
+- `pytest -q`: **76/76**. Bunlara `test_islem_kaydi.py`'deki 19 test dahil:
+  - zincir değişikliği ve kuyruktan silmeyi yakalıyor;
+  - giriş türleri ve nedenleri doğru;
+  - görüntüleme 10 dakikada bir yazılıyor;
+  - konum paylaşımı bir kez yazılıyor;
+  - konum geçmişi silinemiyor;
+  - kamera 422/503 dönüyor.
+- `npx tsc -b`, `npm run kontrol:token` temiz.
+- Tarayıcıda koordinatörle:
+  - yanlış şifre ve doğru giriş kayda düştü (neden "şifre hatalı", adres, tarayıcı);
+  - SOS, ihbar, kullanıcı listesi ve işlem kaydı görüntülemeleri yazıldı;
+  - çıkış yazıldı;
+  - baştan doğrulama: 6 kayıt sağlam, zincir öncesi 3 kayıt; artımlı doğrulama da çalıştı;
+  - çerezsiz açılış (`127.0.0.1`) giriş ekranına düşüyor, kilitlenme yok.
+- Çalışan API'de gerçek modelle:
+  - `modelType="ikisi"` 422;
+  - `hybrid` iki modeli de çalıştırdı (6 tespit, ağır + çatlak, 4,1 sn; ilk çağrı modeli belleğe
+    yüklüyor);
+  - kayıt ve zincir güncel.
+
+**Sınırlar (bilinerek).**
+- Zincir kurcalamayı **gösterir, engellemez**. Dosyaya erişen biri bütün özetleri yeniden
+  hesaplayabilir. Bunu yakalamak için son özet zaman zaman dışarıya yazılmalı (ekranda öneriliyor).
+- Vekil arkasında `ip` vekilin adresidir. Nginx `X-Forwarded-For` eklerse o da yazılır ama
+  doğrulanmamıştır (istemci uydurabilir).
+- Kayıtlarda kişisel veri var: e-posta, IP, konum izi. Saklama süresi, erişim ve dışa aktarma
+  kararı verilmedi (KVKK).
+- Başarısız giriş denemesi sınırsız yazılır; sınırlama J-167 S-1'de.
+- Konum geçmişini haritada izleyen bir ekran yok; yalnız uç var.
+
+## J-167 🟠 Uçtan uca tarama (17 Kasım): giriş ve SOS sınırsız, birkaç ölü ekran, saha ana düğmesi ekran dışında
+**Durum:** AÇIK · **Bulundu:** 17 Kasım 2026 · **İlgili:** J-158, J-162, J-165, CLAUDE.md §1, §5, §8
+
+> Not: J-166 kimliği kodda (ekip konum geçmişi, işlem kaydı hash zinciri) başka bir iş için
+> kullanılıyor ama bu dosyada henüz maddesi yok; çakışmasın diye bu tarama J-167 aldı.
+
+**Nasıl ölçüldü.**
+- Çalışma ağacının o anki hâli (J-165 + J-166 commit edilmemiş).
+- Gerçek veritabanının kopyasında ayrı bir API (8001) ve konsol (3201). Gerçek veritabanına yazılmadı.
+- Demo hesaplarıyla dört rol, tarayıcıda (1440×900 ve 375×812) ve betikle (54 kontrol).
+- Bu makinede ölçüldü (Windows, GPU yok).
+
+**Geçenler.**
+- Testler:
+  - `tsc -b` ve `kontrol:token` temiz.
+  - Backend 66/68 (kalan ikisi aşağıda T-1).
+- Uçtan uca zincir:
+  - afetzede SOS → koordinatör sevk → saha "yola çıktık / vardık / bitti" → afetzede "kapandı";
+  - ihtiyaç, metin ve fotoğraf ihbarı;
+  - duyuru yayını ve geri çekme;
+  - hepsi işlem kaydında, zincir doğrulaması sağlam.
+- Yetki:
+  - 100 yolun yalnız 10'u oturumsuz (giriş, kayıt, yenile, çıkış, durum, deprem ve fay katmanı).
+  - Rol istemciden alınmıyor.
+  - Koordinatör yönetici hesabı açamıyor, kendi rolünü yükseltemiyor (409).
+  - Kurcalanmış JWT ve `alg=none` 401 alıyor.
+  - Başka afetzedenin fotoğrafı 404, SOS'u 403 dönüyor; yol geçişi denemeleri 404/422.
+  - 20 MB gövde 422 ile reddediliyor.
+- Canlı akış:
+  - API'den atılan SOS 1,5 sn içinde konsolda.
+  - Boşta 67 sn'de 8 istek (§4'teki eski ölçüm dakikada ~65'ti).
+- Tatbikat ("Hızlı", Elektrik): 33,8 sn sürdü; bu sırada `/api/ozet` p95 12 ms (API donmuyor).
+- Mobil: afetzede ve saha ekranında yatay taşma yok.
+
+**Bulgular.**
+
+*Güvenlik*
+- **S-1 🟠 Giriş denemesi sınırı yok.**
+  - Aynı hesaba 15 yanlış şifre gönderildi; hepsi 401 döndü, kilit ya da 429 yok.
+  - Tek engel bcrypt (~370 ms).
+  - ✅ Düzeltildi (17 Kasım, Grup B): `hiz_siniri.py`, `uclar/oturum.py` giriş ucu.
+    - Aynı e-postaya 15 dakikada 5 hatalı deneme → 6.'da **429** + `Retry-After`. Kilit sürerken
+      doğru şifre de 429 alır (şifre hiç denenmez). Başarılı giriş sayacı sıfırlar.
+    - Aynı adresten 15 dakikada 30 hatalı deneme (çok hesaba yayılan) → 429.
+    - Olmayan e-posta da aynı sayıda denemede aynı iletiyle kilitlenir; hesabın varlığı sızmaz.
+    - Konsol iletisi: "Çok fazla hatalı deneme. 15 dakika sonra yeniden dene."
+    - **Karar `[T]`: sayaç SQLite'ta** (`hiz_sayaclari`), bellekte değil. Sunucu yeniden
+      başlatılınca kilit sıfırlanmaz, ileride birden çok worker'a geçilirse ortak kalır.
+      Bedeli deneme başına bir yazma. Bir günden eski satırlar silinir. Sorgular
+      `(anahtar, zaman)` indeksinden okunuyor; `EXPLAIN QUERY PLAN` tablo taramıyor.
+    - **Vekil:** `X-Forwarded-For` geliyorsa yalnız `QUAKEMIND_VEKIL_GUVENILIR=1` iken
+      adres sınırı uygulanır. Yoksa Nginx arkasında herkes aynı adresten görünür ve bir kişi
+      herkesi kilitlerdi. Canlıda Nginx arkasında bu değişken açılmalı (Deha).
+    - Tarayıcıda (veritabanı kopyasında) denendi: olmayan bir e-postayla 5 kez "E-posta veya
+      şifre hatalı", 6.'da 429 iletisi.
+- **S-2 🟠 SOS sınırı yok.**
+  - Tek afetzede hesabı 0,2 sn'de 30 SOS attı; hepsi 201 döndü.
+  - Kuyrukta 30 ayrı satır oldu ve ısı haritasında tek başına "en acil bölge" lekesi çıktı.
+  - Kayıt açık, doğrulama yok: çok hesapla sel de mümkün.
+  - Öneri:
+    - hesap başına tek açık SOS; yenisi var olanı güncellesin;
+    - hesap ve IP başına dakikalık sınır;
+    - kayıtta IP sınırı.
+  - ✅ Düzeltildi (17 Kasım, Grup B, U-3 ile): `depo/sqlite_surucu.py` `sos_ac_ya_da_guncelle`,
+    `uclar/sozlesme.py` SOS ucu.
+    - **Hesap başına tek açık SOS.** Açık çağrı varken yeniden basılırsa yeni satır açılmaz:
+      konum, not ve kişi sayısı güncellenir; öncelik yalnız daha acile çıkar; ihtiyaçlar
+      birleşir.
+    - Yanıt 200 + mevcut kimlik (yeni çağrı 201).
+    - Bekleme süresi bozulmasın diye çağrının geldiği an (`zaman`) değişmez; kaç kez ve en son
+      ne zaman güncellendiği `ek`te durur.
+    - Kontrol ve yazma aynı kilitte: aynı anda iki basış iki satır açamaz.
+    - Isı haritasına güncellemede nokta yazılmaz: kişi bir kez sayılır.
+    - Hesap başına dakikada 6, adres başına dakikada 30 basış → 429 ("Çağrın zaten
+      iletildi… şebeke varsa 112'yi ara").
+    - Hesap açmaya adres başına saatte 10 sınırı (aile, aynı Wi-Fi payı).
+    - Yeni sorgu `ix_sos_kullanici_zaman` indeksinden okunuyor (`EXPLAIN QUERY PLAN`).
+    - Ekranda:
+      - konsol kuyruğu tek satır, "N kez yeniden gönderdi";
+      - ayrıntıda "Yeni çağrı açılmadı; konum ve bilgiler güncellendi";
+      - afetzede ekranı "Çağrın zaten iletilmişti… güncellendi (N kez)" diyor; açık çağrı
+        varken form bunu önceden söylüyor.
+    - Kopyada 8 hızlı SOS: 201, 200×5, 429×2 → tek açık satır, `guncellemeSayisi` 5. Konsolda
+      tek satır göründü.
+- **S-3 🟡 Kamera ucu bilinmeyen `modelType`'ta model çalıştırmıyor ama "temiz" diyor.**
+  - `"ikisi"` gönderilince 28 ms'de 200 `NO_DETECTION` dönüyor.
+  - `activeModels` iki modeli de çalışmış gibi yazıyor (`uclar/kamera.py:255`). Kural §1'e aykırı ve yanlış negatif üretiyor.
+  - Bilinmeyen değer 422 almalı.
+  - ✅ Düzeltildi (J-166): `cekirdek.py` `CameraAnalysisRequest.modelType` Literal; `uclar/kamera.py` model yoksa 503, `activeModels` yalnız koşanlar.
+- **S-4 🟡 Belgeler oturumsuz açık.** `/docs`, `/redoc`, `/openapi.json` 200 dönüyor; üretimde kapatılmalı.
+  - ✅ Düzeltildi (17 Kasım, Grup B): `fastapi_app.py`. Varsayılan **kapalı** (404); geliştirmede
+    `QUAKEMIND_BELGELER=1` ile açılır. Konsol ve araçlar bunlara bağlı değil (tarandı).
+- **S-5 🟡 Metin ihbarındaki adres dış servise gidiyor.**
+  - Adres, kamuya açık OSM Nominatim'e gönderiliyor (`apps/disaster_nlp/src/ner_extraction.py:120`).
+  - Afetzedenin yazdığı adres üçüncü tarafa çıkıyor.
+  - Nominatim saniyede 1 istek kuralı koyuyor; internet zayıfsa adres bulunamıyor. Yerel mahalle/sokak dizini önerilir.
+- **S-6 ⚪ Canlı akış kimliği yalnız bağlanırken denetliyor** (`uclar/canli.py`). Hesap askıya alınsa da açık akış sürer. Kodda görüldü, ölçülmedi.
+  - ✅ Düzeltildi (17 Kasım, Grup B): `uclar/canli.py`, `konsol/src/canli/canliAkis.ts`.
+    - Açık akış oturumu 15 saniyede bir yeniden denetliyor.
+    - Hesap askıya alınırsa, oturum kapanırsa ya da rol değişirse akış `oturum-bitti` olayıyla
+      kapanıyor. İstemci yeniden bağlanmayı bırakıyor, sonraki istek giriş ekranına götürüyor.
+    - Kopyada: saha konsolu açıkken hesap askıya alındı; ~24 sn içinde giriş ekranına düştü,
+      canlı akışa yeniden bağlanma denemesi olmadı.
+
+*İşlev ve doğruluk*
+- **F-1 🟠 Metin modeli kendi örnek cümlesini çözemiyor.**
+  - Kutudaki örnek, "Armutlu Mahallesi 5. Sokak'ta bina çöktü, iki kişi enkaz altında…", "metinde adres bulunamadı" sonucu verdi.
+  - Kategori "Acil Yardım İhtiyacı" çıktı (enkaz cümlesi).
+  - İlk istek 31,8 sn sürdü.
+- **F-2 🟡 Koordinatla gelen SOS'ta mahalle boş.**
+  - Konsolda "Mahalle bilinmiyor", saha ekranında yalnız ham koordinat (`36.19250, 36.14150`) görünüyor.
+  - Sunucu koordinattan mahalleyi bulabilir (altlıkta mahalle var).
+- **F-3 🟡 "Yol ve Rota" sayfası ölü.** "Rota ucu (A*) henüz bağlı değil" diyor, oysa görev ekranında rota var (J-162). Ya bağlanmalı ya menüden kalkmalı.
+- **F-4 🟡 Zaman şeridi histogramı hiç yazılmamış.**
+  - Şerit canlı bağlıyken ve 35 SOS varken de "canlı akış bağlanınca şerit dolacak" diyor (`konsol/src/kabuk/ZamanSeridi.tsx:114-119`).
+  - Metin ya düzeltilmeli ya histogram yazılmalı.
+- **F-5 ⚪ Afetzede "Nereye" kartında İtfaiye 0, Polis 0.** Antakya merkezi, 5 km içinde. Yerel OSM kopyasında bu türler var mı bakılmalı; doğrulanmadı.
+- **F-6 ⚪ Tatbikat ilerleme metinlerinde Türkçe karakter yok.**
+  - "Uydu goruntusu indiriliyor", "Analiz tamamlandi" gibi.
+  - Drone katmanında da "Uydu" yazıyor.
+- **F-7 ⚪ Hasar sayfası kapsaması %0 olan görüntüleri de listeliyor.**
+
+*Arayüz*
+- **U-1 🟠 Saha ekranının ana düğmesi telefonda ekranın dışında.**
+  - 375×812'de "Yola çıktık" 800. pikselde başlıyor; görmek için kaydırmak gerekiyor.
+  - Üstteki "Rotayı haritada göster" aynı birincil vurguda, dikkati bölüyor.
+  - Öneri: adım düğmeleri yapışkan bir alt çubukta.
+  - ✅ Düzeltildi (17 Kasım, Grup C): `konsol/src/ekip/EkipEkrani.tsx`, `stil/token.css` (`.alt-guvenli`),
+    `index.html` (`viewport-fit=cover`).
+    - Adım düğmeleri görev kartının altında yapışkan bir çubukta: kart boyunca ekranın altında durur.
+    - Birincil adım tam genişlikte; "İşimiz bitti…" ve "Gidemiyoruz…" yan yana.
+    - iPhone'un alt güvenli alanı hesaba katılır.
+    - "Rotayı haritada göster" ikincil görünüme indi.
+    - 375×812'de `saha-demo` ile ölçüldü: "Yola çıktık" 700–748 px'te, kaydırmadan görünüyor (önce ~800).
+- **U-2 🟡 API ayakta değilken giriş ekranı ham hata gösteriyor:** "/api/oturum/giris → HTTP 500". API'nin açılışı ~30 sn sürüyor; bu sürede insan diliyle bir ileti gerekir.
+  - ✅ Düzeltildi (17 Kasım, Grup C): `konsol/src/kimlik/GirisEkrani.tsx`.
+    - 5xx ve ağ hatasında "Sunucu şu an yanıt vermiyor; açılıyor olabilir (yaklaşık 30 sn).
+      Birkaç saniye sonra yeniden dene." yazıyor.
+    - Yoklama yok: kişi yeniden basınca dener (§4).
+    - API açılırken tarayıcıda denendi; ham ileti görünmedi.
+    - Kök neden: uvicorn açılış bitene kadar bağlantı kabul etmiyor, vekil o sırada 500/502 dönüyor.
+- **U-3 🟡 Aynı kişinin art arda SOS'ları kuyrukta ayrı satır.** S-2 ile birlikte birleştirilmeli.
+  - ✅ Düzeltildi (S-2 ile): kuyrukta tek satır, "N kez yeniden gönderdi".
+- **U-4 🟡 Tatbikat lejantı haritanın yaklaşık üçte birini kapatıyor.** "Haritada ne var" kutusu varsayılan olarak kapalı açılmalı.
+  - ✅ Düzeltildi (17 Kasım, Grup C): `konsol/src/kabuk/HaritaGostergesi.tsx`. Varsayılan kapalı; başlık
+    görünür, tek tıkla açılır. Tatbikat koşturulup tarayıcıda bakılmadı (değişiklik tek satır, başlangıç değeri).
+- **U-5 ⚪ Konsol metni küçük.** Görünen metnin %87'si 11–12 px (169/194 öğe), operasyon ekranı için küçük.
+- **U-6 ⚪ Afetzede ekranında adsız düğmeler var.** Yer listesi satırları ve alt kartlar ekran okuyucuya ad vermiyor. Konsolda adsız düğme yok.
+  - ✅ Düzeltildi (17 Kasım, Grup C): `afetzede/BildirDugmeleri.tsx`, `afetzede/NereyeKarti.tsx`.
+    - Erişilebilirlik ağacında ölçüldü: üç ihbar kartı artık "Hasar fotoğrafı: Fotoğraf çek, modele
+      incelet, ihbar et" gibi okunuyor.
+    - Yer satırları "Toplanma alanı, Turunçlu, yürüyerek 650 m, yön batı" diye okunuyor.
+    - 375×812, afetzede ekranında adsız düğme kalmadı.
+
+*Performans*
+- **P-1 Harita parçası büyük.**
+  - Üretim derlemesinde 2,08 MB (gzip 574 KB).
+  - Afetzede ekranı da deck.gl yüklüyor (`afetzede/haritaKatmanlari.ts`); toplam ≈ 711 KB gzip JS.
+  - Öneri:
+    - afetzede haritasını yalnız maplibre ile çiz;
+    - yavaş 3G'de "SOS'a basılabilir" süresini ölç.
+- **P-2 Metin analizinin ilk isteği 31,8 sn.** Model tembel yükleniyor, üstüne Nominatim bekleniyor. Model işçide açılışta ısıtılmalı; adres çözümü yerelde yapılmalı (S-5).
+- **P-3 Isı haritası soğukken yavaş.**
+  - İlk açılışta 4 paralel istek 4,3 sn sürüyor; ısınınca 28 ms.
+  - Öneri: açılışta ısıt ya da 4 kaynağı tek istekte dön.
+- **P-4 Tatbikatta yol ağı 12,4 sn, görüntü 12,6 sn sürdü.** `DEMO_CALISTIRMA.md` §4'e göre önbellekten 0–1 sn olmalıydı. Katalog alanları önceden indirilmeli.
+- **P-5 Hazır olma ucu yok.** API açılışı ~30 sn, `/health` 404. Hazır ucu eklenmeli, konsol beklerken bunu göstermeli (U-2).
+  - ✅ Düzeltildi (17 Kasım, Grup C): `uclar/genel.py` `GET /api/hazir`.
+    - Oturumsuz; yalnız evet/hayır döner.
+    - Veritabanı okunuyor ve analiz işçisi havuzu kurulmuşsa 200, değilse 503.
+    - Not: açılış sürerken uvicorn bağlantı almadığı için bu uç da yanıt veremez. Açılıştan sonraki
+      eksikleri ayırt eder.
+    - Bu makinede açılış ~45–60 sn sürdü (30 değil).
+- **P-6 Zincir doğrulaması bütün tabloyu okuyor.**
+  - `/api/islem-kayitlari/dogrula` her istekte bütün `islem_kayitlari`'nı tarıyor.
+  - Kayıt büyüdükçe doğrusal büyür. Artımlı doğrulama ya da sınır gerekir.
+  - ✅ Düzeltildi (J-166): artımlı doğrulama, 100 bin kayıttan sonra 100 yeni kayıt 2,9 ms; tam tarama `?tam=true`.
+
+*Test*
+- **T-1 İki test kırık.**
+  - `test_konum_gecmisi_tutulur` sıraya bağlı: tek başına geçiyor, dosyanın tamamında kalıyor. `test_islem_kaydi.py:116` saha hesabını başka ekibe taşıyor.
+  - `test_heatmap_offline_fallback_returns_200` eskimiş: uç artık giriş istiyor (401), test oturumsuz çağırıyor.
+  - ✅ Düzeltildi (J-166): ikisi de geçiyor, `pytest -q` 76/76.
+- **T-2 8000'deki API eski kodla çalışıyor.** 14:24'te açılmış, J-166 dosyaları 14:49'da değişti. Yeniden başlatılmadan denenen her şey eski kodu sınar.
+
+**Açık.**
+- Fotoğraf yükleme tarayıcıda denenmedi (dosya seçici sürülemedi); yalnız API ile denendi.
+- Hasar analizi (uydu) ve risk tahmini tarayıcıda koşulmadı.
+- Yavaş ağ ve düşük cihaz ölçümü yapılmadı.
+
+## J-168 🔴 Eski web kamera sayfası API'ye ulaşamayınca uydurma sonuç gösteriyor
+**Durum:** AÇIK · **Görüldü** · **İlgili:** J-165, CLAUDE.md §1, §7
+
+**Bulgu (17 Kasım, J-166 kontrolünde).**
+- `quakemind-web/src/app/command/camera/page.tsx:114-133`: istek hata verirse (`catch`) ekrana
+  sabit bir sonuç basılıyor.
+  - "Bina" seçiliyse "BİNA AĞIR HASARLI TESPİT EDİLDİ! BÖLGEYE GİRİŞ TEHLİKELİDİR", güven %96,2.
+  - Öteki modellerde "YAPISAL BÜTÜNLÜK KORUNUYOR".
+- Model hiç koşmadan, gerçek bir ölçüm gibi görünüyor. Kural §1'e doğrudan aykırı.
+
+**Neden açık.** Eski web'e yalnız kritik düzeltme yapılır (CLAUDE.md §7); karar kullanıcının.
+Önerilen düzeltme: `catch` içinde sonuç yerine "Sunucuya ulaşılamadı, analiz yapılmadı" yazmak.
+
+## J-169 🟠 Başarısız bir yazma veritabanı kilidini bırakmıyordu
+**Durum:** KAPALI · **Görüldü** · **İlgili:** J-158, J-166, J-167
+
+**Bulgu (17 Kasım, J-167 Grup C testlerinde).**
+- `depo/sqlite_surucu.py`'deki 14 yazma bloğunun hiçbiri hata anında işlemi geri almıyordu.
+- Bir yazma reddedilince (tetikleyici, kısıt, disk) bağlantıda açık işlem kalıyordu.
+  - Aynı dosyaya yazan başka bağlantılar ve süreçler "database is locked" alıyordu.
+  - Sonraki yazmalar da o yarım işlemin içine giriyordu.
+- Testte, işlem kaydının silinemediğini sınayan testten sonra 16 test kuruluşta düştü.
+- Canlıda: tek bir başarısız yazma, aynı dosyaya yazan araç betiklerini kilitleyebilirdi.
+
+**Yapılan.**
+- `_yazma()`: kilit + hata anında `rollback`, hata yine fırlatılır. 14 blok buna çevrildi.
+- Test: `tests/test_depo_eszamanlilik.py::test_basarisiz_yazma_kilidi_birakir`.
+  - Reddedilen silmeden sonra açık işlem kalmıyor.
+  - Başka bir bağlantı 0,5 sn içinde yazabiliyor.
+- `pytest -q` **89/89**.
+
 ---
 
 # DEĞİŞİKLİK GÜNLÜĞÜ
@@ -5528,3 +5948,10 @@ görünür, `/api/sos/{id}/kapat` saha ve üstüne açık kalır; değişiklik y
 | 17 Kasım 2026 | **J-162**: saha ekibi görev ekranına kapanmalardan kaçınan rota haritası eklendi (tembel yükleme). Rolüne kapalı konsol modları adresten de açılmıyor. Karar: saha konsolu görür, koordinasyon işleri kapalı (J-163). |
 | 17 Kasım 2026 | **J-163** kapatıldı: ekip gönderme sunucuda ve ekranda yalnız koordinasyonda; Acil bildirim ve Simülasyon saha ekibine görünmüyor. Oturumsuz 14 eski/araştırma ucu `QUAKEMIND_ESKI_UCLAR` bayrağının arkasına alındı, tanı görseli giriş istiyor. Yeni `tests/test_uc_yetkileri.py` (18). |
 | 17 Kasım 2026 | **J-164** kapatıldı: konsol üst çubuğu 1024 px'te 202 px taşıyordu (çıkış ve Canlı rozeti ekran dışında); 1280 altında yazılar simgeye iniyor, sağ denetimler hep görünür. Kullanıcılar sayfası yüklenirken sayıları 0 yerine "—" yazıyor. |
+| 17 Kasım 2026 | **J-165** kapatıldı: kamera tespiti çatlağa "binayı derhal boşaltın" diyordu (tek sınıflı modelin güveni şiddet sayılıyordu); derece artık yalnız bina modelinin sınıfından. Silinmeyen işlem kaydı: analizler, sevk, SOS/ihbar, ekip, bildirim (18 tür). Kamera sonucu numaralı kutularla ve tam ekran incelemeyle. `tests/test_islem_kaydi.py` (10). |
+| 17 Kasım 2026 | **J-167** açıldı: uçtan uca tarama (yalıtılmış kopyada, 4 rol, 54 kontrol). Giriş ve SOS sınırsız (S-1, S-2), kamera ucu bilinmeyen modelde "temiz" diyor (S-3), metin modeli örnek cümlesinin adresini bulamıyor (F-1), Yol ve Rota sayfası ve zaman şeridi ölü (F-3, F-4), saha ana düğmesi telefonda ekran dışında (U-1); iki backend testi kırık (T-1). |
+| 17 Kasım 2026 | **J-166** kapatıldı: işlem kaydına hash zinciri (artımlı doğrulama: 100 bin kayıttan sonra 100 yeni kayıt 2,9 ms; tam tarama 3,1–3,4 sn), giriş geçmişi (başarısızlar ve nedenleri), kişisel veri görüntüleme kaydı (10 dk'da bir), silinmeyen ekip konum geçmişi. J-167 S-3, P-6 ve T-1 düzeltildi; `pytest -q` 76/76. |
+| 17 Kasım 2026 | **J-168** açıldı: eski web kamera sayfası API'ye ulaşamayınca %96,2 güvenli uydurma "bina ağır hasarlı" sonucu gösteriyor; düzeltme kararı kullanıcıda (§7). |
+| 17 Kasım 2026 | **J-167 Grup B** (güvenlik) düzeltildi: giriş denemesi sınırı (S-1, 6. hatalı denemede 429, sayaç SQLite'ta), hesap başına tek açık SOS ve dakikalık sınır (S-2, U-3), API belgeleri varsayılan kapalı (S-4), canlı akış oturumu 15 sn'de bir denetliyor (S-6). S-3 J-166'da, S-5 Grup D'ye bırakıldı. Yeni `tests/test_hiz_siniri.py` (11); `pytest -q` 87/87. Canlıda Nginx arkasında `QUAKEMIND_VEKIL_GUVENILIR=1` açılmalı. |
+| 17 Kasım 2026 | **J-167 Grup C** (saha ve giriş arayüzü) düzeltildi: saha adım düğmeleri telefonda yapışkan alt çubukta (U-1, "Yola çıktık" 375×812'de kaydırmadan görünüyor), giriş ekranı sunucu açılırken insan diliyle yazıyor (U-2) ve `/api/hazir` ucu (P-5), tatbikat lejantı varsayılan kapalı (U-4), afetzede kartları ve yer satırları ekran okuyucuya adlı (U-6). |
+| 17 Kasım 2026 | **J-169** kapatıldı: başarısız bir yazma açık işlem bırakıp veritabanını kilitliyordu; 14 yazma bloğu hata anında geri alıyor. `pytest -q` 89/89. |

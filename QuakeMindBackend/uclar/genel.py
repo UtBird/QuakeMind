@@ -43,6 +43,29 @@ def health_check():
     return {"status": "ok", "message": "QuakeMind API is running!"}
 
 
+@yonlendirici.get("/api/hazir")
+def hazir():
+    """Hazir olma ucu (J-167 P-5). Oturumsuz: yalniz evet/hayir doner, veri yok.
+
+    Veritabani okunabiliyor ve analiz iscisi havuzu kurulduysa 200, degilse 503.
+    Not: uvicorn acilis (lifespan) bitene kadar baglanti kabul etmez; o sirada bu
+    uc da yanit veremez, istemci "ulasilamadi" gorur. Bu uc acilistan SONRAKI
+    eksikleri (DB kilidi, havuz kurulamadi) ayirt eder."""
+    from fastapi.responses import JSONResponse
+    from depo import aktif_depo
+
+    try:
+        veritabani = aktif_depo()._tek("SELECT 1 AS n") is not None
+    except Exception:  # noqa: BLE001
+        veritabani = False
+    isci = ck.road_damage_pool is not None
+    hazir_mi = veritabani and isci
+    return JSONResponse(
+        status_code=200 if hazir_mi else 503,
+        content={"hazir": hazir_mi, "veritabani": veritabani, "analizIscisi": isci},
+    )
+
+
 @yonlendirici.get("/api/postgis/status")
 def postgis_status():
     from utils.postgis_manager import postgis_engine

@@ -39,6 +39,8 @@ MESAJ_TIPLERI = (
     "hesap",
     # Simulasyon modu: bir katman cizilmeye hazir (SIMULASYON_SOZLESMESI.md 3).
     "simulasyon-katman",
+    # Islem kaydi (J-165): yalniz tur gider; konsol kayit listesini tazeler.
+    "islem-kaydi",
 )
 
 

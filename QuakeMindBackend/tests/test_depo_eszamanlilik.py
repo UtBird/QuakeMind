@@ -95,3 +95,24 @@ def test_hasar_ozeti_100_binden_fazlasini_eksiksiz_sayar(d):
 def test_kapanma_sayisi_ve_zaman_araligi(d):
     assert d.kapanma_sayisi() == 0
     assert d.hasar_ozeti() == {"kaynakSayilari": {}, "yikikYapi": 0, "hasarliYapi": 0}
+
+
+def test_basarisiz_yazma_kilidi_birakir(tmp_path):
+    """Reddedilen yazma (tetikleyici, kisit) acik islem birakmasin: ayni dosyaya
+    yazan baska baglanti 'database is locked' almasin (J-167 testlerinde bulundu)."""
+    import sqlite3
+
+    from depo.sqlite_surucu import SqliteDepo
+
+    yol = str(tmp_path / "kilit.sqlite3")
+    d = SqliteDepo(yol)
+    d.islem_kaydi_ekle({"id": "u", "ad_soyad": "A", "rol": "koordinator"}, "sos_kapatildi", "deneme")
+    try:
+        d._yaz("DELETE FROM islem_kayitlari")  # tetikleyici reddeder
+    except sqlite3.DatabaseError:
+        pass
+    assert not d._baglanti.in_transaction
+    baska = sqlite3.connect(yol, timeout=0.5)
+    baska.execute("INSERT INTO ekipler (id, ad, guncellendi) VALUES ('kilit-x', 'x', 0)")
+    baska.commit()
+    baska.close()

@@ -1,7 +1,9 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { ArrowsOut } from '@phosphor-icons/react'
 import { Amac, Bolum, VeriYok } from '@/kabuk/Panel'
 import { Micro, Rozet } from '@/kabuk/parcalar'
 import { IsaretliFoto, TespitListesi } from '@/kabuk/IsaretliFoto'
+import { FotoInceleme } from '@/kabuk/FotoInceleme'
 import { useHarita } from '@/harita/HaritaKabugu'
 import { useKonsol } from '@/durum/konsolDurumu'
 import { useSorguAraligi } from '@/durum/zamanDurumu'
@@ -12,6 +14,7 @@ import {
   FOTOGRAF_MODELI,
   IHBAR_DURUMU,
   IHBAR_TURU,
+  ihbarBasligi,
   ihbarKonumu,
   useIhbarDurum,
   useIhbarFotografi,
@@ -217,10 +220,40 @@ function FotografAyrintisi({ ihbar }: { ihbar: Ihbar }) {
   const foto = useIhbarFotografi(ihbar.fotografVar ? ihbar.id : null)
   const tespitler = ihbar.tespitler ?? []
   const hasarli = tespitler.filter((t) => t.hasar)
+  const [inceleme, setInceleme] = useState<{ acik: boolean; sira: number | null }>({ acik: false, sira: null })
   return (
     <>
       {foto.data ? (
-        <IsaretliFoto veri={foto.data.veri} en={foto.data.en} boy={foto.data.boy} tespitler={tespitler} />
+        <>
+          <button
+            type="button"
+            onClick={() => setInceleme({ acik: true, sira: null })}
+            className="group relative block w-full rounded-control focus-visible:outline-2 focus-visible:outline-accent"
+            aria-label="Fotoğrafı tam ekranda incele"
+          >
+            <IsaretliFoto veri={foto.data.veri} en={foto.data.en} boy={foto.data.boy} tespitler={tespitler} numarali />
+            <span className="absolute right-2 bottom-2 flex items-center gap-1.5 rounded-control border border-line-2 bg-panel px-2 py-1 text-small text-ink group-hover:bg-hover">
+              <ArrowsOut size={14} aria-hidden />
+              Büyüt
+            </span>
+          </button>
+          <FotoInceleme
+            acik={inceleme.acik}
+            kapat={() => setInceleme({ acik: false, sira: null })}
+            baslik={`${ihbarBasligi(ihbar)} · ${ihbar.mahalle ?? 'konum'}`}
+            veri={foto.data.veri}
+            en={foto.data.en}
+            boy={foto.data.boy}
+            tespitler={tespitler}
+            baslangic={inceleme.sira}
+            kunye={
+              <p className="text-small text-ink-3">
+                Afetzedenin seçtiği model: {ihbar.model ? FOTOGRAF_MODELI[ihbar.model].ad : '—'}. Modelin
+                tahminidir; sahada doğrulanmadı.
+              </p>
+            }
+          />
+        </>
       ) : (
         <div className="grid h-40 place-items-center rounded-control bg-sunken text-small text-ink-3">
           {foto.isError ? 'Fotoğraf alınamadı.' : 'Fotoğraf yükleniyor…'}
@@ -231,10 +264,14 @@ function FotografAyrintisi({ ihbar }: { ihbar: Ihbar }) {
         {hasarli.length ? `${hasarli.length} yer işaretledi.` : 'Model hasar işaretlemedi; fotoğrafa bakın.'}
       </p>
       <div className="mt-1">
-        <TespitListesi tespitler={tespitler} />
+        <TespitListesi
+          tespitler={tespitler}
+          numarali
+          onSec={(sira) => setInceleme({ acik: true, sira })}
+        />
       </div>
       <p className="mt-1.5 text-small text-ink-3">
-        Modelin tahminidir; sahada doğrulanmadı. Model mAP değeri henüz ölçülmedi.
+        Modelin tahminidir; sahada doğrulanmadı. Bağımsız bir sınamada başarımı ölçülmedi.
       </p>
     </>
   )
