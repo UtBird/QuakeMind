@@ -85,6 +85,8 @@ export function canliAkisBaslat(qc: QueryClient, secenek: AkisSecenek = {}): () 
   let deneme = 0
   let enAzBirKezBaglandi = false
   let sonSinyal = 0
+  /** "oturum-bitti" sonrası tek yeniden bağlanma denemesi sürüyor (J-174). */
+  let sonDeneme = false
 
   /* Sunucu kopukken yayınlanan mesajları biriktirmez; kopukluk sırasında
      gelen bildirim, geri çekme ya da ekip ataması kaybolur. Bu yüzden akış
@@ -120,6 +122,7 @@ export function canliAkisBaslat(qc: QueryClient, secenek: AkisSecenek = {}): () 
     kaynak.onopen = () => {
       sonSinyal = Date.now()
       deneme = 0
+      sonDeneme = false
       useCanliAkisDurumu.setState({ durum: 'bagli', denemeSayisi: 0, sonrakiDenemeMs: null })
       if (enAzBirKezBaglandi) hepsiniTazele()
       enAzBirKezBaglandi = true
@@ -132,17 +135,30 @@ export function canliAkisBaslat(qc: QueryClient, secenek: AkisSecenek = {}): () 
     kaynak.addEventListener('nabiz', () => {
       sonSinyal = Date.now()
     })
-    // Sunucu oturumu geçersiz buldu (askıya alma, çıkış, rol değişikliği; J-167
-    // S-6): yeniden bağlanmak yalnız 401 üretir. Akış kapanır; sonraki API
-    // isteği oturumu düşürüp giriş ekranına götürür.
+    // Sunucu akışın açıldığı çerezi geçersiz buldu. İki ayrı neden var:
+    //  - Jeton döndü (J-174): istemci 15 dakikada bir erişim jetonunu yeniler,
+    //    sunucu yenileme çerezini değiştirip eskisini iptal eder. Tarayıcıda
+    //    artık YENİ çerez var; eskiden akış burada kalıcı kapanıyor, ekran
+    //    ilk yenilemeden sonra canlı veriyi almayı bırakıyordu.
+    //  - Çıkış, askıya alma (J-167 S-6): tarayıcıdaki çerez de geçersiz.
+    // Bu yüzden bir kez hemen yeniden bağlanılır; açılırsa jeton dönmüştür,
+    // açılmazsa (401) akış kapanır ve sonraki API isteği giriş ekranına götürür.
     kaynak.addEventListener('oturum-bitti', () => {
-      kapandi = true
-      window.clearInterval(bekci)
       kaynak?.close()
       kaynak = null
-      useCanliAkisDurumu.setState({ durum: 'kapali', sonrakiDenemeMs: null })
+      if (sonDeneme) return bitir()
+      sonDeneme = true
+      bagla()
     })
-    kaynak.onerror = koptu
+    kaynak.onerror = () => (sonDeneme ? bitir() : koptu())
+  }
+
+  const bitir = () => {
+    kapandi = true
+    window.clearInterval(bekci)
+    kaynak?.close()
+    kaynak = null
+    useCanliAkisDurumu.setState({ durum: 'kapali', sonrakiDenemeMs: null })
   }
 
   const koptu = () => {

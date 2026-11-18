@@ -191,7 +191,17 @@ def _cikti(k: dict, afetzede: bool = False) -> dict:
         c["en"] = ek.get("en")
         c["boy"] = ek.get("boy")
     elif k["tur"] == "metin":
-        c["analiz"] = ek.get("analiz")
+        a = ek.get("analiz")
+        c["analiz"] = a
+        # Metinde ihtiyac geciyorsa ("suyumuz bitti, 30 kisiyiz") ihtiyac
+        # sayfasina da duser (J-174). Eskiden yalniz analizin icindeydi; ihtiyac
+        # sayfasi yalniz formdan gelen talepleri sayiyordu. Model cikarimidir,
+        # afetzedenin sectigi degil: istemci bunu "metinden" diye yazar.
+        if a and not a.get("ilgisiz"):
+            gecen = {x.get("ihtiyac") for x in a.get("ihtiyaclar") or []}
+            c["ihtiyaclar"] = [i for i in IHTIYACLAR if i in gecen]
+            sayilar = [int(x["sayi"]) for x in a.get("kisiler") or [] if isinstance(x.get("sayi"), (int, float))]
+            c["kisiSayisi"] = max(sayilar) if sayilar else None
     else:
         c["ihtiyaclar"] = ek.get("ihtiyaclar", [])
         c["kisiSayisi"] = ek.get("kisiSayisi")

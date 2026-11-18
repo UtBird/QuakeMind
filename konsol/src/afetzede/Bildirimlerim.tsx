@@ -111,8 +111,11 @@ function SatirOgesi({ s, acik, degistir }: { s: Satir; acik: boolean; degistir: 
   // Ekip giderse satır ekibin durumunu gösterir: kim, kaç kişi, hangi aşamada (J-54).
   const gorevler = s.tur === 'sos' ? s.sos.gorevler : s.ihbar.gorevler
   const gelenler = (gorevler ?? []).filter(acikGorev)
+  // İhbarda ekip bir kez gittiyse (bitirdi ya da gelemedi dahil) durum ekipten
+  // anlatılır; eskiden yalnız açık görev bakılıyordu, ekip bitirince afetzede
+  // "İhbar işlendi" görüyor, kimin geldiğini görmüyordu (J-174).
   const ekipDurumu =
-    s.tur === 'sos' || gelenler.length
+    s.tur === 'sos' || (gorevler ?? []).length
       ? afetzedeDurumu(
           gorevler,
           s.tur === 'sos' ? s.sos.durum === 'kapandi' : s.ihbar.durum === 'kapandi',

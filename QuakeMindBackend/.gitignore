@@ -42,3 +42,5 @@ veri/yol_agi/
 
 # Il merkezleri (risk ekrani, 81 il): yerel OSM kopyasindan, araclar_il_merkezleri_uret.py
 veri/il_merkezleri.json
+# Indirilen acik lisansli goruntu karolari (J-172); yeniden indirilebilir.
+veri/goruntu_onbellek/

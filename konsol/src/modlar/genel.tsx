@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Amac, Bolum, HazirSecenekler, InceAyar, SuAn, Teknik, VeriYok } from '@/kabuk/Panel'
-import { Chip, Kaydirici, Micro, Rozet } from '@/kabuk/parcalar'
+import { Chip, Micro, Rozet } from '@/kabuk/parcalar'
 import { useHarita } from '@/harita/HaritaKabugu'
 import { sn } from '@/lib/sinif'
 import {
@@ -10,7 +10,7 @@ import {
   useKonsol,
   type KanalId,
 } from '@/durum/konsolDurumu'
-import { agirlik, sayi, tarihSaat } from '@/lib/bicim'
+import { sayi, tarihSaat } from '@/lib/bicim'
 import { useSorguAraligi } from '@/durum/zamanDurumu'
 import {
   ONCELIK_ADI,
@@ -44,6 +44,20 @@ const LISTE_BOYU = 30
 /** Sunucudaki kaynak tipi → ısı kanalı. Sayım tek yerden gelir (özet ucu),
     yoksa aynı çağrı hem nokta hem çağrı olarak iki kez sayılıyor. */
 const KAYNAK_KANAL: Record<string, KanalId> = { uydu: 'sat', sos: 'sos', kamera: 'cam', metin: 'nlp' }
+
+/** Kaynak etkisi seviyeleri (J-172): eski kaydırıcı -1..1,5 arası sayı
+    gösteriyordu ("×1,0"), ne demek olduğu anlaşılmıyordu. Hazır karışımların
+    ara değerleri (ör. -0,6) en yakın seviyede gösterilir. */
+const SEVIYELER = [
+  { id: 'cikar', ad: 'Çıkar', deger: -1, aciklama: 'Bu kaynağın olduğu yeri soğutur' },
+  { id: 'kapali', ad: 'Kapalı', deger: 0, aciklama: 'Bu kaynak ısıyı etkilemez' },
+  { id: 'normal', ad: 'Normal', deger: 1, aciklama: 'Öteki kaynaklarla eşit katkı' },
+  { id: 'guclu', ad: 'Güçlü', deger: 1.5, aciklama: 'Bu kaynak öne çıkar' },
+] as const
+
+function enYakinSeviye(w: number) {
+  return SEVIYELER.reduce((en, sv) => (Math.abs(sv.deger - w) < Math.abs(en.deger - w) ? sv : en)).id
+}
 
 /** Sol panel — birleşik ısı haritası karışımı (ARAYUZ §9 sırasıyla). */
 export function GenelSol() {
@@ -84,42 +98,60 @@ export function GenelSol() {
         onSec={karisimSec}
       />
 
-      {/* 3 — ince ayar en altta */}
-      <InceAyar baslik="Kaynak ağırlıkları">
+      {/* 3 — ince ayar: her kaynak ısıyı ne kadar etkilesin (J-172) */}
+      <InceAyar baslik="Her kaynak ısıyı ne kadar etkilesin?">
         {KANALLAR.map((k) => {
           const bilgi = KANAL_BILGI[k]
           const n = sayimlar[k]
           const yok = n === null || n === 0
+          const secili = enYakinSeviye(agirliklar[k])
           return (
             <div key={k} className="border-t border-line py-2 first:border-t-0">
-              <div className="kilav-kanal items-center gap-2">
-                <span
-                  aria-hidden
-                  className="h-2 w-2 rounded-badge"
-                  style={{ background: bilgi.renk }}
-                />
-                <span>
-                  <span className="text-small text-ink">{bilgi.ad}</span>
-                  <br />
-                  <span className="text-small text-ink-3">{bilgi.kaynak}</span>
+              <div className="flex items-start justify-between gap-2">
+                <span className="flex min-w-0 items-start gap-2">
+                  <span aria-hidden className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: bilgi.renk }} />
+                  <span className="min-w-0">
+                    <span className="block text-small text-ink">{bilgi.ad}</span>
+                    <span className="block text-small text-ink-3">{bilgi.kaynak}</span>
+                  </span>
                 </span>
-                <span className="font-mono text-small whitespace-nowrap text-ink-2">
-                  {n === null ? '—' : `${sayi(n)} nokta`}
+                <span className={sn('shrink-0 text-small', yok ? 'text-ink-3' : 'text-ink-2')}>
+                  {n === null ? '—' : yok ? 'bu aralıkta yok' : `${sayi(n)} nokta`}
                 </span>
               </div>
-              <Kaydirici
-                etiket={`${bilgi.ad} ağırlığı`}
-                deger={agirliklar[k] * 100}
-                enAz={-100}
-                enCok={150}
-                adim={10}
-                kapali={yok}
-                degerEtiketi={yok ? '—' : agirlik(agirliklar[k])}
-                onDegis={(v) => agirlikAyarla(k, v / 100)}
-              />
+              <div
+                role="radiogroup"
+                aria-label={`${bilgi.ad}: ısıya etkisi`}
+                className={sn('mt-1.5 grid grid-cols-4 gap-1', yok && 'opacity-40')}
+              >
+                {SEVIYELER.map((sv) => (
+                  <button
+                    key={sv.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={secili === sv.id}
+                    disabled={yok}
+                    title={sv.aciklama}
+                    onClick={() => agirlikAyarla(k, sv.deger)}
+                    className={sn(
+                      'rounded-control border px-1 py-1 text-small transition-colors duration-150 ease-out-qm',
+                      secili === sv.id
+                        ? 'border-accent bg-accent-soft text-ink'
+                        : 'border-line-2 text-ink-2 hover:bg-hover hover:text-ink',
+                    )}
+                  >
+                    {sv.ad}
+                  </button>
+                ))}
+              </div>
             </div>
           )
         })}
+        <p className="mt-1.5 text-small text-ink-3">
+          <span className="text-ink-2">Normal</span> eşit katkı, <span className="text-ink-2">Güçlü</span> öne
+          çıkarır, <span className="text-ink-2">Kapalı</span> yok sayar, <span className="text-ink-2">Çıkar</span>{' '}
+          o kaynağın olduğu yeri soğutur (ör. sessiz bölgeler: uydu yıkık gösteriyor ama çağrı yok).
+        </p>
       </InceAyar>
 
       <div className="mt-3">
@@ -203,37 +235,39 @@ export function GenelSag() {
   const seciliIhbar =
     secili?.tip === 'ihbar' ? (ihbar.data ?? []).find((i) => i.id === secili.id) : undefined
 
+  // Yüklenirken "veri yok" yazılmaz (J-174): o, sorgunun hata verdiği anlamına gelir.
+  const yok = (q: { isError: boolean }) => (q.isError ? 'veri yok' : 'yükleniyor…')
   const kartlar: Array<[string, string, string]> = [
     [
       'Yıkık yapı',
       ozet.data ? sayi(ozet.data.yikikYapi) : '—',
-      ozet.data ? `${sayi(ozet.data.hasarliYapi)} yapı da hasarlı` : 'veri yok',
+      ozet.data ? `${sayi(ozet.data.hasarliYapi)} yapı da hasarlı` : yok(ozet),
     ],
     [
       'Kapalı yol',
       ozet.data ? sayi(ozet.data.hasarliYol) : '—',
-      ozet.data ? 'uydu analizinden gelen kapanma' : 'veri yok',
+      ozet.data ? 'uydu analizinden gelen kapanma' : yok(ozet),
     ],
     [
       'Bekleyen SOS',
       ozet.data ? sayi(ozet.data.bekleyenSos) : '—',
-      ozet.data ? `${sayi(ozet.data.atananSos)} çağrıya ekip gidiyor` : 'veri yok',
+      ozet.data ? `${sayi(ozet.data.atananSos)} çağrıya ekip gidiyor` : yok(ozet),
     ],
     [
       'Yeni ihbar',
       ihbar.data ? sayi(ihbar.data.filter((i) => i.durum === 'yeni').length) : '—',
-      ihbar.data ? `aralıkta ${sayi(ihbar.data.length)} ihbar` : 'veri yok',
+      ihbar.data ? `aralıkta ${sayi(ihbar.data.length)} ihbar` : yok(ihbar),
     ],
     // Ekipler şu anki durumuyla (zaman aralığından bağımsız, J-54).
     [
       'Görevdeki ekip',
       ozet.data?.ekipSayisi != null ? `${sayi(ozet.data.gorevdekiEkip ?? 0)} / ${sayi(ozet.data.ekipSayisi)}` : '—',
-      ozet.data?.ekipSayisi != null ? `${sayi(ozet.data.musaitEkip ?? 0)} ekip müsait` : 'veri yok',
+      ozet.data?.ekipSayisi != null ? `${sayi(ozet.data.musaitEkip ?? 0)} ekip müsait` : yok(ozet),
     ],
     [
       'Sahadaki kişi',
       ozet.data?.sahadakiKisi != null ? sayi(ozet.data.sahadakiKisi) : '—',
-      ozet.data?.sahadakiKisi != null ? 'açık görevlere giden' : 'veri yok',
+      ozet.data?.sahadakiKisi != null ? 'açık görevlere giden' : yok(ozet),
     ],
   ]
 

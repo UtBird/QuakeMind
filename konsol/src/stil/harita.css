@@ -27,21 +27,61 @@
   outline: none;
 }
 
-/* Üstüne gelince bilgi kutusu (J-41): paneller gibi opak, kenarlıklı; gölge ve
-   cam efekti yok (ARAYUZ §2). */
+/* Üstüne gelince bilgi kartı (J-41, J-172): paneller gibi opak, kenarlıklı;
+   gölge ve cam efekti yok (ARAYUZ §2). Düzen her türde aynı: tür (simgeyle),
+   başlık, ad-değer satırları, kaynak, tıklayınca ne olacağı. */
 .qm-ipucu {
-  max-width: 280px;
+  min-width: 200px;
+  max-width: 300px;
   background: var(--color-panel);
   border: 1px solid var(--color-line-2);
   border-radius: var(--radius-control);
   padding: 8px 10px;
-  color: var(--color-ink-3);
+  color: var(--color-ink-2);
   font-family: var(--font-sans);
   font-size: var(--text-small);
   line-height: 1.45;
 }
+.qm-ipucu-tur {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-3);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
 .qm-ipucu-baslik {
   color: var(--color-ink);
+  font-size: var(--text-body);
   font-weight: 600;
-  margin-bottom: 2px;
+  margin: 4px 0 4px;
+}
+.qm-ipucu-satir {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--color-line);
+  padding: 3px 0;
+}
+.qm-ipucu-satir > span:first-child {
+  color: var(--color-ink-3);
+}
+.qm-ipucu-satir > span:last-child {
+  color: var(--color-ink);
+  text-align: right;
+}
+.qm-ipucu-metin {
+  border-top: 1px solid var(--color-line);
+  padding: 3px 0;
+  color: var(--color-ink-2);
+}
+.qm-ipucu-kaynak {
+  margin-top: 4px;
+  color: var(--color-ink-3);
+}
+.qm-ipucu-eylem {
+  margin-top: 6px;
+  color: var(--color-accent);
 }

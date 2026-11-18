@@ -1,267 +1,357 @@
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { WarningCircle } from '@phosphor-icons/react'
 import { Amac, Bolum, HazirSecenekler, SuAn, Teknik, VeriYok } from '@/kabuk/Panel'
 import { Micro, Rozet } from '@/kabuk/parcalar'
 import { apiGet, apiPost } from '@/veri/istemci'
 import { useHarita } from '@/harita/HaritaKabugu'
-import { BOLGELER, type BolgeId } from '@/veri/analiz'
 import { useCozumleme } from '@/durum/cozumlemeDurumu'
-import { sayi } from '@/lib/bicim'
+import { sn } from '@/lib/sinif'
 
-/* Risk modu: bir şehir için kısa vadeli model riski, uzun vadeli tehlike ve
-   fay etkisi. Model sunucuda dosyadan yüklenir; istek yolunda eğitim yoktur. */
+/* ---------------------------------------------------------------------------
+   Deprem riski (J-173). Panelin sorusu: hangi ilde risk daha yüksek, neden?
+   Sol: 81 il riske göre sıralı. Harita: il merkezleri risk renginde, seçili
+   ilin hesap alanı halkalarla. Sağ: skor ve üç bileşen, her biri neyi
+   ölçtüğü ve dayanağıyla; zayıf olan bileşen bunu söyler.
+   Hesap sunucuda (`risk_hizmeti.py`), model dosyadan yüklenir.
+--------------------------------------------------------------------------- */
 
-type RiskYaniti = {
+export type RiskYaniti = {
   city: string
   coordinates: { lat: number; lon: number }
   riskScore: number
   riskLevel: string
   lastUpdate?: string
-  factors: Record<string, number>
   metrics: {
     shortRisk: number
     longHazard: number
     faultScore: number
     faultDistanceKm: number
-    heatSampleCount?: number
-    totalFaultFeatures?: number
+    nearbyQuakeCount?: number
+    maxMagnitude?: number
   }
-  /** Sunucu bunları hazır metin olarak veriyor: "Dogu Anadolu Fayi (5.5 km)",
-      "M1.8 - 114 km - 2026-08-13". */
-  nearbyFaults?: string[]
-  recentEvents?: string[]
+  dayanak?: {
+    kisaVadeKaynagi: 'yerel' | 'ulke'
+    kisaVadeYerelDeprem: number
+    uzunVadeAnaSok: number
+    katalogBasi: string
+    katalogSonu: string
+    agirlik: { kisa: number; uzun: number; fay: number }
+    yaricapKm: { kisa: number; uzun: number; yakinDeprem: number }
+  }
+  yakinFaylar?: { tur: string; kimlik: string; km: number }[]
+  sonDepremler?: { time: string; magnitude: number; distanceKm: number; place: string; depth: number | null }[]
 }
 
-/** Sunucu seviye metnini emoji ile veriyor; arayüzde emoji kullanılmaz
-    (ARAYUZ §2), renk zaten rozetten geliyor. */
-function seviyeMetni(ham: string): string {
-  return ham.replace(/[^\p{L}\p{N}\s]/gu, '').trim()
+export type RiskSirasi = {
+  il: string
+  lat: number
+  lon: number
+  skor: number
+  seviye: string
+  kisa: number
+  uzun: number
+  fay: number
+  fayKm: number
+  kisaVadeKaynagi: 'yerel' | 'ulke'
 }
 
-function seviyeTonu(skor: number): 'crit' | 'high' | 'mid' | 'ok' {
-  if (skor >= 75) return 'crit'
-  if (skor >= 50) return 'high'
-  if (skor >= 25) return 'mid'
-  return 'ok'
-}
+export const RISK_TONU = (skor: number): 'crit' | 'high' | 'mid' | 'ok' =>
+  skor >= 75 ? 'crit' : skor >= 50 ? 'high' : skor >= 25 ? 'mid' : 'ok'
 
-/** 81 il merkezi: sunucu yerel OSM kopyasından bir kez üretir
-    (araclar_il_merkezleri_uret.py). Konum dış servisten aranmaz. */
-type IlMerkezi = { il: string; merkez: string; lat: number; lon: number; osm: string }
-type IlListesi = {
-  iller: IlMerkezi[]
-  kaynak: { atif: string; lisans: string; dosyaTarihi: string; yontem: string } | null
-}
+const TON_ZEMIN = { crit: 'bg-crit', high: 'bg-high', mid: 'bg-mid', ok: 'bg-ok' } as const
 
-const IL_ONEKI = 'il:'
+const OPERASYON = [
+  { id: 'Hatay', etiket: 'Antakya (Hatay)' },
+  { id: 'Kahramanmaraş', etiket: 'Kahramanmaraş' },
+  { id: 'Gaziantep', etiket: 'Gaziantep' },
+  { id: 'Malatya', etiket: 'Malatya' },
+  { id: 'Adıyaman', etiket: 'Adıyaman' },
+] as const
 
-function useIller() {
+const yuzde = (x: number) => `%${Math.round(x * 100)}`
+const ondalik = (x: number, b = 1) => x.toFixed(b).replace('.', ',')
+
+export function useRiskSiralamasi() {
   return useQuery({
-    queryKey: ['risk-iller'],
-    staleTime: Infinity,
-    queryFn: () => apiGet<IlListesi>('/api/risk/iller'),
+    queryKey: ['risk', 'siralama'],
+    staleTime: 10 * 60_000,
+    queryFn: () => apiGet<{ iller: RiskSirasi[] }>('/api/risk/siralama'),
   })
 }
 
-/** Seçim ya bir harita bölgesinin kimliği ya da `il:<ad>`. */
-function hedefi(secim: string | null, iller: IlMerkezi[] | undefined) {
-  if (!secim) return null
-  if (secim.startsWith(IL_ONEKI)) {
-    const il = iller?.find((x) => x.il === secim.slice(IL_ONEKI.length))
-    return il ? { ad: il.il, lat: il.lat, lon: il.lon } : null
-  }
-  return BOLGELER.find((x) => x.id === (secim as BolgeId)) ?? null
-}
-
-function useRisk(secim: string | null) {
-  const iller = useIller()
-  const h = hedefi(secim, iller.data?.iller)
+function useRisk(il: RiskSirasi | null) {
   return useQuery({
-    queryKey: ['risk', secim],
-    enabled: !!h,
+    queryKey: ['risk', 'il', il?.il],
+    enabled: !!il,
+    staleTime: 10 * 60_000,
     queryFn: () =>
-      apiPost<RiskYaniti>('/api/risk/predict', {
-        city: h!.ad,
-        manualLatitude: h!.lat,
-        manualLongitude: h!.lon,
-      }),
+      apiPost<RiskYaniti>('/api/risk/predict', { city: il!.il, manualLatitude: il!.lat, manualLongitude: il!.lon }),
   })
+}
+
+/** Seçili il (mağazada `il:<ad>`); sol ve sağ panel ile harita paylaşır. */
+export function useSeciliRiskIli(siralama: RiskSirasi[] | undefined): RiskSirasi | null {
+  const secim = useCozumleme((d) => d.riskBolge)
+  return useMemo(() => {
+    const ad = secim?.startsWith('il:') ? secim.slice(3) : null
+    return (ad && siralama?.find((x) => x.il === ad)) || null
+  }, [secim, siralama])
 }
 
 export function RiskSol() {
-  const secim = useCozumleme((d) => d.riskBolge)
+  const siralama = useRiskSiralamasi()
+  const secili = useSeciliRiskIli(siralama.data?.iller)
   const sec = useCozumleme((d) => d.riskBolgeSec)
-  const risk = useRisk(secim)
-  const iller = useIller()
   const { ucus } = useHarita()
+  const [ara, setAra] = useState('')
+
+  const ilSec = (il: RiskSirasi) => {
+    sec(`il:${il.il}`)
+    ucus(il.lon, il.lat, 6.4) // 200 km'lik hesap alanı ekrana sığsın
+  }
+  // Haritadan ya da düğmeden seçilen il listede görünür olsun.
+  useEffect(() => {
+    if (secili) document.getElementById(`risk-il-${secili.il}`)?.scrollIntoView({ block: 'nearest' })
+  }, [secili])
+  const liste = useMemo(() => {
+    const a = ara.trim().toLocaleLowerCase('tr')
+    return (siralama.data?.iller ?? [])
+      .map((x, i) => ({ ...x, sira: i + 1 }))
+      .filter((x) => !a || x.il.toLocaleLowerCase('tr').includes(a))
+  }, [siralama.data, ara])
 
   return (
-    <Bolum baslik="Deprem riski" ek={<Micro>CatBoost</Micro>}>
+    <Bolum baslik="Deprem riski" ek={<Micro>81 il</Micro>}>
       <Amac>
-        Hangi bölgede önümüzdeki dönemde risk daha yüksek? Sismik geçmiş, fay uzaklığı ve son
-        hareketlilik birlikte değerlendirilir.
+        Hangi ilde deprem riski daha yüksek, neden? Geçmiş depremler, fay uzaklığı ve son
+        hareketlilik birlikte; her il merkezi için.
       </Amac>
 
       <HazirSecenekler
-        etiket="Bölgeler"
-        secenekler={BOLGELER.map((b) => ({ id: b.id, etiket: b.ad }))}
-        secili={secim as BolgeId | null}
+        etiket="Operasyon bölgeleri"
+        secenekler={OPERASYON}
+        secili={(secili?.il as (typeof OPERASYON)[number]['id']) ?? null}
         onSec={(id) => {
-          sec(id)
-          const b = BOLGELER.find((x) => x.id === id)
-          if (b) ucus(b.lon, b.lat, 9)
+          const il = siralama.data?.iller.find((x) => x.il === id)
+          if (il) ilSec(il)
         }}
       />
 
-      <label className="mt-3 block text-micro ls-micro text-ink-3 uppercase" htmlFor="risk-il">
-        81 il
+      <label className="mt-3 block" htmlFor="risk-ara">
+        <Micro>İl ara</Micro>
       </label>
-      {iller.isError || (iller.data && !iller.data.iller.length) ? (
-        <div className="mt-1.5">
-          <VeriYok
-            ne="İl listesi"
-            neden="il merkezleri üretilmedi (araclar_il_merkezleri_uret.py)"
-          />
+      <input
+        id="risk-ara"
+        type="search"
+        value={ara}
+        onChange={(e) => setAra(e.target.value)}
+        placeholder="ör. Bolu"
+        className="mt-1 w-full rounded-control border border-line-2 bg-sunken px-2.5 py-1.5 text-body text-ink"
+      />
+
+      {siralama.isError ? (
+        <div className="mt-2">
+          <VeriYok ne="Risk sıralaması" neden="model yüklenemedi (araclar_risk_egit.py)" />
         </div>
       ) : (
-        <select
-          id="risk-il"
-          value={secim?.startsWith(IL_ONEKI) ? secim : ''}
-          disabled={!iller.data}
-          onChange={(e) => {
-            if (!e.target.value) return
-            sec(e.target.value)
-            const il = iller.data?.iller.find((x) => IL_ONEKI + x.il === e.target.value)
-            if (il) ucus(il.lon, il.lat, 11)
-          }}
-          className="mt-1.5 w-full rounded-control border border-line-2 bg-sunken px-2.5 py-2 text-body text-ink"
-        >
-          <option value="">{iller.data ? 'İl seç…' : 'İl listesi yükleniyor…'}</option>
-          {(iller.data?.iller ?? []).map((il) => (
-            <option key={il.il} value={IL_ONEKI + il.il}>
-              {il.il}
-            </option>
+        <ol aria-label="İller, riske göre" className="mt-2 max-h-form overflow-auto rounded-control border border-line">
+          {siralama.isPending && <li className="px-2.5 py-2 text-small text-ink-3">81 il hesaplanıyor…</li>}
+          {liste.map((il) => (
+            <li key={il.il}>
+              <button
+                id={`risk-il-${il.il}`}
+                type="button"
+                aria-pressed={secili?.il === il.il}
+                onClick={() => ilSec(il)}
+                className={sn(
+                  'flex w-full items-center gap-2 border-b border-line px-2.5 py-1.5 text-left last:border-b-0',
+                  secili?.il === il.il ? 'bg-raised' : 'hover:bg-hover',
+                )}
+              >
+                <span className="w-6 shrink-0 font-mono text-small text-ink-3">{il.sira}</span>
+                <span className="min-w-0 flex-1 truncate text-small text-ink">{il.il}</span>
+                <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-line">
+                  <span
+                    className={sn('block h-full', TON_ZEMIN[RISK_TONU(il.skor)])}
+                    style={{ width: `${Math.max(3, il.skor)}%` }}
+                  />
+                </span>
+                <span className="w-9 shrink-0 text-right font-mono text-small text-ink">{Math.round(il.skor)}</span>
+              </button>
+            </li>
           ))}
-        </select>
+        </ol>
       )}
 
       <SuAn>
-        {risk.isFetching
-          ? 'Model koşuyor…'
-          : risk.data
-            ? `${risk.data.city}: risk skoru ${risk.data.riskScore}, en yakın fay ${risk.data.metrics.faultDistanceKm.toFixed(
-                1,
-              )} km.`
-            : 'Bir bölge ya da il seç; sonuç sağ panelde bileşenleriyle görünür.'}
+        {secili
+          ? `${secili.il}: skor ${Math.round(secili.skor)}, ${secili.seviye.toLocaleLowerCase('tr')}; ayrıntı sağda.`
+          : 'Bir ile tıkla; skorun bileşenleri ve dayanağı sağda, hesap alanı haritada.'}
       </SuAn>
 
-      {risk.isError && (
-        <div className="mt-2">
-          <VeriYok
-            ne="Risk sonucu"
-            neden="model dosyası yoksa sunucu eğitim komutunu istiyor (araclar_risk_egit.py)"
-          />
-        </div>
-      )}
-
       <Teknik>
-        Model istek yolunda eğitilmez: eğitim ayrı bir komuttur, sonuç dosyaya yazılır, API
-        yalnız yükler. Ölçüm: ilk istek 1,7 sn (soğuk), sonrakiler ortanca 168 ms.
+        Skor her il için il merkezinde hesaplanır, ilin tamamı için değil. Model istek yolunda
+        eğitilmez; sonuç veri değişmedikçe sunucuda saklanır (ilk sıralama ~2 sn, sonra anında).
       </Teknik>
-      {iller.data?.kaynak && (
-        <Teknik>
-          İl merkezleri: {iller.data.kaynak.atif} ({iller.data.kaynak.lisans}), yerel kopya{' '}
-          {iller.data.kaynak.dosyaTarihi}; il sınırı içindeki şehir noktası. Hesap il merkezi için
-          yapılır, ilin tamamı için değil.
-        </Teknik>
-      )}
     </Bolum>
   )
 }
 
 export function RiskSag() {
-  // Seçim mağazada; sol panelle aynı sorgu anahtarı paylaşıldığı için
-  // ikinci bir istek atılmaz.
-  const secim = useCozumleme((d) => d.riskBolge)
-  const risk = useRisk(secim)
-  const veri = risk.data
-
-  if (!veri) {
+  const siralama = useRiskSiralamasi()
+  const secili = useSeciliRiskIli(siralama.data?.iller)
+  const risk = useRisk(secili)
+  if (!secili) {
     return (
       <Bolum baslik="Risk">
-        <Amac>Seçilen bölgenin ya da ilin risk skoru ve bileşenleri burada görünür.</Amac>
+        <Amac>Seçilen ilin risk skoru, üç bileşeni ve her birinin dayanağı burada görünür.</Amac>
         <div className="mt-2">
-          <VeriYok ne="Risk" neden="henüz bölge ya da il seçilmedi" />
+          <VeriYok ne="Risk" neden="henüz il seçilmedi" />
         </div>
       </Bolum>
     )
   }
+  if (!risk.data) {
+    return (
+      <Bolum baslik={secili.il}>
+        <p className="text-small text-ink-3">{risk.isError ? 'Risk hesaplanamadı.' : 'Hesaplanıyor…'}</p>
+      </Bolum>
+    )
+  }
+  return <RiskSonucu veri={risk.data} />
+}
 
-  return <RiskSonucu veri={veri} />
+function Bilesen({
+  ad,
+  soru,
+  deger,
+  agirlik,
+  dayanak,
+  uyari,
+}: {
+  ad: string
+  soru: string
+  deger: number
+  agirlik: number
+  dayanak: string
+  uyari?: string | null
+}) {
+  const ton = RISK_TONU(deger * 100)
+  return (
+    <div className="border-t border-line py-2.5 first:border-t-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-body text-ink">{ad}</span>
+        <span className="font-mono text-body text-ink">{yuzde(deger)}</span>
+      </div>
+      <p className="text-small text-ink-3">{soru}</p>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line">
+        <span className={sn('block h-full', TON_ZEMIN[ton])} style={{ width: `${Math.max(2, deger * 100)}%` }} />
+      </div>
+      <p className="mt-1 text-small text-ink-2">
+        {dayanak} <span className="text-ink-3">· skordaki payı {yuzde(agirlik)}</span>
+      </p>
+      {uyari && (
+        <p className="mt-1 flex items-start gap-1.5 text-small text-ink-2">
+          <WarningCircle size={14} weight="bold" className="mt-0.5 shrink-0 text-high" aria-hidden />
+          {uyari}
+        </p>
+      )}
+    </div>
+  )
 }
 
 export function RiskSonucu({ veri }: { veri: RiskYaniti }) {
+  const d = veri.dayanak
+  const ag = d?.agirlik ?? { kisa: 0.4, uzun: 0.3, fay: 0.3 }
+  const katalogYil = d ? `${d.katalogBasi.slice(0, 4)}–${d.katalogSonu.slice(0, 4)}` : null
   return (
     <>
       <Bolum baslik="Risk skoru" ek={<Micro>{veri.city}</Micro>}>
-        <p className="font-cond text-metric text-ink">
-          {veri.riskScore.toFixed(1).replace('.', ',')}
-        </p>
-        <p className="mt-1.5">
-          <Rozet ton={seviyeTonu(veri.riskScore)}>{seviyeMetni(veri.riskLevel)}</Rozet>
-        </p>
+        <div className="flex items-end justify-between gap-2">
+          <p className="font-cond text-metric text-ink">{Math.round(veri.riskScore)}</p>
+          <Rozet ton={RISK_TONU(veri.riskScore)}>{veri.riskLevel}</Rozet>
+        </div>
+        <p className="mt-1 text-small text-ink-3">100 üzerinden; üç bileşenin ağırlıklı toplamı.</p>
 
-        <dl className="kilav-kv mt-3 gap-x-2.5 gap-y-1.5 text-small">
-          <dt className="text-ink-3">Kısa vadeli</dt>
-          <dd className="text-ink">{(veri.metrics.shortRisk * 100).toFixed(1).replace('.', ',')}</dd>
-          <dt className="text-ink-3">Uzun vadeli</dt>
-          <dd className="text-ink">
-            {(veri.metrics.longHazard * 100).toFixed(1).replace('.', ',')}
-          </dd>
-          <dt className="text-ink-3">Fay etkisi</dt>
-          <dd className="text-ink">
-            {(veri.metrics.faultScore * 100).toFixed(1).replace('.', ',')}
-          </dd>
-          <dt className="text-ink-3">En yakın fay</dt>
-          <dd className="text-ink">
-            {veri.metrics.faultDistanceKm.toFixed(1).replace('.', ',')} km
-          </dd>
-        </dl>
-
-        <Teknik>
-          Skor üç bileşenin ağırlıklı toplamıdır (0,4 kısa + 0,3 uzun + 0,3 fay); ağırlıklar uzman
-          tanımlıdır, ölçülmüş değildir. Kısa vadeli model zayıftır: yedi model karşılaştırmasında
-          (13.643 kayıt, 5 katlı zamana göre doğrulama, 19 Ekim 2026) CatBoost ROC-AUC 0,61 ± 0,04,
-          en iyisi lojistik regresyon 0,64 ± 0,06. Fay mesafesi GEM Global Active Faults (CC BY-SA
-          4.0) çizgilerine en kısa uzaklıktır.
-        </Teknik>
+        <div className="mt-2">
+          <Bilesen
+            ad="Kısa vadeli"
+            soru={`30 gün içinde ${d?.yaricapKm.kisa ?? 150} km'de M ≥ 4 olasılığı (model)`}
+            deger={veri.metrics.shortRisk}
+            agirlik={ag.kisa}
+            dayanak={
+              d?.kisaVadeKaynagi === 'yerel'
+                ? `Son bir yılda yakında ${d.kisaVadeYerelDeprem} deprem.`
+                : 'Yakında son bir yılda yeterli deprem yok.'
+            }
+            uyari={
+              d?.kisaVadeKaynagi === 'ulke'
+                ? 'Bu il için ülke genelinin son depremleri kullanıldı; bu bileşen burada anlamlı değil.'
+                : 'Zayıf model: ROC-AUC 0,61 (yedi model kıyası). Tek başına karar verdirmez.'
+            }
+          />
+          <Bilesen
+            ad="Uzun vadeli"
+            soru={`10 yılda ${d?.yaricapKm.uzun ?? 200} km'de en az bir M ≥ 6 olasılığı`}
+            deger={veri.metrics.longHazard}
+            agirlik={ag.uzun}
+            dayanak={
+              d ? `${katalogYil} kataloğunda ${d.uzunVadeAnaSok} ana şok (artçılar sayılmadı).` : 'Katalogdan.'
+            }
+          />
+          <Bilesen
+            ad="Fay etkisi"
+            soru="En yakın etkin faya uzaklık"
+            deger={veri.metrics.faultScore}
+            agirlik={ag.fay}
+            dayanak={`En yakın fay ${ondalik(veri.metrics.faultDistanceKm)} km (30 km altı tam puan, 150 km üstü %10).`}
+          />
+        </div>
       </Bolum>
 
-      {!!veri.nearbyFaults?.length && (
+      {!!veri.yakinFaylar?.length && (
         <Bolum baslik="Yakın faylar">
           <ul>
-            {veri.nearbyFaults.slice(0, 4).map((f) => (
-              <li key={f} className="border-b border-line py-1.5 text-small text-ink-2 last:border-b-0">
-                {f}
+            {veri.yakinFaylar.map((f) => (
+              <li key={f.kimlik} className="flex justify-between gap-2 border-b border-line py-1.5 text-small last:border-b-0">
+                <span className="text-ink-2">{`${f.tur.charAt(0).toLocaleUpperCase('tr')}${f.tur.slice(1)} fay`}</span>
+                <span className="font-mono text-ink">{ondalik(f.km)} km</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-small text-ink-3">GEM Global Active Faults; veri setinde fay adı yok.</p>
+        </Bolum>
+      )}
+
+      {!!veri.sonDepremler?.length && (
+        <Bolum
+          baslik="Yakındaki son depremler"
+          ek={<Micro>{`${d?.yaricapKm.yakinDeprem ?? 150} km içinde`}</Micro>}
+        >
+          <ul>
+            {veri.sonDepremler.map((o, i) => (
+              <li key={`${o.time}-${i}`} className="flex items-baseline justify-between gap-2 border-b border-line py-1.5 last:border-b-0">
+                <span className="font-mono text-small text-ink">{`M ${ondalik(o.magnitude)}`}</span>
+                <span className="min-w-0 flex-1 truncate text-small text-ink-2">{o.place}</span>
+                <span className="shrink-0 font-mono text-small text-ink-3">
+                  {`${Math.round(o.distanceKm)} km · ${o.time.slice(0, 10)}`}
+                </span>
               </li>
             ))}
           </ul>
         </Bolum>
       )}
 
-      {!!veri.recentEvents?.length && (
-        <Bolum baslik="Son depremler" ek={<Micro>{sayi(veri.recentEvents.length)} kayıt</Micro>}>
-          <ul>
-            {veri.recentEvents.slice(0, 6).map((o, i) => (
-              <li
-                key={`${o}-${i}`}
-                className="border-b border-line py-1.5 font-mono text-small text-ink-2 last:border-b-0"
-              >
-                {o}
-              </li>
-            ))}
-          </ul>
-        </Bolum>
-      )}
+      <Bolum baslik="Yöntem">
+        <Teknik>
+          Ağırlıklar (kısa %40, uzun %30, fay %30) uzman tanımlıdır, ölçülmüş değildir. Uzun vadeli
+          bileşende artçılar Gardner–Knopoff pencereleriyle ayıklanır ve oran kataloğun bütün süresine
+          bölünür. Katalog: Kandilli ve USGS{d ? `, ${d.katalogBasi} – ${d.katalogSonu}` : ''}. Fay
+          mesafesi GEM Global Active Faults (CC BY-SA 4.0). Bu bir tehlike göstergesidir, deprem
+          tahmini değildir.
+        </Teknik>
+      </Bolum>
     </>
   )
 }

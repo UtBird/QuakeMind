@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import maplibregl, { type Map as MlMap } from 'maplibre-gl'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import type { Layer, PickingInfo } from '@deck.gl/core'
@@ -51,6 +52,7 @@ export function HaritaKabugu({ children, className, ipucu, baslangic }: KabukSec
   const ortu = useRef<MapboxOverlay | null>(null)
   const [hazir, setHazir] = useState(false)
   const [gorunum, setGorunum] = useState<HaritaApi['gorunum']>(null)
+  const [kart, setKart] = useState<{ x: number; y: number; html: string } | null>(null)
 
   useEffect(() => {
     if (!kutu.current || harita.current) return
@@ -69,8 +71,19 @@ export function HaritaKabugu({ children, className, ipucu, baslangic }: KabukSec
     m.touchZoomRotate.disableRotation()
     m.addControl(new maplibregl.ScaleControl({ unit: 'metric', maxWidth: 96 }), 'bottom-right')
 
-    // Üstüne gelince bilgi (J-41): ne, ne zaman, ne kadar acil.
-    const o = new MapboxOverlay({ interleaved: false, layers: [], getTooltip: ipucu ?? haritaIpucu })
+    // Üstüne gelince bilgi kartı (J-41, J-172). deck.gl'in kendi ipucu haritanın
+    // içinde çiziliyor, panellerin ve zaman şeridinin ALTINDA kalıp kesiliyordu;
+    // kart artık sayfanın üstünde (portal) ve ekran kenarında yön değiştiriyor.
+    const ipucuUret = ipucu ?? haritaIpucu
+    const o = new MapboxOverlay({
+      interleaved: false,
+      layers: [],
+      onHover: (bilgi) => {
+        const icerik = bilgi.object ? ipucuUret(bilgi) : null
+        const kab = kutu.current?.getBoundingClientRect()
+        setKart(icerik && kab ? { x: kab.left + bilgi.x, y: kab.top + bilgi.y, html: icerik.html } : null)
+      },
+    })
     m.addControl(o)
 
     harita.current = m
@@ -148,6 +161,34 @@ export function HaritaKabugu({ children, className, ipucu, baslangic }: KabukSec
         <div ref={kutu} className="h-full w-full" aria-label="Durum haritası" role="application" />
       </div>
       {children}
+      {kart && createPortal(<IpucuKarti {...kart} />, document.body)}
     </Baglam.Provider>
+  )
+}
+
+/** Fareyi izleyen bilgi kartı. İçerik `haritaIpucu`dan gelir: bütün metin
+    kaçışlı (`kacis`), simge kendi ürettiğimiz veri adresi. Ekranın sağına ya
+    da altına taşacaksa imlecin öbür yanına geçer. */
+function IpucuKarti({ x, y, html }: { x: number; y: number; html: string }) {
+  const kutu = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = kutu.current
+    if (!el) return
+    const { width: w, height: h } = el.getBoundingClientRect()
+    const pay = 14
+    const sol = x + pay + w > window.innerWidth - 8 ? x - pay - w : x + pay
+    const ust = y + pay + h > window.innerHeight - 8 ? y - pay - h : y + pay
+    el.style.left = `${Math.max(8, sol)}px`
+    el.style.top = `${Math.max(8, ust)}px`
+    el.style.visibility = 'visible'
+  }, [x, y, html])
+  return (
+    <div
+      ref={kutu}
+      role="tooltip"
+      className="pointer-events-none invisible fixed top-0 left-0 z-50"
+      // eslint-disable-next-line react/no-danger -- içerik kaçışlı, bkz. katmanlar.ts kacis
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   )
 }

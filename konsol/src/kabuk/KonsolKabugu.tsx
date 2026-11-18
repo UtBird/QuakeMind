@@ -12,7 +12,8 @@ import { useIhbarlar, type IhbarTuru } from '@/veri/ihbar'
 import { belirsizlikMetni, duzeyAciklamasi, ihbarBelirsizligi, type BelirsizlikCemberi } from '@/veri/metin'
 import { useCozumleme } from '@/durum/cozumlemeDurumu'
 import { haritadanNokta, useRota } from '@/durum/rotaDurumu'
-import { useDepremler, useFaylar, useKapanmalar, useToplanmaAlanlari } from '@/veri/katman'
+import { useRiskSiralamasi, useSeciliRiskIli } from '@/modlar/risk'
+import { useDepremler, useFaylar, useKapanmalar, useSaglik, useToplanmaAlanlari } from '@/veri/katman'
 import { useSimAlanlar, useSimMaske, useSimSonuc } from '@/veri/simulasyon'
 import { useSimulasyon } from '@/durum/simulasyonDurumu'
 import { isiDokusuKur } from '@/harita/isiDokusu'
@@ -262,6 +263,7 @@ function KatmanKopru() {
   const depremler = useDepremler(katmanlar.depremler)
   const faylar = useFaylar(katmanlar.faylar)
   const toplanma = useToplanmaAlanlari(katmanlar.toplanma, gorunenBolgeler)
+  const saglik = useSaglik(katmanlar.saglik)
 
   // Tatbikat koşusu (SIMULASYON_SOZLESMESI.md): sonuç canlı akış mesajıyla
   // tazelenir, maske jetonla indirilip ImageBitmap'e çevrilir.
@@ -339,11 +341,11 @@ function KatmanKopru() {
   // Altlık: yalnız görünen bölgelerin paketleri iner (harita durunca), bir kez.
   const { altlik, altlikYapiGorunur, bolgeAdlari, adSeviyesi, gorunum } = useAltlikGirdisi()
   // Isı yakınlaştıkça saydamlaşır: sokak ölçeğinde zemini, yapıları ve adları
-  // örtmesin (z13'e kadar 0,72, z16 ve üstü 0,30). 0,05 adımlı: her kaydırmada
+  // örtmesin (z13'e kadar 0,55, z16 ve üstü 0,22; J-172: 0,72 simgeleri bastırıyordu). 0,05 adımlı: her kaydırmada
   // katmanlar yeniden kurulmasın.
   const isiOrtuculugu = useMemo(() => {
     const z = gorunum?.zoom ?? 0
-    const o = z <= 13 ? 0.72 : z >= 16 ? 0.3 : 0.72 - ((z - 13) / 3) * 0.42
+    const o = z <= 13 ? 0.55 : z >= 16 ? 0.22 : 0.55 - ((z - 13) / 3) * 0.33
     return Math.round(o * 20) / 20
   }, [gorunum?.zoom])
   // Haritada bir ihbara ya da ekibe tıklayınca oraya yakınlaşılır; SOS seçilir.
@@ -357,6 +359,12 @@ function KatmanKopru() {
       if (!nesne || nesne.lon == null || nesne.lat == null) return
       if (katman === 'sos' && nesne.id) kayitSec({ tip: 'sos', id: nesne.id })
       if (katman === 'ihbarlar' && nesne.id) kayitSec({ tip: 'ihbar', id: nesne.id })
+      if (katman === 'risk-illeri') {
+        const il = bilgi.object as { il: string; lat: number; lon: number }
+        useCozumleme.getState().riskBolgeSec(`il:${il.il}`)
+        ucus(il.lon, il.lat, 6.4)
+        return
+      }
       if (katman === 'sos' || katman === 'ihbarlar' || katman === 'hasar-noktalari' || katman === 'ekipler') {
         ucus(nesne.lon, nesne.lat, Math.max(15.5, haritaAl()?.getZoom() ?? 0))
       }
@@ -439,6 +447,18 @@ function KatmanKopru() {
     }
   }, [tanim.id, rotaBas, rotaHedef, rotaSonuc, rotaKiyas, rotaAdaylar])
 
+  // Deprem riski (J-173): yalnız risk modunda.
+  const riskSiralamasi = useRiskSiralamasi()
+  const riskIli = useSeciliRiskIli(riskSiralamasi.data?.iller)
+  const riskGirdisi = useMemo(() => {
+    if (tanim.id !== 'risk' || !riskSiralamasi.data) return null
+    return {
+      iller: riskSiralamasi.data.iller,
+      secili: riskIli?.il ?? null,
+      halkalar: riskIli ? { lon: riskIli.lon, lat: riskIli.lat, kisaKm: 150, uzunKm: 200 } : null,
+    }
+  }, [tanim.id, riskSiralamasi.data, riskIli])
+
   const deckKatmanlari = useMemo(
     () =>
       katmanlariKur({
@@ -457,11 +477,14 @@ function KatmanKopru() {
         seciliIhbar: seciliKayit?.tip === 'ihbar' ? seciliKayit.id : null,
         belirsizlik,
         guzergah,
+        risk: riskGirdisi,
         secim: { kutu: secimKutusu, cokgen: secimCokgeni, taslak: secimTaslagi },
         goruntu: analizKarosu,
         analiz: segmentler.data ?? null,
         isi: isiDokusu,
         toplanmaGorunur: (gorunum?.zoom ?? 0) >= TOPLANMA_EN_AZ_ZOOM,
+        zoom: gorunum?.zoom,
+        saglik: saglik.data?.kayitlar,
         simulasyon: simGirdi,
         kapanmalar: kapanmalar.data?.kayitlar,
         depremler: depremler.data?.kayitlar,
@@ -483,6 +506,7 @@ function KatmanKopru() {
       seciliKayit,
       belirsizlik,
       guzergah,
+      riskGirdisi,
       secimKutusu,
       secimCokgeni,
       secimTaslagi,
@@ -494,6 +518,7 @@ function KatmanKopru() {
       depremler.data,
       faylar.data,
       toplanma.data,
+      saglik.data,
       simGirdi,
     ],
   )

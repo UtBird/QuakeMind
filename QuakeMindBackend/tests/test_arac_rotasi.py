@@ -237,3 +237,13 @@ def test_guzergah_antakyada_rota_ve_en_yakin(istemci):
     assert y.status_code == 200, y.text
     yerler = y.json()["yerler"]
     assert yerler and [x["sureDk"] for x in yerler] == sorted(x["sureDk"] for x in yerler)
+
+
+def test_guzergah_hiz_siniri(istemci, monkeypatch):
+    import hiz_siniri
+
+    c, j = istemci
+    monkeypatch.setattr(hiz_siniri, "ROTA_HESAP_SINIRI", 2)
+    disari = {"basLon": 29.0, "basLat": 41.0, "hedefLon": 29.1, "hedefLat": 41.05}
+    kodlar = [c.post("/api/guzergah", json=disari, headers=j["koordinator"]).status_code for _ in range(3)]
+    assert kodlar[-1] == 429, kodlar

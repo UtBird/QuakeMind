@@ -57,7 +57,10 @@ function altYazi(i: Ihbar): string {
     const kisi = i.kisiSayisi ? `${sayi(i.kisiSayisi)} kişi` : null
     return [kisi, i.mahalle, i.metin].filter(Boolean).join(' · ')
   }
-  if (i.tur === 'metin') return i.metin ?? ''
+  if (i.tur === 'metin') {
+    const kisi = i.kisiSayisi ? `${sayi(i.kisiSayisi)} kişi` : null
+    return [kisi, i.metin].filter(Boolean).join(' · ')
+  }
   const tespit = (i.tespitler ?? []).filter((t) => t.hasar).length
   return [tespit ? `${tespit} işaret` : 'model işaretlemedi', i.mahalle, i.metin].filter(Boolean).join(' · ')
 }
@@ -336,9 +339,12 @@ export function GelenIhbarlar({
   baslik,
   amac,
   suz,
+  kapsa,
   sinir = 20,
 }: {
   tur: IhbarTuru
+  /** Başka türden de bu listeye düşenler (ihtiyaç geçen yazılı ihbar; J-174). */
+  kapsa?: (i: Ihbar) => boolean
   baslik: string
   amac: string
   suz?: (i: Ihbar) => boolean
@@ -353,10 +359,10 @@ export function GelenIhbarlar({
   const liste = useMemo(
     () =>
       (ihbar.data ?? [])
-        .filter((i) => i.tur === tur && (!suz || suz(i)))
+        .filter((i) => (i.tur === tur || !!kapsa?.(i)) && (!suz || suz(i)))
         // Önce işlenmemişler, sonra en yeni.
         .sort((a, b) => Number(a.durum === 'kapandi') - Number(b.durum === 'kapandi') || b.zaman - a.zaman),
-    [ihbar.data, tur, suz],
+    [ihbar.data, tur, suz, kapsa],
   )
   const seciliIhbar =
     secili?.tip === 'ihbar' ? liste.find((i) => i.id === secili.id) : undefined

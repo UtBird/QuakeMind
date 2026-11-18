@@ -540,6 +540,7 @@ function Gecmis({ veri }: { veri: Ekibim }) {
                 {' '}
                 · {GOREV_DURUMU[g.durum].kisa}
                 {g.bitti ? ` ${saat(g.bitti)}` : ''}
+                {g.olaySuruyor ? ' · olay sürüyordu' : ''}
               </span>
             </p>
             {g.sonuc && <p className="text-ink-3">{g.sonuc}</p>}

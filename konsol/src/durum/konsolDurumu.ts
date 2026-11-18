@@ -19,6 +19,7 @@ export const KATMANLAR = [
   'isi',
   'depremler',
   'toplanma',
+  'saglik',
   'ekipler',
   'faylar',
   'ihbarlar',
@@ -42,6 +43,7 @@ export const KATMAN_ADI: Record<KatmanId, string> = {
   isi: 'Birleşik ısı',
   depremler: 'Depremler',
   toplanma: 'Toplanma alanları',
+  saglik: 'Hastane ve sağlık',
   ekipler: 'Saha ekipleri',
   faylar: 'Fay hatları',
   ihbarlar: 'Afetzede ihbarları',
@@ -59,7 +61,7 @@ export const KATMAN_ADI: Record<KatmanId, string> = {
     hiçbir şey çizmiyordu (hasarlı yollar boş veriyle, ötekiler hiç). */
 export const KATMAN_BILGI: Record<
   KatmanId,
-  { grup: 'olay' | 'hasar' | 'altlik' | 'tatbikat'; kaynak: string; bagli: boolean }
+  { grup: 'olay' | 'hasar' | 'yer' | 'altlik' | 'tatbikat'; kaynak: string; bagli: boolean }
 > = {
   ihbarlar: { grup: 'olay', kaynak: 'Afetzede ekranı: fotoğraf (YOLO), yazılı (BERTurk), ihtiyaç', bagli: true },
   ekipler: { grup: 'olay', kaynak: 'Ekip kaydı; konum ekibin telefonundan ya da koordinasyondan', bagli: true },
@@ -88,8 +90,13 @@ export const KATMAN_BILGI: Record<
   yapilar: { grup: 'altlik', kaynak: 'OpenStreetMap, yerel kopya; yakınlaşınca çizilir', bagli: true },
   yollar: { grup: 'altlik', kaynak: 'OpenStreetMap, yerel kopya', bagli: true },
   toplanma: {
-    grup: 'altlik',
+    grup: 'yer',
     kaynak: 'AFAD toplanma alanları listesi; şehir ölçeğine yakınlaşınca çizilir',
+    bagli: true,
+  },
+  saglik: {
+    grup: 'yer',
+    kaynak: 'OpenStreetMap (hastane, sağlık merkezi); şehir ölçeğine yakınlaşınca çizilir',
     bagli: true,
   },
   // Tatbikat katmanları: gerçek olan ne, üretilen ne — her satır kendi yazıyor
@@ -131,6 +138,7 @@ export const KATMAN_BILGI: Record<
 export const KATMAN_GRUBU = {
   olay: 'Olaylar ve ekipler',
   hasar: 'Hasar',
+  yer: 'Yerler',
   altlik: 'Altlık',
   tatbikat: 'Tatbikat (simülasyon)',
 } as const
@@ -206,6 +214,7 @@ const BASLANGIC: Record<KatmanId, boolean> = {
   isi: true,
   depremler: true,
   toplanma: false,
+  saglik: false,
   ekipler: true,
   faylar: false,
   ihbarlar: true,

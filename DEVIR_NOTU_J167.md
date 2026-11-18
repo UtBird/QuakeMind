@@ -34,7 +34,10 @@ değiştirilmedi. Ayrıntı ve açık kalanlar `EKSIKLER_VE_SORUNLAR.md` J-170't
 **Grup E yapıldı (18 Kasım, J-171; `rota-ve-grup-e` dalı):** Yol ve rota bağlandı, araç rotası
 kenar tabanlı; zaman şeridi, Nereye kartı, Türkçe metinler, kapsamasız görüntüler.
 
-**Sıradaki iş: Grup F**, sonra G. Aşağıdaki sıra geçerli.
+**Grup F yapıldı (18 Kasım, J-172; `harita-ve-grup-f` dalı):** P-3, P-4, P-6 kapandı; P-1 ölçüldü,
+ertelendi (karar kullanıcıda). Aynı dalda harita sadeleştirmesi (simgeler, kart, katman paneli).
+
+**Sıradaki iş: Grup G.**
 
 Commit durumu: A, B ve C, J-165 ve J-166 ile birlikte `kamera-analiz-gelistirme` dalında,
 **commit edilmedi** (kullanıcı söyleyince).
@@ -207,7 +210,7 @@ drone katmanında "Uydu" yazısı.
 **F-5** Afetzede "Nereye" kartında İtfaiye 0, Polis 0 (Antakya merkezi). Önce yerel OSM
 kopyasında bu türler var mı bak; yoksa kartta "veri yok" de, 0 deme (CLAUDE.md §1).
 
-### Grup F — Performans (ölçerek)
+### Grup F — Performans (ölçerek) — ✅ J-172 (P-1 ertelendi)
 
 Her madde için önce taban ölçüm, sonra iyileştirme, sonra yeniden ölçüm.
 - **P-1** Harita parçası 2,08 MB (gzip 574 KB); afetzede de deck.gl yüklüyor

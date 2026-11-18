@@ -1,87 +1,67 @@
 """Deprem riski uclari (CatBoost; model dosyadan yuklenir, istek yolunda egitim yok).
 
-TASIMA_PLANI.md Faz 5: fastapi_app.py'den tasindi. Paylasilan durum ve
-`ck.` ile cekirdek modulunden okunur."""
+J-173: hesap `risk_hizmeti.py`'de, is parcacigi guvenli ve onbellekli. Eskiden
+`quakemind/tool/risk_bridge.build_payload` her istekte sureecin calisma klasorunu
+ve sys.path'i degistiriyor, motorun ortak `last_lat` alanindan okuyordu:
+eszamanli isteklerde yanit baska ilin koordinatini tasiyordu (40'ta 35, olculdu).
+"""
+from __future__ import annotations
 
-# ruff: noqa: F401  -- cekirdek importlari toplu kopyalandi
-import cekirdek as ck
-from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-import bcrypt
-import math
-import re
-import sys
-import os
-import site
-import importlib
-import time
-import uuid
-from datetime import datetime, timezone
-from pathlib import Path
-from contextlib import contextmanager, asynccontextmanager
-from typing import Optional
-from threading import Event, Lock, Thread
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, TimeoutError as FutureTimeoutError
-import asyncio
-import functools
-import multiprocessing
-import canli_yayin
-from depo import depo_ac
-from utils.postgis_manager import postgis_engine
-from apps.road_damage.utils.serialization import compact_segment_coords as _compact_segment_coords, serialize_segments as _serialize_segments, haversine_m as _haversine_m
-from apps.road_damage.utils.imaging import image_array_to_b64 as _image_array_to_b64, build_damage_overlay as _build_damage_overlay, build_segmentation_overlay as _build_segmentation_overlay
-from apps.road_damage.utils.tiling import zoom_for_radius as _zoom_for_radius
-from fastapi import APIRouter, Depends
 import json
+import logging
+import threading
+from pathlib import Path
+from typing import Literal, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+
+import cekirdek as ck
 import kimlik
+import risk_hizmeti
 
 yonlendirici = APIRouter()
-
+log = logging.getLogger("quakemind.risk")
 
 #: Dis servise (Kandilli, USGS) istek atip deprem katalogunu yeniden yazan
 #: islemler yalniz koordinasyona acik (J-152).
 _KOORDINASYON = ("koordinator", "yonetici")
 
+IL_MERKEZLERI = Path(__file__).resolve().parents[1] / "veri" / "il_merkezleri.json"
+
+
+class RiskIstegi(BaseModel):
+    city: str = Field(..., min_length=1, max_length=80)
+    manualLatitude: Optional[float] = Field(None, ge=34.0, le=43.5)
+    manualLongitude: Optional[float] = Field(None, ge=24.5, le=46.0)
+    refreshData: bool = False
+
 
 @yonlendirici.post("/api/risk/predict")
-def predict_risk(req: ck.RiskRequest, kul: dict = Depends(kimlik.kullanici)):
-    """Risk skoru (J-152): giris yapmis her rol. Eskiden kimliksizdi; herkes
-    sorgu atabiliyor, `refreshData` ile dis servise istek de attirabiliyordu.
-    `refreshData` artik yalniz koordinasyon icin calisir; digerlerinde yok sayilir."""
-    if req.refreshData and kul["rol"] not in _KOORDINASYON:
-        req.refreshData = False
-    if not ck.risk_engine:
-        raise HTTPException(status_code=503, detail="Risk model is not loaded.")
-    
+def predict_risk(req: RiskIstegi, kul: dict = Depends(kimlik.kullanici)):
+    """Risk skoru: giris yapmis her rol (J-152). Koordinat verilmezse il adi il
+    merkezleri listesinden aranir; dis servise (Nominatim) GIDILMEZ (J-173).
+    Turkiye kutusu disindaki koordinat 422 (model Turkiye katalogu ile egitildi)."""
+    if req.refreshData and kul["rol"] in _KOORDINASYON:
+        _tazele()
+    if req.manualLatitude is not None and req.manualLongitude is not None:
+        lat, lon = req.manualLatitude, req.manualLongitude
+    else:
+        il = risk_hizmeti.il_merkezi(req.city)
+        if il is None:
+            raise HTTPException(status_code=422, detail="Konum yok: koordinat ver ya da 81 ilden birini seç.")
+        lat, lon = il["lat"], il["lon"]
     try:
-        manual_coords = None
-        if req.manualLatitude is not None and req.manualLongitude is not None:
-            manual_coords = (req.manualLatitude, req.manualLongitude)
-        
-        with ck.temporary_sys_path(ck.RISK_ROOT, ck.MOBILE_TOOL_ROOT), ck.temporary_cwd(ck.RISK_ROOT):
-            if req.refreshData:
-                from data_manager import fetch_and_update_data
-                fetch_and_update_data()
-            
-            # Tek hesap: build_payload ayni motoru kullanir. Onceden burada
-            # predict_city_risk bir kez, build_payload icinde YENI bir motorla
-            # bir kez daha kosuyordu (olculen: istek basina ~20 sn).
-            from risk_bridge import build_payload
-            payload = build_payload(
-                city=req.city,
-                manual_coords=manual_coords,
-                refresh_data=req.refreshData,
-                motor=ck.risk_engine,
-            )
-            return payload
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-IL_MERKEZLERI = Path(__file__).resolve().parents[1] / "veri" / "il_merkezleri.json"
+        return risk_hizmeti.hesapla(req.city.strip(), float(lat), float(lon))
+    except risk_hizmeti.RiskHazirDegil as e:
+        log.warning("risk modeli hazir degil: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail="Risk modeli hazır değil. Sunucuda `python araclar_risk_egit.py` çalıştırılmalı.",
+        ) from e
+    except Exception as e:  # ayrinti sunucu kaydinda; istemciye ham hata metni gitmez
+        log.exception("risk hesabi basarisiz (%s)", req.city)
+        raise HTTPException(status_code=500, detail="Risk hesaplanamadı.") from e
 
 
 @yonlendirici.get("/api/risk/iller")
@@ -95,99 +75,118 @@ def risk_illeri(_kul: dict = Depends(kimlik.kullanici)):
     return json.loads(IL_MERKEZLERI.read_text(encoding="utf-8"))
 
 
+@yonlendirici.get("/api/risk/siralama")
+def risk_siralamasi(_kul: dict = Depends(kimlik.kullanici)):
+    """81 il merkezi, risk skoruna gore sirali (J-173). Panelin sorusu "hangi
+    bolgede risk daha yuksek?" idi ama ekran tek tek il soruyordu. Ilk istek
+    81 hesap (~2 sn), sonrakiler onbellekten."""
+    if not IL_MERKEZLERI.exists():
+        return {"iller": [], "not": "Il merkezleri uretilmedi: python araclar_il_merkezleri_uret.py"}
+    iller = json.loads(IL_MERKEZLERI.read_text(encoding="utf-8"))["iller"]
+    try:
+        satirlar = []
+        for il in iller:
+            r = risk_hizmeti.hesapla(il["il"], float(il["lat"]), float(il["lon"]))
+            m = r["metrics"]
+            satirlar.append({
+                "il": il["il"], "lat": il["lat"], "lon": il["lon"],
+                "skor": r["riskScore"], "seviye": r["riskLevel"],
+                "kisa": round(m["shortRisk"], 4), "uzun": round(m["longHazard"], 4),
+                "fay": round(m["faultScore"], 4), "fayKm": round(m["faultDistanceKm"], 1),
+                "kisaVadeKaynagi": r["dayanak"]["kisaVadeKaynagi"],
+            })
+    except risk_hizmeti.RiskHazirDegil as e:
+        raise HTTPException(status_code=503, detail="Risk modeli hazır değil.") from e
+    satirlar.sort(key=lambda x: -x["skor"])
+    return {"iller": satirlar, "agirlik": risk_hizmeti.AGIRLIK}
+
+
 @yonlendirici.get("/api/risk/fault_lines")
-def risk_fault_lines():
+def risk_fault_lines(_kul: dict = Depends(kimlik.kullanici)):
+    """Eski web ve mobil icin elle yazilmis yaklasik fay cizgileri. J-173: giris
+    ister (CLAUDE.md 5; eskiden oturumsuzdu). Konsol GEM faylarini
+    /api/katman/faylar ile alir."""
     lines = ck._get_turkey_fault_lines()
     return {"faultLines": lines, "count": len(lines)}
 
 
 @yonlendirici.get("/api/risk/all_quakes")
 def risk_all_quakes(
-    minMagnitude: float = 0.0,
-    startDate: Optional[str] = None,
-    endDate: Optional[str] = None,
-    limit: int = 500,
-    sortBy: str = "time",
+    minMagnitude: float = Query(0.0, ge=0, le=10),
+    startDate: Optional[str] = Query(None, max_length=32),
+    endDate: Optional[str] = Query(None, max_length=32),
+    limit: int = Query(500, ge=1, le=2000),
+    sortBy: Literal["time", "magnitude"] = "time",
+    _kul: dict = Depends(kimlik.kullanici),
 ):
-    """Rasathane view: the full national catalog (query.csv, ~20k events back to
-    1933), independent of any selected city — unlike /predict's 150km-around-one-city
-    slice. Filterable/sortable/paginated so a browser never has to render 20k markers
-    at once."""
-    if not ck.risk_engine:
-        raise HTTPException(status_code=503, detail="Risk model is not loaded.")
+    """Ulusal katalog (~20 bin kayit, 1933'ten), suzulmus ve sayfali. J-173: giris
+    ister (eskiden oturumsuzdu); satir satir dongu yerine toplu donusum."""
+    import pandas as pd
 
+    motor = ck.risk_engine
     try:
-        import pandas as pd
+        risk_hizmeti._hazirla(motor)
+    except risk_hizmeti.RiskHazirDegil as e:
+        raise HTTPException(status_code=503, detail="Deprem kataloğu yüklenemedi.") from e
+    df = motor.df_full
+    try:
+        maske = df["mag"] >= minMagnitude
+        for deger, karsilastir in ((startDate, "ge"), (endDate, "le")):
+            if deger:
+                ts = pd.Timestamp(deger)
+                ts = ts.tz_localize("UTC") if ts.tzinfo is None else ts
+                maske &= getattr(df["time"], karsilastir)(ts)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=422, detail="Tarih biçimi geçersiz (YYYY-AA-GG).") from e
+    secim = df[maske]
+    toplam = int(len(secim))
+    secim = (secim.sort_values(["mag", "time"], ascending=[False, False]) if sortBy == "magnitude"
+             else secim.sort_values("time", ascending=False)).head(limit)
+    cikti = pd.DataFrame({
+        "time": secim["time"].astype(str),
+        "place": secim["place"].fillna("Bilinmeyen konum") if "place" in secim else "Bilinmeyen konum",
+        "magnitude": secim["mag"].astype(float),
+        "depth": secim["depth"].astype(float),
+        "latitude": secim["latitude"].astype(float),
+        "longitude": secim["longitude"].astype(float),
+        "status": secim["status"].fillna("reviewed") if "status" in secim else "reviewed",
+    })
+    kayitlar = json.loads(cikti.to_json(orient="records", force_ascii=False))  # NaN -> null
+    return {
+        "quakes": kayitlar,
+        "totalMatched": toplam,
+        "returned": len(kayitlar),
+        "datasetStart": str(df["time"].min()),
+        "datasetEnd": str(df["time"].max()),
+        "datasetTotal": int(len(df)),
+    }
 
-        with ck.temporary_sys_path(ck.RISK_ROOT), ck.temporary_cwd(ck.RISK_ROOT):
-            ck.risk_engine._prepare_frames()
-            df = ck.risk_engine.df_full.copy()
 
-        df = df[df["mag"] >= minMagnitude]
-        if startDate:
-            start_ts = pd.Timestamp(startDate)
-            if start_ts.tzinfo is None:
-                start_ts = start_ts.tz_localize("UTC")
-            df = df[df["time"] >= start_ts]
-        if endDate:
-            end_ts = pd.Timestamp(endDate)
-            if end_ts.tzinfo is None:
-                end_ts = end_ts.tz_localize("UTC")
-            df = df[df["time"] <= end_ts]
-
-        total_matched = int(len(df))
-
-        if sortBy == "magnitude":
-            df = df.sort_values(["mag", "time"], ascending=[False, False])
-        else:
-            df = df.sort_values("time", ascending=False)
-
-        capped_limit = max(1, min(int(limit), 2000))
-        df = df.head(capped_limit)
-
-        quakes = [
-            {
-                "time": str(row["time"]),
-                "place": row.get("place") or "Bilinmeyen konum",
-                "magnitude": float(row["mag"]),
-                "depth": float(row["depth"]) if pd.notna(row.get("depth")) else None,
-                "latitude": float(row["latitude"]),
-                "longitude": float(row["longitude"]),
-                "status": row.get("status") or "reviewed",
-            }
-            for _, row in df.iterrows()
-        ]
-
-        full_range = ck.risk_engine.df_full["time"]
-        return {
-            "quakes": quakes,
-            "totalMatched": total_matched,
-            "returned": len(quakes),
-            "datasetStart": str(full_range.min()),
-            "datasetEnd": str(full_range.max()),
-            "datasetTotal": int(len(ck.risk_engine.df_full)),
-        }
-
+def _tazele() -> str:
+    try:
+        return risk_hizmeti.veriyi_tazele()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        log.exception("risk verisi tazelenemedi")
+        raise HTTPException(status_code=502, detail="Deprem verisi tazelenemedi (Kandilli/USGS).") from e
 
 
 @yonlendirici.post("/api/risk/refresh_live_data")
 def risk_refresh_live_data(_kul: dict = Depends(kimlik.rol_gerektir(*_KOORDINASYON))):
-    """Pulls fresh Kandilli (+ USGS gap-fill) data into query.csv and invalidates
-    the risk engine's in-memory frames/model so the next request re-reads it."""
-    if not ck.risk_engine:
-        raise HTTPException(status_code=503, detail="Risk model is not loaded.")
+    """Kandilli (+ USGS) verisini ceker; yeni motor hazirlanip tek atamayla
+    devreye girer (koşan istekler eski veriyle biter)."""
+    return {"message": _tazele()}
 
+
+def _onyukle():
+    """Acilista arka planda: ilk risk istegi cerceve ve model yuklemesini
+    (~1,5 sn, olculdu) beklemesin. Acilisi geciktirmez."""
     try:
-        with ck.temporary_sys_path(ck.RISK_ROOT, ck.MOBILE_TOOL_ROOT), ck.temporary_cwd(ck.RISK_ROOT):
-            from data_manager import fetch_and_update_data
-            message = fetch_and_update_data()
-
-        ck.risk_engine.df_full = None
-        ck.risk_engine.df_main = None
-        ck.risk_engine.model = None
-
-        return {"message": message}
+        if ck.risk_engine is not None:
+            risk_hizmeti._hazirla(ck.risk_engine)
+            risk_hizmeti._diziler(ck.risk_engine)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"risk on yukleme: {e}", flush=True)
+
+
+if getattr(ck, "_IS_APP_PROCESS", False):
+    threading.Thread(target=_onyukle, name="risk-onyukleme", daemon=True).start()

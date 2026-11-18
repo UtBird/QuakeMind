@@ -103,6 +103,20 @@ def _afetzede_icin(mesaj: dict, kullanici_id: str):
     return None
 
 
+#: Yalniz koordinasyonun okuyabildigi uclarin degisiklik isaretleri (J-174).
+#: Saha `islem-kayitlari` uclarini okuyamaz (403); isaret ona gitmez.
+KOORDINASYON_OLAYLARI = frozenset({"islem-kaydi"})
+
+
+def role_gore(mesaj: dict, kul: dict) -> Optional[dict]:
+    """Akistaki mesajin bu kullaniciya giden bicimi; gitmeyecekse None."""
+    if kul["rol"] == "afetzede":
+        return _afetzede_icin(mesaj, kul["id"])
+    if kul["rol"] not in ("koordinator", "yonetici") and mesaj.get("tip") in KOORDINASYON_OLAYLARI:
+        return None
+    return mesaj
+
+
 @yonlendirici.get("/api/live")
 async def canli_akis(
     request: Request,
@@ -128,7 +142,6 @@ async def canli_akis(
     kul = kimlik.cerezden_kullanici(cerez)
     if kul is None:
         raise HTTPException(status_code=401, detail="Oturum acilmamis.")
-    afetzede = kul["rol"] == "afetzede"
     kuyruk = canli_yayin.abone_ol()
 
     async def uret():
@@ -153,10 +166,9 @@ async def canli_akis(
                 except asyncio.TimeoutError:
                     yield 'event: nabiz\ndata: {"tip":"nabiz"}\n\n'
                     continue
-                if afetzede:
-                    mesaj = _afetzede_icin(mesaj, kul["id"])
-                    if mesaj is None:
-                        continue
+                mesaj = role_gore(mesaj, kul)
+                if mesaj is None:
+                    continue
                 yield canli_yayin.sse_bicimle(mesaj)
         finally:
             canli_yayin.abonelik_bitir(kuyruk)

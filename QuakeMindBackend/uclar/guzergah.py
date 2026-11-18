@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 import arac_rotasi
+import hiz_siniri
 import kimlik
 
 yonlendirici = APIRouter()
@@ -52,7 +53,8 @@ AG_DISI = ("Bu nokta yol ağımızın dışında. Rota beş şehrin (Antakya, Ka
 
 
 @yonlendirici.post("/api/guzergah")
-def guzergah(istek: GuzergahIstegi, _kul: dict = Depends(kimlik.rol_gerektir(*ROLLER))):
+def guzergah(istek: GuzergahIstegi, kul: dict = Depends(kimlik.rol_gerektir(*ROLLER))):
+    hiz_siniri.rota_kontrol(kul["id"])
     r = arac_rotasi.rota(istek.basLon, istek.basLat, istek.hedefLon, istek.hedefLat, kacin=istek.kacin)
     if r is None:
         raise HTTPException(status_code=422, detail=AG_DISI)
@@ -62,7 +64,8 @@ def guzergah(istek: GuzergahIstegi, _kul: dict = Depends(kimlik.rol_gerektir(*RO
 
 
 @yonlendirici.post("/api/guzergah/en-yakin")
-def en_yakin(istek: EnYakinIstegi, _kul: dict = Depends(kimlik.rol_gerektir(*ROLLER))):
+def en_yakin(istek: EnYakinIstegi, kul: dict = Depends(kimlik.rol_gerektir(*ROLLER))):
+    hiz_siniri.rota_kontrol(kul["id"])
     from uclar import yerler
 
     if arac_rotasi.bolge_bul(istek.basLon, istek.basLat) is None:

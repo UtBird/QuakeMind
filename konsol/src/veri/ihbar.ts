@@ -88,13 +88,19 @@ export type Ihbar = {
   boy?: number
   /* yazılı ihbar */
   analiz?: MetinAnalizi | null
-  /* ihtiyaç */
+  /* ihtiyaç; yazılı ihbarda metinden model çıkarır (J-174) */
   ihtiyaclar?: Ihtiyac[]
   kisiSayisi?: number | null
   /** Konsolda: işleyen görevli (afetzedeye gelmez). */
   isleyenAd?: string | null
   /** İhbara giden ekipler, yeniden eskiye (J-54). */
   gorevler?: Gorev[]
+}
+
+/** İhtiyaç sayfasına düşen kayıt: formdan gelen talep ya da metninde ihtiyaç
+    geçen yazılı ihbar ("suyumuz bitti, 30 kişiyiz"; J-174). */
+export function ihtiyacTalebiMi(i: Ihbar): boolean {
+  return i.tur === 'ihtiyac' || (i.tur === 'metin' && !!i.ihtiyaclar?.length)
 }
 
 type TurBilgisi = {

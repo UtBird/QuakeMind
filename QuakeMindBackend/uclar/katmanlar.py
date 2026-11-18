@@ -324,6 +324,35 @@ def toplanma(
     }
 
 
+
+@yonlendirici.get("/saglik")
+def saglik(
+    kutu: Optional[str] = Query(default=None, description="bati,guney,dogu,kuzey"),
+    _kul: dict = Depends(kimlik.rol_gerektir(*SAHA_VE_USTU)),
+):
+    """Hastane ve saglik merkezleri (OSM, yerel kopya; afetzede ekraniyla ayni
+    liste). Yalniz operasyon bolgelerinde uretildi. Kayittir: yerin su an acik
+    oldugunu ya da hasta kabul ettigini soylemez."""
+    k = _kutu(kutu)
+    w, s, e, n = k
+    h = yerler._hizmetler()
+    kayitlar = []
+    if h:
+        for y in h[0]["yerler"]:
+            if y["tur"] in ("hastane", "saglik") and w <= y["lon"] <= e and s <= y["lat"] <= n:
+                kayitlar.append({"id": y["osm"], "tur": y["tur"], "ad": y.get("ad"),
+                                 "lon": y["lon"], "lat": y["lat"]})
+    return {
+        "kutu": list(k),
+        "sayi": len(kayitlar),
+        "kaynak": {
+            "ad": "OpenStreetMap (yerel kopya" + (f", {h[0]['kaynak']['dosyaTarihi']}" if h else "") + ")",
+            "not": "Kayittir; yerin su an acik oldugunu ya da hasta kabul ettigini soylemez.",
+        },
+        "kayitlar": kayitlar,
+    }
+
+
 # --- on yukleme ------------------------------------------------------------
 
 def _onyukle():

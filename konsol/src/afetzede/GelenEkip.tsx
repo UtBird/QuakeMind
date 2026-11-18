@@ -59,12 +59,17 @@ export function afetzedeDurumu(
   if (!ileri && eskiAtama)
     return { baslik: 'Ekip görevlendirildi', aciklama: 'Çağrına bir ekip görevlendirildi.', ton: 'ok' }
   if (!ileri) {
-    const iptal = liste[0]?.durum === 'iptal'
+    // liste en yeniden eskiye (sunucu: ORDER BY atandi DESC).
+    const son = liste[0]
     return {
       baslik: 'Bekliyor',
-      aciklama: iptal
-        ? 'Görevlendirilen ekip gelemedi; koordinasyon başka ekip gönderecek.'
-        : 'Kaydın alındı, henüz ekip görevlendirilmedi. Ekip görevlendirilince adı ve nerede olduğu burada görünür.',
+      aciklama:
+        son?.durum === 'iptal'
+          ? 'Görevlendirilen ekip gelemedi; koordinasyon başka ekip gönderecek.'
+          : son?.durum === 'tamamlandi'
+            ? // Ekip "olay sürüyor" diyerek bitirdi (J-174): kayıt kapanmadı, sıraya döndü.
+              `${son.ekip.ad} işini bitirdi ama olay sürüyor; koordinasyon başka ekip gönderecek.`
+            : 'Kaydın alındı, henüz ekip görevlendirilmedi. Ekip görevlendirilince adı ve nerede olduğu burada görünür.',
       ton: 'high',
     }
   }

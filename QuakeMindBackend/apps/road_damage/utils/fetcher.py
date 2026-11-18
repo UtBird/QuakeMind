@@ -1,6 +1,7 @@
 import math
 import os
 import time
+from pathlib import Path
 
 import requests
 import numpy as np
@@ -49,6 +50,36 @@ def num2deg(xtile, ytile, zoom):
     lat_deg = math.degrees(lat_rad)
     return (lat_deg, lon_deg)
 
+# Gorunttu disk onbellegi (J-172, J-167 P-4). Tatbikat ayni alani tekrar tekrar
+# kosar; her kosuda ayni karolar agdan yeniden iniyordu (olculen 7-13 sn).
+# Yalniz acik lisansli kaynaklar saklanir: OpenAerialMap (provider='custom') ve
+# Esri Wayback. Google karolari lisans geregi saklanmaz (bkz. asagidaki NOT).
+# Yalniz EKSIKSIZ inen goruntu saklanir: gecici hatayla eksik kalan karo varsa
+# (siyah blok, J-89) saklanmaz, sonraki kosu yeniden indirir.
+GORUNTU_ONBELLEGI = Path(__file__).resolve().parents[3] / "veri" / "goruntu_onbellek"
+GORUNTU_ONBELLEK_SINIRI = 40  # dosya; en eskisi silinir
+
+
+def _onbellek_yolu(kaynak: str, z: int, x0: int, x1: int, y0: int, y1: int) -> Path:
+    import hashlib
+
+    anahtar = hashlib.sha1(f"{kaynak}|{z}|{x0}|{x1}|{y0}|{y1}".encode()).hexdigest()[:20]
+    return GORUNTU_ONBELLEGI / f"{anahtar}.png"
+
+
+def _onbellege_yaz(yol: Path, img) -> None:
+    try:
+        GORUNTU_ONBELLEGI.mkdir(parents=True, exist_ok=True)
+        gecici = yol.with_suffix(".yaziliyor.png")
+        img.save(gecici, format="PNG")
+        gecici.replace(yol)
+        dosyalar = sorted(GORUNTU_ONBELLEGI.glob("*.png"), key=lambda f: f.stat().st_mtime)
+        for eski in dosyalar[:-GORUNTU_ONBELLEK_SINIRI]:
+            eski.unlink(missing_ok=True)
+    except OSError as e:
+        print(f"goruntu onbellegi yazilamadi: {e}")
+
+
 def fetch_satellite_area(lat, lon, bbox=None, zoom_level=18, wayback_id=None, provider='google', custom_url=None):
     """Downloads tiles covering a bounding box or a single coordinate.
 
@@ -95,6 +126,22 @@ def fetch_satellite_area(lat, lon, bbox=None, zoom_level=18, wayback_id=None, pr
 
         nx_tiles = xtile_max - xtile_min + 1
         ny_tiles = ytile_max - ytile_min + 1
+        real_lat_n, real_lon_w = num2deg(xtile_min, ytile_min, z)
+        real_lat_s, real_lon_e = num2deg(xtile_max + 1, ytile_max + 1, z)
+        sinirlar = (real_lon_w, real_lat_s, real_lon_e, real_lat_n)
+
+        # Disk onbellegi (yalniz acik lisansli kaynak; bkz. GORUNTU_ONBELLEGI).
+        onbellek_kaynagi = (f"esri:{wayback_id}" if provider == 'esri' and wayback_id
+                            else f"custom:{custom_url}" if provider == 'custom' and custom_url else None)
+        onbellek = (_onbellek_yolu(onbellek_kaynagi, z, xtile_min, xtile_max, ytile_min, ytile_max)
+                    if onbellek_kaynagi else None)
+        if onbellek is not None and onbellek.exists():
+            try:
+                img = Image.open(onbellek).convert('RGB')
+                os.utime(onbellek)  # en son kullanilan en son silinir
+                return img, sinirlar
+            except OSError:
+                pass
         stitched_img = Image.new('RGB', (nx_tiles * 256, ny_tiles * 256))
         headers = {'User-Agent': 'Mozilla/5.0'}
 
@@ -127,7 +174,7 @@ def fetch_satellite_area(lat, lon, bbox=None, zoom_level=18, wayback_id=None, pr
                         tile_img = Image.open(BytesIO(r.content)).convert('RGB')
                         return (x - xtile_min) * 256, (y - ytile_min) * 256, tile_img
                     if r.status_code == 404:
-                        return None                      # kapsama disi: tekrar deneme
+                        return "yok"                     # kapsama disi: tekrar deneme
                 except Exception:
                     pass
                 if deneme < denemeler - 1:
@@ -141,6 +188,7 @@ def fetch_satellite_area(lat, lon, bbox=None, zoom_level=18, wayback_id=None, pr
         ]
 
         any_success = False
+        eksik = False  # gecici hatayla inmeyen karo (404 degil)
         # Tile fetches are I/O-bound (network round trips), so run them
         # concurrently instead of one-at-a-time -- otherwise a 12x12 (144)
         # tile grid at ~8s worst-case each can take minutes and blow past
@@ -158,9 +206,12 @@ def fetch_satellite_area(lat, lon, bbox=None, zoom_level=18, wayback_id=None, pr
         try:
             futures = [executor.submit(_fetch_tile, coords) for coords in tile_coords]
             done, _pending = futures_wait(futures, timeout=60)
+            eksik = len(done) < len(futures)
             for future in done:
                 result = future.result()
-                if result is not None:
+                if result is None:
+                    eksik = True
+                elif result != "yok":
                     px, py, tile_img = result
                     stitched_img.paste(tile_img, (px, py))
                     any_success = True
@@ -169,10 +220,9 @@ def fetch_satellite_area(lat, lon, bbox=None, zoom_level=18, wayback_id=None, pr
 
         if not any_success:
             return None, None
-
-        real_lat_n, real_lon_w = num2deg(xtile_min, ytile_min, z)
-        real_lat_s, real_lon_e = num2deg(xtile_max + 1, ytile_max + 1, z)
-        return stitched_img, (real_lon_w, real_lat_s, real_lon_e, real_lat_n)
+        if onbellek is not None and not eksik:
+            _onbellege_yaz(onbellek, stitched_img)
+        return stitched_img, sinirlar
 
     # Try requested zoom level first, fallback to lower zooms if 404
     for z in [zoom_level, zoom_level - 1, zoom_level - 2]:

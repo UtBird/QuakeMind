@@ -1,0 +1,488 @@
+[
+ {
+  "il": "Adana",
+  "eski": 0.485,
+  "yeni": 0.414,
+  "anaSok": 5
+ },
+ {
+  "il": "Adıyaman",
+  "eski": 0.605,
+  "yeni": 0.4734,
+  "anaSok": 6
+ },
+ {
+  "il": "Afyonkarahisar",
+  "eski": 0.7517,
+  "yeni": 0.6179,
+  "anaSok": 9
+ },
+ {
+  "il": "Ağrı",
+  "eski": 0.5769,
+  "yeni": 0.5268,
+  "anaSok": 7
+ },
+ {
+  "il": "Aksaray",
+  "eski": 0.1068,
+  "yeni": 0.1014,
+  "anaSok": 1
+ },
+ {
+  "il": "Amasya",
+  "eski": 0.3638,
+  "yeni": 0.2743,
+  "anaSok": 3
+ },
+ {
+  "il": "Ankara",
+  "eski": 0.751,
+  "yeni": 0.6566,
+  "anaSok": 10
+ },
+ {
+  "il": "Antalya",
+  "eski": 0.6576,
+  "yeni": 0.5268,
+  "anaSok": 7
+ },
+ {
+  "il": "Ardahan",
+  "eski": 0.3495,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Artvin",
+  "eski": 0.3546,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Aydın",
+  "eski": 0.854,
+  "yeni": 0.8192,
+  "anaSok": 16
+ },
+ {
+  "il": "Balıkesir",
+  "eski": 0.8429,
+  "yeni": 0.7761,
+  "anaSok": 14
+ },
+ {
+  "il": "Bartın",
+  "eski": 0.751,
+  "yeni": 0.6566,
+  "anaSok": 10
+ },
+ {
+  "il": "Batman",
+  "eski": 0.6628,
+  "yeni": 0.6179,
+  "anaSok": 9
+ },
+ {
+  "il": "Bayburt",
+  "eski": 0.7322,
+  "yeni": 0.6566,
+  "anaSok": 10
+ },
+ {
+  "il": "Bilecik",
+  "eski": 0.8377,
+  "yeni": 0.7508,
+  "anaSok": 13
+ },
+ {
+  "il": "Bingöl",
+  "eski": 0.7817,
+  "yeni": 0.7227,
+  "anaSok": 12
+ },
+ {
+  "il": "Bitlis",
+  "eski": 0.7248,
+  "yeni": 0.6914,
+  "anaSok": 11
+ },
+ {
+  "il": "Bolu",
+  "eski": 0.799,
+  "yeni": 0.7227,
+  "anaSok": 12
+ },
+ {
+  "il": "Burdur",
+  "eski": 0.7517,
+  "yeni": 0.6179,
+  "anaSok": 9
+ },
+ {
+  "il": "Bursa",
+  "eski": 0.8984,
+  "yeni": 0.8375,
+  "anaSok": 17
+ },
+ {
+  "il": "Çanakkale",
+  "eski": 0.6633,
+  "yeni": 0.6179,
+  "anaSok": 9
+ },
+ {
+  "il": "Çankırı",
+  "eski": 0.6568,
+  "yeni": 0.5748,
+  "anaSok": 8
+ },
+ {
+  "il": "Çorum",
+  "eski": 0.6592,
+  "yeni": 0.5748,
+  "anaSok": 8
+ },
+ {
+  "il": "Denizli",
+  "eski": 0.8688,
+  "yeni": 0.7988,
+  "anaSok": 15
+ },
+ {
+  "il": "Diyarbakır",
+  "eski": 0.7287,
+  "yeni": 0.6914,
+  "anaSok": 11
+ },
+ {
+  "il": "Düzce",
+  "eski": 0.7763,
+  "yeni": 0.7227,
+  "anaSok": 12
+ },
+ {
+  "il": "Edirne",
+  "eski": 0.4198,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Elâzığ",
+  "eski": 0.8243,
+  "yeni": 0.7508,
+  "anaSok": 13
+ },
+ {
+  "il": "Erzincan",
+  "eski": 0.76,
+  "yeni": 0.6914,
+  "anaSok": 11
+ },
+ {
+  "il": "Erzurum",
+  "eski": 0.8006,
+  "yeni": 0.7508,
+  "anaSok": 13
+ },
+ {
+  "il": "Eskişehir",
+  "eski": 0.8542,
+  "yeni": 0.7508,
+  "anaSok": 13
+ },
+ {
+  "il": "Gaziantep",
+  "eski": 0.6305,
+  "yeni": 0.5268,
+  "anaSok": 7
+ },
+ {
+  "il": "Giresun",
+  "eski": 0.3687,
+  "yeni": 0.2743,
+  "anaSok": 3
+ },
+ {
+  "il": "Gümüşhane",
+  "eski": 0.6664,
+  "yeni": 0.5748,
+  "anaSok": 8
+ },
+ {
+  "il": "Hakkâri",
+  "eski": 0.285,
+  "yeni": 0.2743,
+  "anaSok": 3
+ },
+ {
+  "il": "Hatay",
+  "eski": 0.4248,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Iğdır",
+  "eski": 0.4754,
+  "yeni": 0.4734,
+  "anaSok": 6
+ },
+ {
+  "il": "Isparta",
+  "eski": 0.6188,
+  "yeni": 0.4734,
+  "anaSok": 6
+ },
+ {
+  "il": "İstanbul",
+  "eski": 0.8248,
+  "yeni": 0.7508,
+  "anaSok": 13
+ },
+ {
+  "il": "İzmir",
+  "eski": 0.7508,
+  "yeni": 0.7227,
+  "anaSok": 12
+ },
+ {
+  "il": "Kahramanmaraş",
+  "eski": 0.6305,
+  "yeni": 0.5268,
+  "anaSok": 7
+ },
+ {
+  "il": "Karabük",
+  "eski": 0.751,
+  "yeni": 0.6566,
+  "anaSok": 10
+ },
+ {
+  "il": "Karaman",
+  "eski": 0.1068,
+  "yeni": 0.1014,
+  "anaSok": 1
+ },
+ {
+  "il": "Kars",
+  "eski": 0.4158,
+  "yeni": 0.414,
+  "anaSok": 5
+ },
+ {
+  "il": "Kastamonu",
+  "eski": 0.5781,
+  "yeni": 0.4734,
+  "anaSok": 6
+ },
+ {
+  "il": "Kayseri",
+  "eski": 0.4314,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Kilis",
+  "eski": 0.6305,
+  "yeni": 0.5268,
+  "anaSok": 7
+ },
+ {
+  "il": "Kocaeli",
+  "eski": 0.751,
+  "yeni": 0.6914,
+  "anaSok": 11
+ },
+ {
+  "il": "Konya",
+  "eski": 0.2772,
+  "yeni": 0.1014,
+  "anaSok": 1
+ },
+ {
+  "il": "Kütahya",
+  "eski": 0.8827,
+  "yeni": 0.7988,
+  "anaSok": 15
+ },
+ {
+  "il": "Kırklareli",
+  "eski": 0.5333,
+  "yeni": 0.4734,
+  "anaSok": 6
+ },
+ {
+  "il": "Kırşehir",
+  "eski": 0.4314,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Kırıkkale",
+  "eski": 0.6205,
+  "yeni": 0.5268,
+  "anaSok": 7
+ },
+ {
+  "il": "Malatya",
+  "eski": 0.7097,
+  "yeni": 0.5748,
+  "anaSok": 8
+ },
+ {
+  "il": "Manisa",
+  "eski": 0.7999,
+  "yeni": 0.7761,
+  "anaSok": 14
+ },
+ {
+  "il": "Mardin",
+  "eski": 0.4791,
+  "yeni": 0.4734,
+  "anaSok": 6
+ },
+ {
+  "il": "Mersin",
+  "eski": 0.2824,
+  "yeni": 0.2743,
+  "anaSok": 3
+ },
+ {
+  "il": "Muğla",
+  "eski": 0.8192,
+  "yeni": 0.7988,
+  "anaSok": 15
+ },
+ {
+  "il": "Muş",
+  "eski": 0.7528,
+  "yeni": 0.7227,
+  "anaSok": 12
+ },
+ {
+  "il": "Nevşehir",
+  "eski": 0.3634,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Niğde",
+  "eski": 0.3575,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Ordu",
+  "eski": 0.292,
+  "yeni": 0.1925,
+  "anaSok": 2
+ },
+ {
+  "il": "Osmaniye",
+  "eski": 0.6305,
+  "yeni": 0.5268,
+  "anaSok": 7
+ },
+ {
+  "il": "Rize",
+  "eski": 0.5933,
+  "yeni": 0.4734,
+  "anaSok": 6
+ },
+ {
+  "il": "Sakarya",
+  "eski": 0.6917,
+  "yeni": 0.6566,
+  "anaSok": 10
+ },
+ {
+  "il": "Samsun",
+  "eski": 0.292,
+  "yeni": 0.2743,
+  "anaSok": 3
+ },
+ {
+  "il": "Siirt",
+  "eski": 0.5769,
+  "yeni": 0.5268,
+  "anaSok": 7
+ },
+ {
+  "il": "Sinop",
+  "eski": 0.417,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Sivas",
+  "eski": 0.369,
+  "yeni": 0.2743,
+  "anaSok": 3
+ },
+ {
+  "il": "Şanlıurfa",
+  "eski": 0.5356,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Şırnak",
+  "eski": 0.3534,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Tekirdağ",
+  "eski": 0.6633,
+  "yeni": 0.6179,
+  "anaSok": 9
+ },
+ {
+  "il": "Tokat",
+  "eski": 0.292,
+  "yeni": 0.2743,
+  "anaSok": 3
+ },
+ {
+  "il": "Trabzon",
+  "eski": 0.4907,
+  "yeni": 0.414,
+  "anaSok": 5
+ },
+ {
+  "il": "Tunceli",
+  "eski": 0.8243,
+  "yeni": 0.7761,
+  "anaSok": 14
+ },
+ {
+  "il": "Uşak",
+  "eski": 0.7517,
+  "yeni": 0.6179,
+  "anaSok": 9
+ },
+ {
+  "il": "Van",
+  "eski": 0.3495,
+  "yeni": 0.3479,
+  "anaSok": 4
+ },
+ {
+  "il": "Yalova",
+  "eski": 0.8542,
+  "yeni": 0.7761,
+  "anaSok": 14
+ },
+ {
+  "il": "Yozgat",
+  "eski": 0.5293,
+  "yeni": 0.414,
+  "anaSok": 5
+ },
+ {
+  "il": "Zonguldak",
+  "eski": 0.7763,
+  "yeni": 0.6914,
+  "anaSok": 11
+ }
+]

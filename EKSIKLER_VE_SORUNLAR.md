@@ -5684,12 +5684,16 @@ baktığı, ekip konum paylaşımı ve hash zinciri.
   - Öneri:
     - afetzede haritasını yalnız maplibre ile çiz;
     - yavaş 3G'de "SOS'a basılabilir" süresini ölç.
+  - ⏸ Ölçüldü, ertelendi (18 Kasım, J-172): SOS'un kritik yolu **153 KB** gzip (giriş + afetzede ekranı); 560 KB'lık harita parçası kritik yolda değil, sonra iner (toplam 731 KB). Karo katmanını (`@deck.gl/geo-layers`) ayırmak yalnız 6,6 KB kazandırdı. Afetzede altlığı da deck.gl ile çizildiği için "yalnız MapLibre" altlık çiziminin baştan yazılması demek; kullanıcıyla konuşulmadan yapılmadı.
 - **P-2 Metin analizinin ilk isteği 31,8 sn.** Model tembel yükleniyor, üstüne Nominatim bekleniyor. Model işçide açılışta ısıtılmalı; adres çözümü yerelde yapılmalı (S-5).
   - ✅ Düzeltildi (17 Kasım, J-170): model ayrı işçide, açılışta ısınıyor. Isınma sürerken gelen ilk istek ~7 sn, sonrakiler ~65 ms.
 - **P-3 Isı haritası soğukken yavaş.**
   - İlk açılışta 4 paralel istek 4,3 sn sürüyor; ısınınca 28 ms.
   - Öneri: açılışta ısıt ya da 4 kaynağı tek istekte dön.
+  - ✅ Düzeltildi (18 Kasım, J-172): sebep ısı değil PostGIS denemesiydi. `utils/postgis_manager.py` her sunucuda varsayılan adrese bağlanmayı deniyordu: deneme 4,0 sn, sonuç 30 sn saklandığı için **her 30 sn'de bir** gelen ilk istek 4 sn bekliyordu. Bağlantı artık yalnız `POSTGIS_URL` açıkça verilmişse denenir. Soğuk 4 kanal: 4,3 sn → **44 ms**; sıcak 28 ms `[Ö]`.
 - **P-4 Tatbikatta yol ağı 12,4 sn, görüntü 12,6 sn sürdü.** `DEMO_CALISTIRMA.md` §4'e göre önbellekten 0–1 sn olmalıydı. Katalog alanları önceden indirilmeli.
+  - ✅ (18 Kasım, J-172) Yol ağı: bu makinede 4 tatbikat alanında 0,0–1,1 sn `[Ö]`. Önbellek tutmasa da yerel bölge dosyası (`araclar_yerel_osm_kur.py`) devreye giriyor; 12,4 sn bölge dosyası olmayan ortamda ölçülmüştü. Canlı sunucuda bu dosya kurulu olmalı.
+  - ✅ Görüntü: açık lisanslı kaynakların (OpenAerialMap, Esri Wayback) birleşik görüntüsü `veri/goruntu_onbellek/`'te saklanıyor (en çok 40 dosya). Defne/Elektrik sahnesi ilk 2,75 sn, ikinci **0,03 sn** `[Ö]`. Google karoları lisans gereği saklanmaz; eksik inen görüntü (geçici hata, J-89) saklanmaz.
 - **P-5 Hazır olma ucu yok.** API açılışı ~30 sn, `/health` 404. Hazır ucu eklenmeli, konsol beklerken bunu göstermeli (U-2).
   - ✅ Düzeltildi (17 Kasım, Grup C): `uclar/genel.py` `GET /api/hazir`.
     - Oturumsuz; yalnız evet/hayır döner.
@@ -5850,6 +5854,129 @@ baktığı, ekip konum paylaşımı ve hash zinciri.
 - Dönüş bedeli ve hız değerleri varsayım; gerçek seyahat süreleriyle ölçülmedi. Trafik verisi yok.
 - OSM'de Türkiye'deki dönüş yasakları seyrek (Antakya'da 8); motor yalnız haritada olanı bilir.
 - Simülasyon (tatbikat) kendi rota motorunu kullanıyor (`apps/road_damage`); bu iş ona dokunmadı.
+
+## J-172 🟠 Harita karmaşık ve okunmuyordu: aynı yuvarlaklar, kesilen bilgi kutusu, anlaşılmaz kaynak ağırlıkları; J-167 Grup F
+**Durum:** KAPALI (P-1 ertelendi) · **Ölçüldü** · **İlgili:** J-41, J-56, J-167 (P-1, P-3, P-4, P-6)
+
+**Bulgu (kullanıcı, 18 Kasım).** "Katmanlar karışık; her nokta ne, anlaşılmıyor; kapalı yol, AFAD, ekip, hastane ayrı ve açık simgelerle gösterilsin; hepsi aynı anda gösterilmesin; kaynak ağırlıkları kullanışsız."
+- Haritadaki bütün noktalar (SOS, ihbar, ekip, toplanma, kapanma) aynı biçimde renkli yuvarlaktı; tür yalnız renkten okunuyordu.
+- Üstüne gelince çıkan bilgi kutusu haritanın içinde çiziliyordu; panellerin ve zaman şeridinin altında kalıp kesiliyordu.
+- Katman paneli 17 katmanı uzun açıklamalarla tek listede gösteriyordu; tatbikat katmanları her modda vardı.
+- Genel durum modunda deprem kataloğu (4 939 halka) varsayılan açıktı.
+- Isı haritası şehir ölçeğinde %72 örtücüydü; simgeleri bastırıyordu.
+- Kaynak ağırlıkları -1…1,5 arası kaydırıcıydı ("×1,0"); ne demek olduğu yazmıyordu.
+
+**Yapılan.**
+- `konsol/src/harita/simgeler.ts`: her tür ayrı **şekil + glif + renk** (deck.gl IconLayer; glifler Phosphor, MIT): SOS daire + siren (aciliyet rengi), ihbar daire + kamera/konuşma/paket, ekip kare + araç (müsait / görevde / hizmet dışı), toplanma kare + kişiler, hastane ve sağlık kare + hastane, kapanma kırmızı daire + yasak. Seçili olan beyaz halkalı ve büyük; kapanan sönük.
+- Yeni katman: **Hastane ve sağlık** (`/api/katman/saglik`, OSM, 196 tesis). SOS, Yol ve rota modlarında açık.
+- Yakınlaştırma eşikleri: tek tek uydu noktaları z ≥ 13, ekip adları z ≥ 12, sağlık z ≥ 12 (toplanma z ≥ 11, yapılar z ≥ 13 eskiden beri).
+- Mod varsayılanları: genel durumdan deprem kataloğu çıktı (yalnız risk modunda); ekipler modundan toplanma çıktı, kapanmalar girdi.
+- Bilgi kartı: tür (simgeyle), başlık, ad-değer satırları, kaynak, tıklayınca ne olacağı; her türde aynı düzen. Kart sayfanın üstünde (portal), ekran kenarında yön değiştiriyor. Metin kaçışlı (`kacis`).
+- Katman paneli: satırda haritadakiyle aynı işaret (panel lejant da), ad, sayı, anahtar; kaynaklar en altta "Veri kaynakları"nda. Tatbikat ve analiz katmanları yalnız kendi modlarında. Eşiğin altındaki katman "yakınlaşınca görünür" yazıyor. "Önerilene dön" düğmesi.
+- Isı örtücülüğü z ≤ 13'te 0,72 → 0,55, z ≥ 16'da 0,30 → 0,22.
+- Kaynak ağırlıkları: her kaynak için dört seçenek (Çıkar / Kapalı / Normal / Güçlü), altında anlamı; verisi olmayan kaynak "bu aralıkta yok" ve kapalı. Hazır karışımların ara değerleri en yakın seçenekte gösterilir; karışım değerleri değişmedi.
+- Grup F: P-3 (PostGIS denemesi, 4,3 sn → 44 ms), P-4 (görüntü önbelleği, 2,75 → 0,03 sn; yol ağı zaten 0–1 sn), P-6 (J-166'da yapılmıştı), P-1 ölçüldü ve ertelendi. Ayrıntı J-167'de.
+- Güvenlik: rota uçlarına hesap başına dakikada 60 sınırı (`hiz_siniri.rota_kontrol`).
+
+**Doğrulama.**
+- `tests/test_harita_katmanlari.py` (4: sağlık ucu yetki ve süzme, görüntü diskten, Google saklanmaz, eksik görüntü saklanmaz), `test_arac_rotasi.py` hız sınırı. `pytest -q` 123/123; `npx tsc -b`, `kontrol:token` temiz.
+- Tarayıcıda: genel durumda ihbar ve ekip simgeleri, bilgi kartı panellerin üstünde ve tam okunuyor; SOS modunda hastane simgeleri ve sade katman paneli. Otomasyonun fare olayı haritaya ölçekli gittiği için kart, harita tuvaline gönderilen olayla denendi.
+
+**Canlıya alırken (Deha).** PostGIS kullanılacaksa `POSTGIS_URL` tanımlanmalı (yoksa denenmez). Tatbikat için yerel bölge dosyası kurulu olmalı (`araclar_yerel_osm_kur.py`).
+
+**Açık kalan.**
+- P-1: afetzede haritasını deck.gl'siz yazmak (altlık çizimi dahil); karar kullanıcıda.
+- Simgelerin renk körlüğünde ayırt edilmesi şekil ve glife dayanıyor; ayrıca sınanmadı.
+
+## J-173 🔴 Deprem riski: eşzamanlı istekte başka ilin sonucu, şişkin uzun vadeli tehlike, açık uçlar; ekran soruya cevap vermiyordu
+**Durum:** KAPALI · **Ölçüldü** · **İlgili:** J-152, J-56, CLAUDE.md §1, §5, §8
+
+**Bulgu (18 Kasım, kullanıcı "doğru, güvenli, performanslı, net mi" diye sordu).**
+- **Yarış durumu.** Motor hesaplanan koordinatı ortak nesnede (`self.last_lat`) tutuyor, köprü (`quakemind/tool/risk_bridge.build_payload`) oradan geri okuyordu. Ölçüldü `[Ö]`: 8 paralel kullanıcıyla 40 istekte **35 yanıt başka ilin koordinatıyla** döndü.
+- Her istek bütün sürecin çalışma klasörünü (`os.chdir`) ve `sys.path`'i değiştiriyordu; aynı anda koşan başka uçları da etkiler.
+- Kısa ve uzun vadeli bileşen iki kez hesaplanıyor, skor metinden ayrıştırılıyordu. Sıralı ortanca 162 ms, paralel 629 ms.
+- **Uzun vadeli tehlike şişkindi.** "10 yılda 200 km'de M≥6 olasılığı" artçılar dahil sayılıyor (motorun ayıklaması 1 gün / 50 km, 2023'te 14 gün sonraki M6,4 ana şok sayılıyordu) ve oran kataloğun süresine değil, o çevredeki ilk ve son deprem arasına bölünüyordu (Konya'da tek ana şok varken 0,28 çıkıyordu).
+- Kısa vadeli bileşen, şehrin 150 km'sinde son bir yılda 7 deprem yoksa sessizce ülke genelinin son 7 depremini kullanıyordu; ekran bunu söylemiyordu.
+- `/api/risk/fault_lines` ve `/api/risk/all_quakes` oturumsuz açıktı (CLAUDE.md §5); `predict` hata olunca ham Python hata metnini döndürüyordu; koordinatsız istekte Nominatim'e (dış servis) gidiliyordu.
+- Ekran "hangi bölgede risk daha yüksek?" diye soruyor ama yalnız tek tek il soruyordu; harita boştu, bileşenlerin dayanağı yazmıyordu.
+
+**Yapılan.**
+- `QuakeMindBackend/risk_hizmeti.py`: iş parçacığı güvenli hesap. Motor yalnız okunur; sonuç yerel değişkenlerden kurulur; veri sürümü değişmedikçe önbellekten; veri tazelenince yeni motor hazırlanıp tek atamayla devreye girer. Çerçeve ve model açılışta arka planda yüklenir.
+- Uzun vadeli: M≥6 depremler Gardner & Knopoff (1974) pencereleriyle ayıklanır [A], oran kataloğun bütün süresine bölünür. Kısa vadeli model ve eğitimi DEĞİŞMEDİ (gerçek sınama olmadan değiştirilmez); yanıt `dayanak` alanında kaynağını ("yerel" / "ülke") yazar.
+- `uclar/risk.py`: `/api/risk/siralama` (81 il, skora göre); `fault_lines` ve `all_quakes` giriş ister; `all_quakes` satır döngüsü yerine toplu dönüşüm, parametre doğrulaması (tarih 422); `predict` Türkiye kutusu dışında 422, koordinatsız istekte il merkezleri listesinden (dış servis yok), hatada genel ileti (ayrıntı sunucu kaydında).
+- Konsol `modlar/risk.tsx`: solda 81 il riske göre sıralı (arama, operasyon bölgesi kısayolları); haritada il merkezleri risk renginde, seçili ilin hesap alanı halkaları (150 / 200 km), il üzerinde bilgi kartı; sağda skor ve üç bileşen çubuğu — her biri neyi ölçtüğü, dayanağı ("1933–2026 kataloğunda 12 ana şok", "en yakın fay 4,9 km") ve skordaki payıyla; kısa vadede zayıf model ve ülke geneline düşme uyarısı.
+
+**Ölçüm** `[Ö]` (gerçek API, gerçek model, aynı betik):
+
+| | Önce | Sonra |
+|---|---|---|
+| Paralel 40 istekte yanlış ilin koordinatı | 35 | **0** |
+| Sıralı istek, ortanca | 162 ms | **30 ms** |
+| Paralel istek, ortanca | 629 ms | **107 ms** |
+| Uzun vadeli tehlike, 81 il ortancası | 0,63 | **0,53** |
+
+- Katalog 1933–2026 (93,6 yıl): 84 adet M≥6 olayın 71'i ana şok. Hiçbir ilde artmadı; en çok düşenler Şanlıurfa 0,54 → 0,35, Konya 0,28 → 0,10, Isparta 0,62 → 0,47. 81 ilin tablosu `QuakeMindBackend/benchmark/reports/risk_uzun_vade_kiyas.json`.
+- `tests/test_risk.py` (4: eşzamanlı istekte doğru il, skor = bileşenlerin ağırlıklı toplamı, yetki ve sınırlar, sıralama). `pytest -q` 127/127.
+- Tarayıcıda: sıralama, Bolu ve Hatay seçimi, halkalar, bileşen kartları.
+
+**Makale.** Makalede risk skorundan söz ediliyorsa uzun vadeli bileşenin değerleri değişti (ortanca 0,63 → 0,53); kontrol edilmeli.
+
+**Açık kalan.**
+- Ağırlıklar (0,4 / 0,3 / 0,3) ve fay basamakları uzman tanımlı; ölçülmedi.
+- Kısa vadeli model zayıf (ROC-AUC 0,61); eğitimdeki "son 7 deprem" özellikleri ülke geneli sıradan, çıkarımda yerel — tutarsız. Düzeltmek modeli yeniden eğitip ölçmek demek.
+- Eski web ve mobil risk ekranları J-152'den beri kimliksiz istek attığı için 401 alıyor; şimdi `fault_lines` ve `all_quakes` da.
+
+## J-174 🔴 Uçtan uca akış: canlı akış ilk jeton yenilemesinde kalıcı kapanıyordu; ihtiyaç geçen yazılı ihbar ihtiyaç sayfasına düşmüyordu
+**Durum:** KAPALI · **Ölçüldü** · **İlgili:** J-42, J-51, J-54, J-167 S-6, CLAUDE.md §4, §5
+
+**İstek (18 Kasım).** Kullanıcı ihbar iletimini, metin analizinden ihbara, enkaz, erzak ve yardım iletimini, ihbarların oluşup düşmesini bütün rollerde ve ekranlarda doğrulamamızı istedi.
+
+**Sınama.** `QuakeMindBackend/araclar_akis_senaryosu.py` (yeni) gerçek API'de dört hesapla (koordinatör, saha, iki afetzede) ve her birinin canlı akışını dinleyerek 48 adımı sınar:
+- SOS;
+- metin analizi ve yazılı ihbar;
+- ihtiyaç talebi;
+- fotoğraf analizi ve ihbarı;
+- "görüldü";
+- SOS'a ve ihbara ekip sevki;
+- saha "yolda", "olay yerinde", konum, "bitti";
+- talebin karşılanması;
+- kapanan kaydın yeniden açılamaması (409);
+- afetzede B'nin başkasının hiçbir kaydını almaması.
+
+Veritabanının kopyasında koşar (`--api http://127.0.0.1:8001`), canlı veriye yazmaz. Ardından üç rolün ekranlarına tarayıcıda bakıldı.
+
+**Bulunan ve düzeltilen.**
+1. **Canlı akış ilk jeton yenilemesinde kalıcı kapanıyordu (bütün roller).**
+   - Akış, açıldığı yenileme çerezini 15 sn'de bir denetliyor (J-167 S-6). Yenileme jetonu ise her yenilemede dönüyor ve eskisi iptal ediliyor.
+   - Sonuç: istemci 15 dakikada bir erişim jetonunu yenileyince sunucu "oturum-bitti" gönderiyor, istemci akışı kalıcı kapatıyordu. Ekran o andan sonra yeni SOS'u, görev ve ihbar durumunu almıyordu; yalnız sayfa yenilenince düzeliyordu.
+   - Düzeltme `konsol/src/canli/canliAkis.ts`: "oturum-bitti" gelince bir kez tarayıcıdaki güncel çerezle yeniden bağlanılır. Açılırsa jeton dönmüştür. Açılmazsa (çıkış, askı: 401) eskisi gibi kapanır.
+   - Tarayıcıda doğrulandı `[Ö]`: jeton iki kez elle döndürüldü, akış 200 ile yeniden bağlandı, ardından koordinatörün "görüldü"sü afetzede ekranına anında düştü.
+2. **Saha akışına işlem kaydı işareti gidiyordu.** Saha `islem-kayitlari` uçlarını okuyamaz (403). `uclar/canli.py` `role_gore`: `islem-kaydi` yalnız koordinatöre ve yöneticiye gider. Ölçüldü `[Ö]`: senaryoda saha akışı 9 → 0.
+3. **İhtiyaç geçen yazılı ihbar ihtiyaç sayfasına düşmüyordu.**
+   - Örnek: "çadırkentte 30 kişiyiz, suyumuz ve bebek maması bitti". Model su, gıda, barınma ve 30 kişi çıkarıyor, ama bunlar yalnız analizin içinde kalıyordu. İhtiyaç sayfası yalnız formdan gelen talepleri sayıyordu.
+   - `uclar/ihbar.py` `_cikti` artık yazılı ihbarda `ihtiyaclar` ve `kisiSayisi` alanlarını analizden üretir. Okuma anında üretildiği için eski kayıtlarda da çalışır.
+   - Konsolda ihtiyaç sayfası bu ihbarları da sayar ve listeler (`ihtiyacTalebiMi`). Teknik notta ve harita kartında bu alanların "metinden" çıkarıldığı yazar.
+4. **Afetzede, ihbarına ekip gelip bitirince kimin geldiğini görmüyordu.** SOS'ta "AKUT 1 işini bitirdi" yazıyor, ihbarda yalnız "İhbar işlendi" yazıyordu. Ekip bir kez gittiyse ihbar da ekipten anlatılır (`afetzede/Bildirimlerim.tsx`).
+5. **Ekip "olay sürüyor" diyerek bitirince afetzede yanlış cümle okuyordu:** "henüz ekip görevlendirilmedi". Artık "AKUT 1 işini bitirdi ama olay sürüyor; koordinasyon başka ekip gönderecek" yazar (`afetzede/GelenEkip.tsx`). Saha geçmişinde de "olay sürüyordu" yazar.
+6. **Yüklenirken "veri yok" yazılıyordu.** Genel durum kartları, SOS kuyruğu ve ihtiyaç sayfası sorgu sürerken "veri yok", "uç yanıt vermiyor" ya da "talep yok" diyordu. Bu cümleler sorgunun hata verdiği ya da gerçekten kayıt olmadığı anlamına gelir (kural 1). Artık yüklenirken "yükleniyor…" yazar.
+7. SOS kuyruğu cümlesi "3 çağrı: 0 bekliyor, 0 gidiyor" diyordu; kalan 3'ün kapandığını söylemiyordu. Artık söylüyor.
+
+**Doğru çalıştığı görülenler (değişiklik yok).**
+- Afetzede yalnız kendi kayıtlarını ve kendi olayına giden ekibi alır.
+- Kapanan ihbar yeniden açılmaz (409).
+- Açık SOS varken yeni SOS aynı kaydı günceller (200, S-2).
+- Ekipte kişi sayısı kayıtlı değilse sevk kişi sayısı ister (422).
+- İhbarın kapanışı afetzedeye "gorev" mesajıyla gelir; istemci o mesajda kendi ihbarını yeniden çeker.
+
+**Ölçüm** `[Ö]`:
+- `araclar_akis_senaryosu.py` 48/48.
+- Akış özetleri: koordinatör {yeni-sos 1, ihbar 5, gorev 7, ekip-konumu 1, islem-kaydi 13}; saha aynısı, islem-kaydi yok; afetzede A yalnız kendi olayları; afetzede B {} (hiçbir şey).
+- `tests/test_akis_rolleri.py` (4).
+- `pytest -q` 131/131; `npx tsc -b` ve `kontrol:token` temiz.
+
+**Açık kalan.**
+- Akış hâlâ tek süreç içi yayın (`canli_yayin.py`). Birden çok worker'da `LISTEN/NOTIFY` gerekir (CLAUDE.md §4).
+- Yazılı ihbardan çıkan kişi sayısı model çıkarımıdır, doğrulanmamıştır. Metinde birden çok sayı varsa en büyüğü alınır.
 
 ---
 
@@ -6072,3 +6199,6 @@ baktığı, ekip konum paylaşımı ve hash zinciri.
 | 17 Kasım 2026 | **J-170** kapatıldı (kategori kararı hariç): metin analizinde adres yerel dizinden (metin dışarı gitmiyor), düzey ve sapma payıyla; model işçide; kişi, ihtiyaç, işaret çıkarımı ve kategori uyarısı. 22 metinlik kümede beklenen yer 7/12 → 11/12, 1,5 km içinde 5/12 → 10/12. Konsolda yazılı ihbar kuyruğu, vurgulu sonuç kartı ve haritada sapma çemberi; afetzede akışı iki adım. J-167 F-1, P-2, S-5 kapandı. `pytest -q` 104/104. |
 | 17 Kasım 2026 | **J-170** ek: "Cumhuriyet meydanında ölüler var 2 tane" ilgisiz ve adressiz çıkıyordu. Meydan adres türü, ölü işareti ve "N tane" sayımı eklendi; model ilgisiz dese de ağır işarette uyarı. `pytest -q` 107/107. |
 | 18 Kasım 2026 | **J-171** kapatıldı: araç rotası kenar tabanlı (dönüş yasağı, U dönüşü yalnız çıkmazda, dönüş bedeli, göbek, yola yönüyle oturtma, zincirle küçültülmüş graf). Dönüş yasağı ihlali 16 → 0; arama şehirde 22,9 → 13,4 ms. Konsol "Yol ve rota" bağlandı. J-167 Grup E (F-3…F-7) kapandı. `pytest -q` 118/118. |
+| 18 Kasım 2026 | **J-172** kapatıldı: haritada türe göre ayrı simgeler (şekil + glif + renk), hastane katmanı, yakınlaştırma eşikleri, sayfa üstünde bilgi kartı, lejant olan sade katman paneli, kaynak ağırlıklarında dört seçenek. Grup F: ısı soğuk 4,3 sn → 44 ms (PostGIS denemesi), tatbikat görüntüsü 2,75 → 0,03 sn (disk önbelleği); P-1 ölçüldü (kritik yol 153 KB), ertelendi. `pytest -q` 123/123. |
+| 18 Kasım 2026 | **J-173** kapatıldı: deprem riskinde eşzamanlı istekte başka ilin sonucu dönüyordu (40'ta 35 → 0); hesap iş parçacığı güvenli ve önbellekli (ortanca 162 → 30 ms). Uzun vadeli tehlike artçısız (Gardner–Knopoff) ve katalog süresiyle (81 il ortancası 0,63 → 0,53). İki açık uç kapandı. Ekran 81 il sıralaması, haritada risk renkli iller ve bileşen kartlarıyla yeniden. `pytest -q` 127/127. |
+| 18 Kasım 2026 | **J-174** kapatıldı: uçtan uca akış 48 adımda dört hesapla sınandı (`araclar_akis_senaryosu.py`). Canlı akış ilk jeton yenilemesinde kalıcı kapanıyordu (bütün roller), düzeltildi. Saha akışına işlem kaydı işareti gitmiyor. İhtiyaç geçen yazılı ihbar ihtiyaç sayfasına düşüyor. Afetzede ihbarına gelen ekibi ve "olay sürüyor" durumunu doğru görüyor. Yüklenirken "veri yok" yazılmıyor. `pytest -q` 131/131. |

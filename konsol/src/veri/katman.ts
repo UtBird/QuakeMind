@@ -69,6 +69,26 @@ export type ToplanmaAlani = {
   adres: string | null
 }
 
+/** Hastane ve sağlık merkezi (OSM; J-172). */
+export type SaglikYeri = {
+  id: string
+  tur: 'hastane' | 'saglik'
+  ad: string | null
+  lon: number
+  lat: number
+}
+
+/** Operasyon bölgelerinin hastane ve sağlık merkezleri: küçük liste (yüzlerce),
+    bir kez alınır. */
+export function useSaglik(acik: boolean) {
+  return useQuery({
+    queryKey: ['katman', 'saglik'],
+    enabled: acik,
+    staleTime: Infinity,
+    queryFn: () => apiGet<KatmanYaniti<SaglikYeri>>('/api/katman/saglik'),
+  })
+}
+
 /** Katalogdan çizilen en küçük büyüklük; katman listesi bunu yazar. */
 export const DEPREM_EN_AZ = 4
 /** Türkiye kutusunda M ≥ 4 deprem 4.909 (19 Ekim 2026); uçtaki 3.000 varsayılanı

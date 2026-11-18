@@ -6,7 +6,7 @@ import { useSorguAraligi } from '@/durum/zamanDurumu'
 import { sayi } from '@/lib/bicim'
 import { sn } from '@/lib/sinif'
 import { IHTIYAC_ADI, type Ihtiyac } from '@/veri/sorgular'
-import { IHTIYAC_SIRASI, useIhbarlar, type Ihbar } from '@/veri/ihbar'
+import { IHTIYAC_SIRASI, ihtiyacTalebiMi, useIhbarlar, type Ihbar } from '@/veri/ihbar'
 import { IHTIYAC_IKONU } from '@/veri/ihbarIkon'
 import { GelenIhbarlar } from './ihbarParcalari'
 
@@ -48,7 +48,7 @@ export function IhtiyacSol() {
   const { suzgec, ihtiyac, suzgecSec, ihtiyacSec } = useIhtiyacSuzgeci()
 
   const talepler = useMemo(
-    () => (ihbar.data ?? []).filter((i) => i.tur === 'ihtiyac' && durumaUyar(i, suzgec)),
+    () => (ihbar.data ?? []).filter((i) => ihtiyacTalebiMi(i) && durumaUyar(i, suzgec)),
     [ihbar.data, suzgec],
   )
   // İhtiyaç başına talep ve kişi sayısı: listenin sayımı, sunucuda hesap yok.
@@ -104,7 +104,9 @@ export function IhtiyacSol() {
       <SuAn>
         {ihbar.isError
           ? 'İhbar ucu yanıt vermiyor; talepler gösterilemiyor.'
-          : talepler.length === 0
+          : !ihbar.data
+            ? 'Talepler yükleniyor…'
+            : talepler.length === 0
             ? `${SUZGECLER.find((s) => s.id === suzgec)?.etiket}: seçili aralıkta talep yok.`
             : `${SUZGECLER.find((s) => s.id === suzgec)?.etiket}: ${sayi(talepler.length)} talep${
                 toplamKisi ? `, ${sayi(toplamKisi)} kişi` : ''
@@ -121,7 +123,8 @@ export function IhtiyacSol() {
 
       <Teknik>
         Talepler canlı akışla gelir. Sayım listeden yapılır; kişi sayısı afetzedenin yazdığıdır,
-        doğrulanmamıştır. Konum afetzedenin cihazından ya da seçtiği mahallenin merkezinden gelir.
+        doğrulanmamıştır. Yazılı ihbarda ihtiyaç geçiyorsa o da buraya düşer; ihtiyacı ve kişi
+        sayısını metinden model çıkarır (BERTurk ve kural tabanlı çıkarım). Konum afetzedenin cihazından ya da seçtiği mahallenin merkezinden gelir.
         Talepler hasar olmadığı için ısı haritasına yazılmaz.
       </Teknik>
     </Bolum>
@@ -137,6 +140,7 @@ export function IhtiyacSag() {
   return (
     <GelenIhbarlar
       tur="ihtiyac"
+      kapsa={ihtiyacTalebiMi}
       baslik="Talepler"
       amac="Önce işlenmemiş talepler, sonra en yeni. Seçince ihtiyaçlar, kişi sayısı ve not açılır; karşılanan talebi kapatabilirsin."
       suz={suz}

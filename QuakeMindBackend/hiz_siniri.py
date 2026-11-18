@@ -40,6 +40,8 @@ KAYIT_PENCERE_SN = 60 * 60
 KAYIT_IP_SINIRI = 10          # ayni adresten saatte 10 yeni hesap (aile, ayni Wi-Fi payi)
 METIN_PENCERE_SN = 60
 METIN_HESAP_SINIRI = 30       # ayni hesaptan dakikada 30 metin analizi (model CPU'su)
+ROTA_PENCERE_SN = 60
+ROTA_HESAP_SINIRI = 60        # ayni hesaptan dakikada 60 rota sorusu (J-172; arama 13-90 ms CPU)
 
 
 def istemci_ip(istek) -> Optional[str]:
@@ -129,6 +131,18 @@ def metin_kontrol(kullanici_id: str) -> None:
         raise _dur(ilk + METIN_PENCERE_SN - simdi,
                    "Çok sık analiz istendi. {sn} saniye sonra yeniden dene.")
     depo.sayac_ekle(f"metin:k:{kullanici_id}")
+
+
+# --- rota (konsol Yol ve rota) -------------------------------------------------
+
+def rota_kontrol(kullanici_id: str) -> None:
+    """J-172: rota aramasi CPU'da kosar; tek hesap API'yi tikamasin."""
+    depo = aktif_depo()
+    simdi = time.time()
+    n, ilk = depo.sayac(f"rota:k:{kullanici_id}", simdi - ROTA_PENCERE_SN)
+    if n >= ROTA_HESAP_SINIRI:
+        raise _dur(ilk + ROTA_PENCERE_SN - simdi, "Çok sık rota istendi. {sn} saniye sonra yeniden dene.")
+    depo.sayac_ekle(f"rota:k:{kullanici_id}")
 
 
 # --- SOS -------------------------------------------------------------------------

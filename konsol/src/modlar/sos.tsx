@@ -71,10 +71,14 @@ export function SosSol() {
 
       <SuAn>
         {!sos.data
-          ? 'Çağrı ucu yanıt vermiyor; kuyruk gösterilemiyor.'
+          ? sos.isError
+            ? 'Çağrı ucu yanıt vermiyor; kuyruk gösterilemiyor.'
+            : 'Çağrılar yükleniyor…'
           : `Seçili aralıkta ${sayi(liste.length)} çağrı: ${sayi(bekleyen)} tanesine ekip gitmedi, ${sayi(
               giden,
-            )} tanesine ekip gidiyor. ${musait == null ? '' : `Şu an ${sayi(musait)} ekip müsait.`}`}
+            )} tanesine ekip gidiyor${
+              liste.length - bekleyen - giden > 0 ? `, ${sayi(liste.length - bekleyen - giden)} tanesi kapandı` : ''
+            }. ${musait == null ? '' : `Şu an ${sayi(musait)} ekip müsait.`}`}
       </SuAn>
 
       {sos.isError && (

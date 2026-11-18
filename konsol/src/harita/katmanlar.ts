@@ -1,4 +1,5 @@
 import {
+  IconLayer,
   ScatterplotLayer,
   PathLayer,
   PolygonLayer,
@@ -24,9 +25,9 @@ import { GOREV_DURUMU, gorevOzeti, kurumTur, uzaklikMetni, type Ekip } from '@/v
 import type { Kutu, Nokta } from '@/durum/secimDurumu'
 import type { Yol } from '@/veri/analiz'
 import type { AltlikVerisi, Etiket } from '@/veri/altlik'
-import { IHBAR_DURUMU, IHBAR_TURU, ihbarBasligi, ihbarKonumu, type Ihbar, type IhbarTuru } from '@/veri/ihbar'
+import { IHBAR_DURUMU, IHBAR_TURU, ihbarKonumu, type Ihbar, type IhbarTuru } from '@/veri/ihbar'
 import type { BelirsizlikCemberi } from '@/veri/metin'
-import { DEPREM_EN_AZ, type Deprem, type Fay, type Kapanma, type ToplanmaAlani } from '@/veri/katman'
+import { DEPREM_EN_AZ, type Deprem, type Fay, type Kapanma, type SaglikYeri, type ToplanmaAlani } from '@/veri/katman'
 import { VARYANT_ADI, type SimGorev, type SimKenar } from '@/veri/simulasyon'
 import { goruntuKatmani } from './goruntuKatmani'
 import {
@@ -38,15 +39,25 @@ import {
 } from './simKatmanlari'
 import { mesafe, sureMetni, tarihSaat, tarihSaatYilli } from '@/lib/bicim'
 import { tokenPx, tokenRenk } from './tokenRenk'
+import { ikon, simgeAdresi, type SimgeTuru } from './simgeler'
+
+/* Yakınlaştırma eşikleri (J-172): harita her ölçekte yalnız o ölçekte işe
+   yarayanı çizer. Olaylar (SOS, ihbar) ve ekipler her ölçekte; tek tek uydu
+   noktaları, ekip adları ve sağlık tesisleri şehir ölçeğinde. */
+export const HASAR_NOKTASI_EN_AZ_ZOOM = 13
+export const EKIP_ADI_EN_AZ_ZOOM = 12
+export const SAGLIK_EN_AZ_ZOOM = 12
+
+/** IconLayer ortak ayarları: simge piksel boyutunda, renk simgenin kendisinde. */
+const SIMGE_ORTAK = {
+  sizeUnits: 'pixels' as const,
+  getColor: [255, 255, 255, 255] as [number, number, number, number],
+  alphaCutoff: 0.05,
+  pickable: true,
+}
 
 /* Veri katmanları altlıktan belirgin şekilde ayrılır: altlık soğuk ve sönük,
    veri sıcak ve doygun (ARAYUZ §11). Hasar renkleri haritada ve panelde aynıdır. */
-
-const ONCELIK_RENK: Record<SosCagrisi['oncelik'], [number, number, number, number]> = {
-  kritik: [255, 92, 92, 240],
-  yuksek: [255, 145, 82, 235],
-  orta: [242, 193, 78, 225],
-}
 
 const KAYNAK_RENK: Record<HasarNoktasi['kaynak'], [number, number, number, number]> = {
   uydu: [69, 200, 224, 220],
@@ -202,6 +213,16 @@ export type KatmanGirdisi = {
   altlikYapiGorunur?: boolean
   /** Toplanma alanları şehir ölçeğinde çizilir (TOPLANMA_EN_AZ_ZOOM). */
   toplanmaGorunur?: boolean
+  /** Haritanın yakınlaştırması: yoğun katmanlar eşiğin altında çizilmez (J-172). */
+  zoom?: number
+  /** Hastane ve sağlık merkezleri (OSM). */
+  saglik?: SaglikYeri[]
+  /** Deprem riski modu (J-173): il merkezleri risk renginde, seçili ilin hesap alanı. */
+  risk?: {
+    iller: { il: string; lat: number; lon: number; skor: number; seviye: string; fayKm: number }[]
+    secili: string | null
+    halkalar: { lon: number; lat: number; kisaKm: number; uzunKm: number } | null
+  } | null
   /** Uzak yakınlaştırmada yazılan bölge adları (altlık kataloğundan). */
   bolgeAdlari?: Etiket[]
   /** Isı katmanının örtücülüğü; yakınlaştıkça azalır (bkz. KatmanKopru). */
@@ -249,6 +270,7 @@ export type KatmanGirdisi = {
 }
 
 type KonumBelirsizligi = BelirsizlikCemberi
+type RiskIli = NonNullable<KatmanGirdisi['risk']>['iller'][number]
 
 function kutuHalkasi(k: Kutu): Nokta[] {
   return [
@@ -364,20 +386,13 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
       )
     }
     L.push(
-      new ScatterplotLayer<Kapanma>({
+      new IconLayer<Kapanma>({
+        ...SIMGE_ORTAK,
         id: 'yol-kapanmalari',
         data: noktali,
         getPosition: (d) => [d.lon, d.lat],
-        getRadius: 14,
-        radiusUnits: 'meters',
-        radiusMinPixels: 3,
-        radiusMaxPixels: 9,
-        getFillColor: [...tokenRenk('--color-high'), 235],
-        stroked: true,
-        getLineColor: [...tokenRenk('--color-ground'), 220],
-        lineWidthUnits: 'pixels',
-        getLineWidth: 1,
-        pickable: true,
+        getIcon: () => ikon('kapanma'),
+        getSize: 18,
       }),
     )
   }
@@ -421,27 +436,98 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
   // yalnız şehir ölçeğinde çizilir.
   if (g.katmanlar.toplanma && g.toplanmaGorunur && g.toplanma?.length) {
     L.push(
-      new ScatterplotLayer<ToplanmaAlani>({
+      new IconLayer<ToplanmaAlani>({
+        ...SIMGE_ORTAK,
         id: 'toplanma',
         data: g.toplanma,
         getPosition: (d) => [d.lon, d.lat],
-        getRadius: 16,
-        radiusUnits: 'meters',
-        radiusMinPixels: 2.5,
-        radiusMaxPixels: 8,
-        getFillColor: [...tokenRenk('--color-yer-toplanma'), 225],
+        getIcon: () => ikon('toplanma'),
+        getSize: 18,
+      }),
+    )
+  }
+
+  // Hastane ve sağlık merkezi (J-172): OSM kaydı; şehir ölçeğinde. Hastane
+  // sağlık merkezinden büyük çizilir.
+  if (g.katmanlar.saglik && (g.zoom ?? 0) >= SAGLIK_EN_AZ_ZOOM && g.saglik?.length) {
+    L.push(
+      new IconLayer<SaglikYeri>({
+        ...SIMGE_ORTAK,
+        id: 'saglik',
+        data: g.saglik,
+        getPosition: (d) => [d.lon, d.lat],
+        getIcon: (d) => ikon(d.tur === 'hastane' ? 'hastane' : 'saglik'),
+        getSize: (d) => (d.tur === 'hastane' ? 22 : 16),
+      }),
+    )
+  }
+
+  // Deprem riski (J-173): seçili ilin hesap alanı (uzun vadeli 200 km, kısa
+  // vadeli 150 km) ve 81 il merkezi risk renginde. Kırmızı-turuncu-sarı burada
+  // aciliyet/tehlike anlamında (ARAYUZ §6).
+  if (g.risk) {
+    const h = g.risk.halkalar
+    if (h) {
+      const soluk = tokenRenk('--color-ink-3')
+      L.push(
+        new ScatterplotLayer<{ p: [number, number]; r: number; uzun: boolean }>({
+          id: 'risk-halkalari',
+          data: [
+            { p: [h.lon, h.lat], r: h.uzunKm * 1000, uzun: true },
+            { p: [h.lon, h.lat], r: h.kisaKm * 1000, uzun: false },
+          ],
+          getPosition: (d) => d.p,
+          getRadius: (d) => d.r,
+          radiusUnits: 'meters',
+          filled: true,
+          getFillColor: (d) => [...soluk, d.uzun ? 14 : 0],
+          stroked: true,
+          lineWidthMinPixels: 1.5,
+          getLineColor: (d) => [...soluk, d.uzun ? 200 : 140],
+        }),
+      )
+    }
+    const renk = (s: number) =>
+      tokenRenk(s >= 75 ? '--color-crit' : s >= 50 ? '--color-high' : s >= 25 ? '--color-mid' : '--color-ok')
+    L.push(
+      new ScatterplotLayer<RiskIli>({
+        id: 'risk-illeri',
+        data: g.risk.iller,
+        getPosition: (d) => [d.lon, d.lat],
+        getRadius: (d) => (d.il === g.risk!.secili ? 9 : 6),
+        radiusUnits: 'pixels',
+        getFillColor: (d) => [...renk(d.skor), 235],
         stroked: true,
-        getLineColor: [...tokenRenk('--color-ground'), 200],
-        lineWidthUnits: 'pixels',
-        getLineWidth: 1,
+        lineWidthMinPixels: 1.5,
+        getLineColor: (d) => (d.il === g.risk!.secili ? [232, 236, 244, 255] : [...tokenRenk('--color-ground'), 255]),
+        updateTriggers: { getRadius: g.risk.secili, getLineColor: g.risk.secili },
         pickable: true,
+      }),
+      new TextLayer<RiskIli>({
+        id: 'risk-il-adlari',
+        // Uzakta yalnız seçili il ve en riskli 10 il yazılır; yakında hepsi.
+        data: (g.zoom ?? 0) >= 7.5 ? g.risk.iller : g.risk.iller.filter((d, i) => i < 10 || d.il === g.risk!.secili),
+        getPosition: (d) => [d.lon, d.lat],
+        getText: (d) => `${d.il} ${Math.round(d.skor)}`,
+        getSize: tokenPx('--text-small'),
+        getColor: [...tokenRenk('--color-ink'), 255],
+        getPixelOffset: [0, -12],
+        fontFamily: 'IBM Plex Sans, sans-serif',
+        fontWeight: 600,
+        characterSet: 'auto',
+        fontSettings: { sdf: true },
+        outlineWidth: 3,
+        outlineColor: [...tokenRenk('--color-ground'), 255],
+        getTextAnchor: 'middle',
+        getAlignmentBaseline: 'bottom',
       }),
     )
   }
 
   // Hasar noktaları birleşik ısının kaynağıdır; ısıyla birlikte açılır.
   // ("Yapılar" bayrağı artık altlıktaki yapıları çizer.)
-  if (g.katmanlar.isi) {
+  // Tek tek noktalar şehir ölçeğinde; uzakta yoğunluğu ısı zaten gösterir.
+  if (g.katmanlar.isi && (g.zoom ?? 0) >= HASAR_NOKTASI_EN_AZ_ZOOM) {
     L.push(
       new ScatterplotLayer<HasarNoktasi>({
         id: 'hasar-noktalari',
@@ -489,32 +575,26 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
         getDashArray: [4, 3],
         extensions: [KESIK],
       }),
-      new ScatterplotLayer<KonumluEkip>({
+      new IconLayer<KonumluEkip>({
+        ...SIMGE_ORTAK,
         id: 'ekipler',
         data: ekipler,
         getPosition: (d) => [d.lon, d.lat],
-        getRadius: 30,
-        radiusMinPixels: 5,
-        radiusMaxPixels: 11,
-        getFillColor: (d) =>
-          d.gorev
-            ? [...tokenRenk('--color-ink'), 245]
-            : d.durum === 'hizmet-disi'
-              ? [...tokenRenk('--color-ink-3'), 220]
-              : [...vurgu, 240],
-        stroked: true,
-        lineWidthMinPixels: 1.8,
-        getLineColor: (d) => (d.gorev ? [...vurgu, 255] : [...tokenRenk('--color-ground'), 255]),
-        pickable: true,
+        getIcon: (d) => ikon(ekipSimgesi(d)),
+        getSize: 24,
       }),
+    )
+  }
+  if (g.katmanlar.ekipler && (g.zoom ?? 0) >= EKIP_ADI_EN_AZ_ZOOM) {
+    L.push(
       new TextLayer<KonumluEkip>({
         id: 'ekip-adlari',
-        data: ekipler,
+        data: g.ekipler.filter(konumlu),
         getPosition: (d) => [d.lon, d.lat],
         getText: (d) => d.ad,
         getSize: tokenPx('--text-small'),
         getColor: [...tokenRenk('--color-ink'), 255],
-        getPixelOffset: [0, -16],
+        getPixelOffset: [0, -15],
         fontFamily: 'IBM Plex Sans, sans-serif',
         fontWeight: 600,
         characterSet: 'auto',
@@ -574,39 +654,31 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
     const turler = g.ihbarTurleri
     const veri = turler ? g.ihbarlar.filter((i) => turler.includes(i.tur)) : g.ihbarlar
     L.push(
-      new ScatterplotLayer<Ihbar>({
+      new IconLayer<Ihbar>({
+        ...SIMGE_ORTAK,
         id: 'ihbarlar',
         data: veri,
         getPosition: (d) => [d.lon, d.lat],
-        getRadius: (d) => (g.seciliIhbar === d.id ? 46 : 30),
-        radiusUnits: 'meters',
-        radiusMinPixels: 4,
-        radiusMaxPixels: 12,
-        getFillColor: (d) => [...tokenRenk(IHBAR_TURU[d.tur].renk), d.durum === 'kapandi' ? 90 : 235],
-        stroked: true,
-        lineWidthMinPixels: 1.5,
-        getLineColor: (d) => (g.seciliIhbar === d.id ? [232, 236, 244, 255] : [10, 14, 20, 220]),
-        updateTriggers: { getRadius: g.seciliIhbar, getLineColor: g.seciliIhbar },
-        pickable: true,
+        getIcon: (d) => ikon(`ihbar-${d.tur}` as SimgeTuru, g.seciliIhbar === d.id),
+        getSize: (d) => (g.seciliIhbar === d.id ? 30 : 22),
+        // Kapanan ihbar sönük.
+        getColor: (d) => [255, 255, 255, d.durum === 'kapandi' ? 110 : 255],
+        updateTriggers: { getIcon: g.seciliIhbar, getSize: g.seciliIhbar },
       }),
     )
   }
 
   L.push(
-    new ScatterplotLayer<SosCagrisi>({
+    new IconLayer<SosCagrisi>({
+      ...SIMGE_ORTAK,
       id: 'sos',
       data: g.sos,
       getPosition: (d) => [d.lon, d.lat],
-      getRadius: (d) => (g.seciliSos === d.id ? 52 : 34),
-      radiusUnits: 'meters',
-      radiusMinPixels: 4.5,
-      radiusMaxPixels: 14,
-      getFillColor: (d) => ONCELIK_RENK[d.oncelik],
-      stroked: true,
-      lineWidthMinPixels: 1.6,
-      getLineColor: (d) => (g.seciliSos === d.id ? [232, 236, 244, 255] : [10, 14, 20, 220]),
-      updateTriggers: { getRadius: g.seciliSos, getLineColor: g.seciliSos },
-      pickable: true,
+      getIcon: (d) => ikon(`sos-${d.oncelik}` as SimgeTuru, g.seciliSos === d.id),
+      getSize: (d) => (g.seciliSos === d.id ? 34 : 26),
+      // Kapanan çağrı sönük; bekleyen tam renk.
+      getColor: (d) => [255, 255, 255, d.durum === 'kapandi' ? 110 : 255],
+      updateTriggers: { getIcon: g.seciliSos, getSize: g.seciliSos },
     }),
   )
 
@@ -763,16 +835,48 @@ function ekipSatiri(e: Ekip): string {
 const kacis = (m: string) =>
   m.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
-export function ipucuKutusu(baslik: string, satirlar: Array<string | null | undefined | false>) {
-  const govde = satirlar
-    .filter((x): x is string => !!x)
-    .map((x) => `<div>${kacis(x)}</div>`)
+export function ekipSimgesi(e: Ekip): SimgeTuru {
+  return e.gorev ? 'ekip-gorevde' : e.durum === 'hizmet-disi' ? 'ekip-disi' : 'ekip-musait'
+}
+
+type KartSatiri = string | null | undefined | false | [string, string | null | undefined]
+
+/** Üstüne gelince bilgi kartı (J-172): ne olduğu (tür ve simge), başlık,
+    ad-değer satırları, kaynağı ve tıklayınca ne olacağı. Her nokta türü aynı
+    düzende: koordinatör türü simgeden, ayrıntıyı karttan okur. */
+export function ipucuKarti(k: {
+  tur: string
+  simge?: SimgeTuru
+  baslik: string
+  satirlar?: KartSatiri[]
+  kaynak?: string | null
+  eylem?: string | null
+}) {
+  const satirlar = (k.satirlar ?? [])
+    .filter((x): x is string | [string, string] => !!x && (typeof x === 'string' || !!x[1]))
+    .map((x) =>
+      typeof x === 'string'
+        ? `<div class="qm-ipucu-metin">${kacis(x)}</div>`
+        : `<div class="qm-ipucu-satir"><span>${kacis(x[0])}</span><span>${kacis(x[1])}</span></div>`,
+    )
     .join('')
+  const simge = k.simge ? `<img alt="" src="${simgeAdresi(k.simge)}" width="18" height="18"/>` : ''
   return {
-    html: `<div class="qm-ipucu"><div class="qm-ipucu-baslik">${kacis(baslik)}</div>${govde}</div>`,
+    html:
+      `<div class="qm-ipucu"><div class="qm-ipucu-tur">${simge}<span>${kacis(k.tur)}</span></div>` +
+      `<div class="qm-ipucu-baslik">${kacis(k.baslik)}</div>${satirlar}` +
+      (k.kaynak ? `<div class="qm-ipucu-kaynak">${kacis(k.kaynak)}</div>` : '') +
+      (k.eylem ? `<div class="qm-ipucu-eylem">${kacis(k.eylem)}</div>` : '') +
+      `</div>`,
     style: { background: 'transparent', boxShadow: 'none', padding: '0', margin: '0' },
   }
 }
+
+export function ipucuKutusu(baslik: string, satirlar: Array<string | null | undefined | false>) {
+  return ipucuKarti({ tur: 'Bilgi', baslik, satirlar })
+}
+
+const kisalt = (m: string | null | undefined, n = 140) => (m && m.length > n ? `${m.slice(0, n)}…` : m)
 
 export function haritaIpucu({ object, layer }: PickingInfo) {
   if (!object || !layer) return null
@@ -780,79 +884,144 @@ export function haritaIpucu({ object, layer }: PickingInfo) {
     case 'sos': {
       const c = object as SosCagrisi
       const ek = sosEkBilgi(c)
-      return ipucuKutusu(`SOS · ${ONCELIK_ADI[c.oncelik].toLocaleLowerCase('tr')} aciliyet`, [
-        sevkSatiri(c.durum, c.gorevler),
-        c.mahalle,
-        ek.kisiIhtiyac,
-        c.metin,
-        ek.yaklasik && ek.konum,
-        tarihSaat(c.zaman),
-        'Tıkla: seç ve yakınlaş',
-      ])
+      return ipucuKarti({
+        tur: 'SOS çağrısı',
+        simge: `sos-${c.oncelik}` as SimgeTuru,
+        baslik: `${ONCELIK_ADI[c.oncelik]} aciliyet${c.mahalle ? ` · ${c.mahalle}` : ''}`,
+        satirlar: [
+          ['Durum', sevkSatiri(c.durum, c.gorevler)],
+          ['Kişi / ihtiyaç', ek.kisiIhtiyac],
+          ['Geldi', tarihSaat(c.zaman)],
+          kisalt(c.metin),
+          ek.yaklasik && ek.konum,
+        ],
+        kaynak: 'Afetzede ekranından gelen acil çağrı',
+        eylem: 'Tıkla: seç, ayrıntı ve ekip gönder',
+      })
     }
     case 'ihbarlar': {
       const i = object as Ihbar
-      return ipucuKutusu(ihbarBasligi(i), [
-        IHBAR_DURUMU[i.durum].ad,
-        gorevOzeti(i.gorevler),
-        i.tur === 'ihtiyac' && i.kisiSayisi ? `${i.kisiSayisi} kişi` : null,
-        i.metin && i.metin.length > 140 ? `${i.metin.slice(0, 140)}…` : i.metin,
-        ihbarKonumu(i),
-        tarihSaat(i.zaman),
-        'Tıkla: seç ve yakınlaş',
-      ])
+      return ipucuKarti({
+        tur: IHBAR_TURU[i.tur].ad,
+        simge: `ihbar-${i.tur}` as SimgeTuru,
+        baslik: i.etiket ?? IHBAR_TURU[i.tur].ad,
+        satirlar: [
+          ['Durum', IHBAR_DURUMU[i.durum].ad],
+          ['Ekip', gorevOzeti(i.gorevler)],
+          ['Kişi', i.kisiSayisi ? `${i.kisiSayisi} kişi${i.tur === 'metin' ? ' (metinden)' : ''}` : null],
+          ['Geldi', tarihSaat(i.zaman)],
+          kisalt(i.metin),
+          ihbarKonumu(i),
+        ],
+        kaynak: i.tur === 'fotograf' ? 'Fotoğraf: YOLO modelinin tahmini' : i.tur === 'metin' ? 'Yazı: BERTurk modelinin tahmini' : 'Afetzedenin ihtiyaç talebi',
+        eylem: 'Tıkla: seç ve ayrıntıyı aç',
+      })
     }
     case 'konum-belirsizligi':
     case 'konum-belirsizligi-merkez': {
       const b = object as KonumBelirsizligi
-      return ipucuKutusu(b.baslik, [b.aciklama])
+      return ipucuKarti({ tur: 'Konum payı', baslik: b.baslik, satirlar: [b.aciklama] })
     }
     case 'hasar-noktalari': {
       const h = object as HasarNoktasi
-      return ipucuKutusu(KAYNAK_ADI[h.kaynak], [
-        `Hasar skoru %${Math.round(h.skor * 100)} · güven %${Math.round(h.guven * 100)}`,
-        tarihSaat(h.zaman),
-      ])
+      return ipucuKarti({
+        tur: 'Hasar noktası',
+        baslik: KAYNAK_ADI[h.kaynak],
+        satirlar: [
+          ['Hasar skoru', `%${Math.round(h.skor * 100)}`],
+          ['Model güveni', `%${Math.round(h.guven * 100)}`],
+          ['Zaman', tarihSaat(h.zaman)],
+        ],
+        kaynak: 'Modelin tahmini; sahada doğrulanmadı. Isı haritası bu noktalardan çıkar.',
+      })
     }
     case 'ekipler': {
       const e = object as Ekip
-      return ipucuKutusu(e.ad, [
-        [kurumTur(e), e.kisiSayisi ? `${e.kisiSayisi} kişi` : null].filter(Boolean).join(' · '),
-        ekipSatiri(e),
-        e.konumZamani ? `Konum: ${e.yerAdi ? `${e.yerAdi} yakını, ` : ''}${tarihSaat(e.konumZamani)}` : null,
-      ])
+      return ipucuKarti({
+        tur: 'Saha ekibi',
+        simge: ekipSimgesi(e),
+        baslik: e.ad,
+        satirlar: [
+          ['Tür', [kurumTur(e), e.kisiSayisi ? `${e.kisiSayisi} kişi` : null].filter(Boolean).join(' · ')],
+          ['Durum', ekipSatiri(e)],
+          ['Konum', e.konumZamani ? `${e.yerAdi ? `${e.yerAdi} yakını, ` : ''}${tarihSaat(e.konumZamani)}` : null],
+        ],
+        kaynak: 'Konum ekibin telefonundan',
+        eylem: 'Tıkla: yakınlaş',
+      })
     }
     case 'analiz-kapali':
-      return ipucuKutusu('Kapalı yol', ['Uydu analizinden: modelin tahmini, sahada doğrulanmadı.'])
-    case 'yol-kapanmalari': {
+      return ipucuKarti({
+        tur: 'Kapalı yol',
+        simge: 'kapanma',
+        baslik: 'Bu analizde kapalı bulundu',
+        kaynak: 'Uydu analizi: modelin tahmini, sahada doğrulanmadı',
+      })
+    case 'yol-kapanmalari':
+    case 'yol-kapanmalari-cizgi': {
       const k = object as Kapanma
-      return ipucuKutusu('Yol kapanması', [
-        k.kaynak === 'uydu' ? 'Uydu analizinden: modelin tahmini, sahada doğrulanmadı.' : `Kaynak: ${k.kaynak}`,
-        'Kapalı bulunan yol parçasının orta noktası.',
-        tarihSaatYilli(k.zaman),
-      ])
+      return ipucuKarti({
+        tur: 'Yol kapanması',
+        simge: 'kapanma',
+        baslik: k.kaynak === 'uydu' ? 'Uydu analizinde kapalı' : `Kapalı (${k.kaynak})`,
+        satirlar: [
+          ['Bulundu', tarihSaatYilli(k.zaman)],
+          'Rotalar bu yoldan kaçınır; başka yol yoksa geçer ve uyarır.',
+        ],
+        kaynak: k.kaynak === 'uydu' ? 'Modelin tahmini; sahada doğrulanmadı' : null,
+      })
     }
     case 'depremler': {
       const d = object as Deprem
-      return ipucuKutusu(`M ${d.buyukluk.toFixed(1)} deprem`, [
-        d.yer,
-        d.derinlikKm != null ? `Derinlik ${d.derinlikKm.toFixed(0)} km` : null,
-        tarihSaatYilli(d.zaman),
-        'Katalog kaydı (Kandilli, USGS); bugünün hasarı değil.',
-      ])
+      return ipucuKarti({
+        tur: 'Geçmiş deprem',
+        baslik: `M ${d.buyukluk.toFixed(1).replace('.', ',')} · ${d.yer ?? 'yer yok'}`,
+        satirlar: [
+          ['Derinlik', d.derinlikKm != null ? `${d.derinlikKm.toFixed(0)} km` : null],
+          ['Zaman', tarihSaatYilli(d.zaman)],
+        ],
+        kaynak: 'Katalog kaydı (Kandilli, USGS); bugünün hasarı değil',
+      })
     }
     case 'faylar':
-      return ipucuKutusu('Etkin fay hattı', [
-        'GEM Global Active Faults; veri setinde ad alanı boş.',
-        'Jeolojik başvuru: bugünkü hasarla ilgisi yok.',
-      ])
+      return ipucuKarti({
+        tur: 'Fay hattı',
+        baslik: 'Etkin fay',
+        kaynak: 'GEM Global Active Faults; jeolojik başvuru, bugünkü hasar değil',
+      })
     case 'toplanma': {
       const t = object as ToplanmaAlani
-      return ipucuKutusu(t.ad ?? 'Toplanma alanı', [
-        t.adres,
-        'AFAD listesi; alanın şu an açık olduğunu göstermez.',
-      ])
+      return ipucuKarti({
+        tur: 'Toplanma alanı',
+        simge: 'toplanma',
+        baslik: t.ad ?? 'Toplanma alanı',
+        satirlar: [t.adres],
+        kaynak: 'AFAD listesi; alanın şu an açık ya da güvenli olduğunu göstermez',
+      })
     }
+    case 'risk-illeri': {
+      const r = object as RiskIli
+      return ipucuKarti({
+        tur: 'Deprem riski',
+        baslik: `${r.il} · ${Math.round(r.skor)} / 100`,
+        satirlar: [['Düzey', r.seviye], ['En yakın fay', `${r.fayKm.toFixed(1).replace('.', ',')} km`]],
+        kaynak: 'İl merkezinde hesaplanır; tehlike göstergesidir, deprem tahmini değildir',
+        eylem: 'Tıkla: seç ve bileşenleri gör',
+      })
+    }
+    case 'saglik': {
+      const y = object as SaglikYeri
+      return ipucuKarti({
+        tur: y.tur === 'hastane' ? 'Hastane' : 'Sağlık merkezi',
+        simge: y.tur === 'hastane' ? 'hastane' : 'saglik',
+        baslik: y.ad ?? (y.tur === 'hastane' ? 'Adsız hastane' : 'Adsız sağlık tesisi'),
+        kaynak: 'OpenStreetMap kaydı; şu an açık olduğunu ya da hasta kabul ettiğini göstermez',
+        eylem: 'Yol ve rota: en yakın hastaneye rota',
+      })
+    }
+    case 'guzergah':
+    case 'guzergah-kenar':
+      return ipucuKarti({ tur: 'Rota', baslik: 'Seçilen rota', satirlar: ['Ayrıntı sağ panelde'] })
     // --- tatbikat (SIMULASYON_SOZLESMESI.md §5) ---
     case 'sim-kapanma-kapali':
       return ipucuKutusu('Tatbikat: kapalı yol', [

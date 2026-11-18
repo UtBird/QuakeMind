@@ -18,6 +18,12 @@ except ImportError:
     PSYCOPG2_AVAILABLE = False
 
 POSTGIS_URL = os.getenv("POSTGIS_URL", "postgresql://postgres:postgres@localhost:5432/quakemind_db")
+# J-172 (J-167 P-3): calisan sistem SQLite kullanir (CLAUDE.md 10); PostGIS hedef
+# mimaridir. Baglanti yalniz POSTGIS_URL ACIKCA verilmisse denenir. Eskiden her
+# sunucuda varsayilan adres deneniyordu: deneme 4,0 sn suruyor (olculdu) ve
+# sonuc 30 sn saklandigi icin her 30 sn'de bir gelen ilk istek (isi haritasi,
+# eski uclar) 4 sn bekliyordu.
+POSTGIS_ACIK = "POSTGIS_URL" in os.environ
 
 class PostGISManager:
     def __init__(self, db_url: str = POSTGIS_URL):
@@ -45,7 +51,7 @@ class PostGISManager:
         return sonuc
 
     def _baglantiyi_dene(self) -> bool:
-        if not PSYCOPG2_AVAILABLE:
+        if not POSTGIS_ACIK or not PSYCOPG2_AVAILABLE:
             self.connected = False
             return False
         try:
