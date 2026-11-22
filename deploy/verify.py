@@ -36,14 +36,14 @@ def main() -> None:
         assert status.json()["modules"]["camera"]
         schema = client.get("/openapi.json")
         schema.raise_for_status()
-        assert "/api/oturum/giris" in schema.json()["paths"]
+        paths = schema.json()["paths"]
+        assert "/api/oturum/giris" in paths
+        assert "/api/oturum/misafir" in paths
+        assert "/api/afetzede/guvende-durumu" in paths
         assert client.get("/api/oturum/ben").status_code == 401
         assert client.post("/api/nlp/analyze", json={"text": "test"}).status_code == 401
+        assert client.get("/api/risk/all_quakes", params={"limit": 2}).status_code == 401
         summary["unauthenticated_access"] = "rejected"
-        catalog = client.get("/api/risk/all_quakes", params={"limit": 2})
-        catalog.raise_for_status()
-        assert catalog.json()["returned"] == 2
-        summary["earthquake_catalog"] = "ok"
         if not args.models:
             print(json.dumps(summary, ensure_ascii=False))
             return
@@ -51,8 +51,16 @@ def main() -> None:
         email = f"deploy-check-{uuid.uuid4().hex}@example.invalid"
         password = secrets.token_urlsafe(24)
         user_id = None
+        guest_id = None
         database = os.environ["QUAKEMIND_SQLITE"]
         try:
+            with httpx.Client(base_url=args.url, timeout=60) as guest_client:
+                guest = guest_client.post("/api/oturum/misafir")
+                guest.raise_for_status()
+                guest_data = guest.json()
+                assert guest_data["kullanici"]["misafir"] is True
+                guest_id = guest_data["kullanici"]["id"]
+            summary["guest_session"] = "ok"
             signup = client.post("/api/oturum/kayit", json={
                 "eposta": email, "adSoyad": "Deployment verification", "sifre": password,
             })
@@ -73,6 +81,10 @@ def main() -> None:
             refresh = client.post("/api/oturum/yenile")
             refresh.raise_for_status()
             summary["auth_registration_login_refresh"] = "ok"
+            catalog = client.get("/api/risk/all_quakes", params={"limit": 2})
+            catalog.raise_for_status()
+            assert catalog.json()["returned"] == 2
+            summary["earthquake_catalog"] = "ok"
             prediction = client.post("/api/risk/predict", json={
                 "city": "Amasya", "manualLatitude": 40.653, "manualLongitude": 35.833,
             })
@@ -102,6 +114,10 @@ def main() -> None:
                 with sqlite3.connect(database) as connection:
                     connection.execute("DELETE FROM oturumlar WHERE kullanici_id=?", (user_id,))
                     connection.execute("DELETE FROM kullanicilar WHERE id=? AND eposta=?", (user_id, email))
+            if guest_id:
+                with sqlite3.connect(database) as connection:
+                    connection.execute("DELETE FROM oturumlar WHERE kullanici_id=?", (guest_id,))
+                    connection.execute("DELETE FROM kullanicilar WHERE id=?", (guest_id,))
         print(json.dumps(summary, ensure_ascii=False))
 
 

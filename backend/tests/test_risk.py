@@ -1,4 +1,5 @@
 """Deprem riski (J-173): eszamanli istekte dogru il, yetki, sinir, siralama."""
+import json
 import os
 import sys
 import tempfile
@@ -12,6 +13,7 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 MODEL = BASE_DIR / "apps" / "earthquake_risk" / "models" / "risk_catboost.cbm"
+IL_MERKEZLERI = BASE_DIR / "veri" / "il_merkezleri.json"
 pytestmark = pytest.mark.skipif(not MODEL.exists(), reason="risk modeli bu makinede egitilmemis")
 
 
@@ -84,9 +86,32 @@ def test_yetki_ve_sinirlar(ortam):
     assert c.get("/api/risk/all_quakes", params={"startDate": "olmaz"}, headers=j).status_code == 422
 
 
+@pytest.mark.skipif(not IL_MERKEZLERI.exists(), reason="il_merkezleri.json uretilmemis (araclar_il_merkezleri_uret.py)")
 def test_siralama(ortam):
     c, j = ortam
     y = c.get("/api/risk/siralama", headers=j)
     assert y.status_code == 200
     iller = y.json()["iller"]
     assert len(iller) == 81 and [x["skor"] for x in iller] == sorted((x["skor"] for x in iller), reverse=True)
+
+
+def test_siralama_gecici_il_listesi_ve_eksik_dosya(ortam, monkeypatch, tmp_path):
+    from uclar import risk
+
+    c, j = ortam
+    monkeypatch.setattr(risk, "IL_MERKEZLERI", tmp_path / "yok.json")
+    assert c.get("/api/risk/iller", headers=j).json()["iller"] == []
+    assert c.get("/api/risk/siralama", headers=j).json()["iller"] == []
+
+    ornek = tmp_path / "il_merkezleri.json"
+    ornek.write_text(
+        json.dumps({"iller": [{"il": ad, "lat": lat, "lon": lon} for ad, lat, lon in ILLER]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(risk, "IL_MERKEZLERI", ornek)
+    assert len(c.get("/api/risk/iller", headers=j).json()["iller"]) == len(ILLER)
+    y = c.get("/api/risk/siralama", headers=j)
+    assert y.status_code == 200
+    iller = y.json()["iller"]
+    assert len(iller) == len(ILLER)
+    assert [x["skor"] for x in iller] == sorted((x["skor"] for x in iller), reverse=True)
