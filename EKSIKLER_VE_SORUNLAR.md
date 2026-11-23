@@ -2173,6 +2173,14 @@ kimlikle. Başka belgelerdeki "EKSIKLER J-xxx" atıfları için kimliği burada 
 | J-177 | 🟠 Konsol yazısı küçüktü (U-5); acil bildirim saha ekibi ekranında hiç görünmüyordu | 18 Kasım 2026 |
 | J-167 | 🟠 Uçtan uca tarama (17 Kasım): giriş ve SOS sınırsız, birkaç ölü ekran, saha ana düğmesi ekran dışında | 18 Kasım 2026 |
 | J-178 | 🟡 Haritada mahalle, sokak ve cadde adları okunmuyordu | 20 Kasım 2026 |
+| J-180 | 🟠 Afetzede çevresindeki kapalı yolları ve hasarı görmüyordu; toplanma alanları hiç yüklenmiyordu | 23 Kasım 2026 |
+| J-181 | 🟠 Yürüme rotası kapanmanın yalnız orta noktasına bakıyordu, her istekte bütün hasar kayıtlarını okuyordu; dış servis yedeği kapanmayı denetlemiyordu | 24 Kasım 2026 |
+| J-182 | 🔴 Boş sunucuda (canlıya ilk çıkış) hiçbir rolde girilemiyordu; ilk yöneticiyi açmanın güvenli ve belgeli yolu yoktu | 24 Kasım 2026 |
+| J-183 | 🟡 Ortak örnek hesap yoktu; profil simgesi doğrudan çıkış yapıyordu, hesap ayarları yoktu | 24 Kasım 2026 |
+| J-184 | 🔴 Canlıda hasar analizi kapalı yol bulamıyordu; model listesinde 4 yerine 1 model (sunucuya dosya kurulumu Deha'da) | 24 Kasım 2026 |
+| J-185 | 🟠 Tatbikat: canlıda koşmuyordu; sonuç paneli okunmuyor ve etkileşimsizdi, çizgiler üst üste, iki yanlış değer | 24 Kasım 2026 |
+| J-186 | 🔴 Tatbikatı kapatmanın görünür yolu yoktu; yeniden başlatmada tatbikat noktaları gerçek veriye karışıyordu | 24 Kasım 2026 |
+| J-187 | 🟠 Üç uydu modeli ve yerel OSM kesiti hiçbir yerden indirilemiyordu | 24 Kasım 2026 |
 
 ---
 
@@ -2404,3 +2412,11 @@ kimlikle. Başka belgelerdeki "EKSIKLER J-xxx" atıfları için kimliği burada 
 | 18 Kasım 2026 | Toplanma alanları genel durum, SOS kuyruğu ve ekipler modlarının varsayılan katmanlarına geri eklendi. J-172'deki sadeleştirmede SOS ve ekipler modlarından çıkarılmıştı; kullanıcı "acil toplanma alanlarını göremiyorum" dedi. Veri sağlamdı (AFAD dosyası yerinde, API Antakya'da 129 alan veriyor); simgeler yalnız z11 ve üstünde çizilir. |
 | 18 Kasım 2026 | **J-177** kapatıldı: konsol yazı ölçeği bir kademe büyük (12 px'te yalnız etiket; genel %91 → %13). Acil bildirim uçtan uca sınandı (senaryo 61/61); saha ekibi ekranı bildirimi hiç göstermiyordu, duyuru bandı ve listesi eklendi; bildirim sayfasında önem rengi, bölge önerisi, yayın süresi, 5'ten fazla uyarısı. J-167 Grup G bitti. |
 | 20 Kasım 2026 | **J-178** kapatıldı: harita adları okunur (sokak 14 px ink-2, mahalle 14 px kalın beyaz, kalın hale). Madde arşivde. |
+| 23 Kasım 2026 | **J-180** kapatıldı: afetzede haritasında 3 km çevresindeki kapalı yollar (kırmızı çizgi) ve hasar bildirilen bölgeler (~250 m kare, SOS sayılmaz, en az 3 bildirim) yeni `/api/afetzede/cevre` ucuyla; lejant, bilgi kartı, aç/kapa. Toplanma alanları ülke iskeleti yüzünden 422 alıyordu, düzeltildi. `pytest -q` 153/153. Madde arşivde. |
+| 24 Kasım 2026 | **J-181** kapatıldı: rota kapanmayı çizgisiyle eşler (kaçan kenar 4 → 0); tehlike verisi yalnız değişince okunur (100 000 kayıtla istek başı 1240 → 36 ms) ve süzme SQL'de (eski sınır kayıt atlıyordu); aynı kapalı parça bir kez (356 → 48). Dış servis yedeği alternatifleri ve iki yandan sapmayı kapanmalara karşı denetler, temiz yol yoksa açıkça söyler. Harita ve rota aynı kapanma kümesine bakar. Madde arşivde. |
+| 24 Kasım 2026 | **J-182** kapatıldı: ilk yönetici sunucuda `araclar_kullanici.py ilk-yonetici` ile (yalnız yönetici yokken, rastgele geçici şifre, ilk girişte değişir, defterde kayıt); `sifre-sifirla` eklendi; açık varsayılan şifre kalktı. Kurulum belgesinde "İlk hesaplar" bölümü. Gerisi konsoldan. `pytest -q` 164/164. Madde arşivde. |
+| 24 Kasım 2026 | **J-183** kapatıldı: dört rol için ortak örnek hesap (şifre ortam değişkeninden, uygulamadan değişmez); üç ekranda aynı profil menüsü (Hesap ayarları, Çıkış yap) ve `/hesap` sayfası; telefonda afetzede üst şeridi taşmıyor. Madde arşivde. |
+| 24 Kasım 2026 | **J-184** kod tarafı kapatıldı: canlıda `roads.gpkg` ve üç model ağırlığı yok (depoya girmiyorlar). Yol dosyası artık kalıcı veri biriminde aranır; boş yol katmanı nedenini yazar; `/api/hazir` eksikleri gösterir; `deploy.sh` kaynağı olan bütün modelleri hazırlar. Dosya kopyalama adımları `deploy/README.md`'de, Deha'da. Madde arşivde. |
+| 24 Kasım 2026 | **J-185** kapatıldı: tatbikat sağ paneli soruya göre (sonuç, tıklanır görevler, katman açan bulgu kutuları, katlanır ayrıntılar); görev seçince harita yalnız o çifti çizer; varsayılan iki çizgi; ekip 'gerçek tesis' ve kapanma yarıçapı metni düzeltildi; ağırlığı olmayan modelle başlatma kapalı. Canlıda koşması J-184'teki dosyalara bağlı. Madde arşivde. |
+| 24 Kasım 2026 | **J-186** kapatıldı: TATBİKAT şeridinde (her modda) onaylı "Tatbikatı bitir"; sunucu koşuyu tanımasa da noktaları siler; açılışta sahipsiz tatbikat noktaları silinir (kopya veritabanında 296 nokta bulundu); kimlik biçimi denetlenir. `pytest -q` 171/171. Madde arşivde. |
+| 24 Kasım 2026 | **J-187** kapatıldı: üç model `Furkei/quakemind-uydu-modelleri`, OSM kesiti `Furkei/quakemind-osm-yollar` (ODbL) depolarında; künyeler ve `araclar_osm_indir.py` sabit sürümle indirir, `deploy.sh` kurar. Anahtarsız indirme ve parmak izleri doğrulandı. J-184'teki elle kopyalama artık gerekmiyor. Madde arşivde. |

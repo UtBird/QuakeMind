@@ -4122,3 +4122,237 @@ Veritabanının kopyasında koşar (`--api http://127.0.0.1:8001`), canlı veriy
 **Doğrulama.** Tarayıcıda Antakya merkezinde mahalle ölçeğinde ve sokak ölçeğinde bakıldı: Meydan, Antakya, Yenicami, Habib-i Neccar; General Şükrü Kanatlı Caddesi, Kemal Paşa Caddesi okunur. `npx tsc -b` ve `kontrol:token` temiz. Ölçüm (kare süresi) yapılmadı; yazı atlası bir kez üretilir.
 
 ---
+
+## J-180 🟠 Afetzede çevresindeki kapalı yolları ve hasarı görmüyordu; toplanma alanları hiç yüklenmiyordu
+**Durum:** KAPALI (23 Kasım 2026) · **Bulundu:** 23 Kasım 2026 (kullanıcı: "afetzede ekranında ısı haritası görünmüyor, kapalı yollar da görünmüyor"; toplanma hatası kendi tarayıcı sınamamızda) · **İlgili:** J-42, J-58, J-175, ARAYUZ §6
+
+**Bulgu.**
+- Afetzede haritasında yalnız yakın yerler, kendi çağrıları ve rota vardı. Koordinatörün ısı haritası (`/api/road_damage/heatmap`) ve kapanma katmanı afetzedeye kapalı: ısı SOS konumlarından da beslenir, afetzede başkasının çağrısını göremez (J-42). Yani afetzede nereden geçmemesi gerektiğini görmüyordu.
+- Konsolda toplanma alanları hiçbir modda yüklenmiyordu: `veri/katman.ts` `useToplanmaAlanlari` kutuyu görünen altlık bölgelerinden kuruyordu; her zaman görünen ülke iskeleti (`tur: 'ulke'`) bütün Türkiye'yi kapsadığı için kutu 8°'yi aşıyor, sunucu 422 veriyordu.
+
+**Yapılan.**
+- Yeni uç `GET /api/afetzede/cevre` (`uclar/afetzede_cevre.py`), giriş yapmış her rol. Konumun en çok 5 km çevresi (varsayılan 3 km), son 30 gün:
+  - Kapalı yollar: uydu analizinden bulunan kapalı yol parçaları, çizgisiyle. Aynı parça birden çok analizde kaydedildiyse bir kez döner (Antakya kopyasında 66 kayıt → 21 parça).
+  - Hasar bölgeleri: ~250 m'lik sabit ızgara karelerinde bildirim sayısı. **SOS sayılmaz**; yalnız uydu, fotoğraf ve metin. Yalnız en az 3 bildirimli kareler döner (tek kişinin bildirimi konum olarak açılmaz). Sayım SQL'de (`depo.hasar_hucreleri`, `EXPLAIN QUERY PLAN` indeks kullanıyor).
+- Afetzede haritası: hasar kareleri (3–5 / 6–14 / 15+ bildirime göre koyulaşan turuncu-kırmızı), kapalı yollar zemin renginde kenarlıklı kırmızı çizgi. Üzerine gelince bilgi kartı: kaç bildirim, kaynakları, son bildirim saati, "binalara girme"; kapalı yolda kaynağı ve "yürüme rotası bilinen kapalı yollardan kaçınır" (`uclar/yerler.py` rota bunu yapıyor). Sol üstte tek satırlık lejant sayılarla ve aç/kapa kutusuyla; kaynak ve uyarı metni üzerine gelince.
+- Toplanma: ülke iskeleti kutuya katılmıyor (`b.tur !== 'ulke'`).
+
+**Doğrulama.** `tests/test_afetzede_cevre.py` 6/6 (oturumsuz 401, SOS ve 3'ten az bildirimli kare dönmüyor, zaman penceresi, sınırlar 422, indeks, kapanma tekrarı). `pytest -q` 153/153. Tarayıcıda afetzede hesabıyla Antakya Cumhuriyet mahallesi: lejant "Kapalı yol 21 · Hasar 6", kırmızı çizgi ve kare çiziliyor, bilgi kartı "8 bildirim · uydu 8", kapatınca katman gidiyor. Toplanma isteği 200, simgeler görünüyor. `npx tsc -b` ve `kontrol:token` temiz. Konum seçilmemişse tehlike gösterilmez (uç konum ister); kare süresi ölçülmedi.
+
+---
+
+## J-181 🟠 Yürüme rotası kapanmanın yalnız orta noktasına bakıyordu, her istekte bütün hasar kayıtlarını okuyordu; dış servis yedeği kapanmayı hiç denetlemiyordu
+**Durum:** KAPALI (24 Kasım 2026) · **Bulundu:** 24 Kasım 2026 (kullanıcı: "yol isterken dış servisten nereden istiyoruz, kapalı yolları kullanabilecek miyiz; performanslı, güvenilir ve doğru çözmeliyiz") · **İlgili:** J-34, J-44, J-58, J-180
+
+**Bulgu.** Sayma birimi: Antakya yol ağı, kopya veritabanı (356 kapanma kaydı, 303 hasar noktası); ölçek denemesi aynı kopyaya 100 000 yapay hasar noktası eklenmiş geçici veritabanında. Cihaz: geliştirme dizüstü, CPU.
+- Asıl rota kendi yol ağımızda (`yol_agi.py`, Dijkstra, J-44). Kapanma eşleşmesi kapalı parçanın **orta noktasına** 25 m bakıyordu. Parçaların çizgisi J-58'den beri saklanıyor ama kullanılmıyordu: çizgiye 25 m içindeki 47 kenarın 4'ü kaçıyordu (%8,5). [Ö]
+- `hasar_verisi` her rota isteğinde kutudaki bütün hasar satırlarını (en çok 100 000) Python'a çekip süzüyor, "veri değişti mi"ye ondan sonra bakıyordu. 100 000 kayıtla bu okuma 1240 ms. Ayrıca sınır süzmeden önce uygulandığı için kayıt 100 000'i aşınca hasar noktaları sessizce eksik kalıyordu (50 233 yerine 49 951). [Ö]
+- Aynı kapalı parça eski analizlerde tekrar tekrar kaydedilmiş: 356 kayıt, 48 ayrı parça. Yanıt "356 kapanma" diyordu.
+- Yol ağı olmayan bölgede yedek, FOSSGIS'in OSRM sunucusu (`routing.openstreetmap.de`, yaya profili). OSRM istekte "şu noktadan geçme" kabul etmez; tek rota alınıyor ve kapanmalara karşı hiç denetlenmiyordu.
+- Afetzede haritası (J-180) son 30 günün kapanmalarını, rota bütün kapanmaları kullanıyordu: haritada görünen ile rotanın kaçındığı farklıydı.
+
+**Yapılan.**
+- Kapanma, çizgisi 5 m'de bir örneklenerek eşleşir (`yol_agi._ornekle`); çizgisiz kayıt orta noktayla. Hem yürüme hem araç rotası (aynı `carpanlar`).
+- Depo: `rota_tehlike_imzasi` (kapanma ve hasar için sayı + son zaman, SQL'de) ve `rota_tehlike_noktalari` (süzme SQL'de, yalnız lon/lat/ek). Satırlar yalnız imza değişince okunur, kutu başına önbellek. `yol_kapanmalari(lon, lat)` indeksi eklendi.
+- Aynı parça (aynı orta nokta) bir kez sayılır (`yol_agi.kapanma_listesi`).
+- Dış servis yedeği (`/api/afetzede/sokak-rotasi`):
+  - en çok 3 alternatif istenir, her biri kapanma çizgilerine karşı denetlenir (`yol_agi.rotadaki_kapanmalar`);
+  - hepsi kapanmadan geçiyorsa ilk geçilen kapanmanın iki yanına 150 m dik ara noktayla en çok iki istek daha atılır;
+  - en az kapanmadan geçen, eşitse en kısa rota seçilir;
+  - temiz rota yoksa yanıt ve ekran kırmızıyla "bu rota bilinen N kapalı yoldan geçiyor" der.
+  - Servis korunur: istekler arası en az 1 sn, aynı istek 10 dk önbellekte, 429'da açık hata. Hasarı ve bilinmeyen yıkık yolu hâlâ bilmez; ekran bunu yazar.
+- Afetzede çevre ucu kapanmaları zaman sınırsız verir; harita ile rota aynı kümeye bakar. Hasar bölgelerinde 30 gün kalır.
+
+**Doğrulama.**
+- Sonra, aynı birimlerle [Ö]:
+  - işaretlenen kenar 43 → 47;
+  - rota isteği (Arama + rota, ortanca) kopya veritabanında 35 → 29 ms;
+  - 100 000 kayıtla tehlike verisi her istekte 1240 ms okunuyordu; şimdi veri değişmedikçe 36 ms (imza sorgusu), değişince bir kez 128 ms. Rota isteği 100 000 kayıtla 66 ms.
+- `tests/test_yurume_rotasi_kapanma.py` 7 test, yapay yol ağıyla:
+  - orta noktası 35 m uzakta, ucu 10 m yakında olan kapanma;
+  - süzme, tekrar ve önbellek;
+  - imza sorgusunda indeks;
+  - rota–kapanma kesişimi;
+  - yedekte sapmayla kaçınma, temiz yol yoksa uyarı, kapanma yoksa tek istek, servis boşsa 503.
+- `test_afetzede_cevre.py` eski kapanmayı da sınar.
+- Tarayıcıda afetzede, Antakya Cumhuriyet → Gazi toplanma alanı: rota 760 m, yanıtta "kapanma 48, rotadaKapanma 0"; lejant da 48.
+- Yedek, sahte servisle sınandı; gerçek servisle uçtan uca denenmedi (konum dışarı gider). Servisin yaya profilinin alternatif verdiği elle bakıldı: kısa yolda 1, Kahramanmaraş'ta 2 rota.
+
+---
+
+## J-182 🔴 Boş sunucuda (canlıya ilk çıkış) hiçbir rolde girilemiyordu; ilk yöneticiyi açmanın güvenli ve belgeli yolu yoktu
+**Durum:** KAPALI (24 Kasım 2026) · **Bulundu:** 24 Kasım 2026 (kullanıcı: "diğer hesapları kim açacak; Deha canlıya aldığında hesaplar orada oluşmuyor, hiçbir rolde girilemiyor") · **İlgili:** J-155, J-156, J-157, CLAUDE.md kural 5
+
+**Bulgu.**
+- Hesap düzeni doğruydu: kayıt ekranı yalnız afetzede açar, istemci rol seçemez. Saha, koordinatör ve yönetici hesaplarını konsoldaki Kullanıcılar sayfası açar: yönetici her rolü, koordinatör saha hesabını; geçici şifre bir kez görünür ve ilk girişte değiştirilmek zorunda.
+- Ama bu zincir bir yöneticiyle başlıyor. Boş veritabanında yönetici olmadığı için kimse hesap açamıyordu. Tek yol sunucuda `araclar_kullanici.py ekle` idi ve:
+  - kurulum belgesinde (`deploy/README.md`) hiç geçmiyordu;
+  - şifre verilmezse depoda açık yazan `degistir1234` şifresini kullanıyordu;
+  - şifre değiştirme zorunluluğu koymuyor, hesap kayıt defterine yazmıyordu;
+  - şifreyi komut satırından alıyordu (kabuk geçmişine düşer).
+- Tek yönetici şifresini unutursa sıfırlayacak kimse yoktu.
+- Konsolda yöneticinin düğmesi "Yeni ekip hesabı" yazıyordu; oysa aynı formdan koordinatör ve yönetici de açılıyor.
+
+**Yapılan.**
+- `araclar_kullanici.py` yeniden yazıldı:
+  - `ilk-yonetici`: yalnız hiç yönetici yokken çalışır. Kayıtlı bir afetzede e-postası verilirse o hesap yükseltilir ve şifresi yenilenir.
+  - `sifre-sifirla`: açık oturumları da kapatır.
+  - `ekle` ve `listele` korundu; `listele` geçici şifresi duranları gösterir.
+  - Şifre her zaman rastgele üretilir (`kimlik.gecici_sifre`, konsolla aynı tek kaynak), yalnız bir kez ekrana yazılır, ilk girişte değiştirilmesi zorunludur. İşlem hesap kayıt defterine yazılır.
+  - Komut satırından şifre kabul edilmez.
+- `deploy/README.md`: "İlk hesaplar (canlıya ilk çıkış)" bölümü. Çalışan konteynerde `docker exec … python araclar_kullanici.py ilk-yonetici …`, ardından konsoldan hesap açma, şifre sıfırlama; demo aracının canlıda çalıştırılmayacağı.
+- Konsol: yöneticide düğme ve çekmece "Yeni hesap", koordinatörde "Yeni ekip hesabı".
+
+**Doğrulama.**
+- `tests/test_araclar_kullanici.py` 4 test:
+  - ilk yönetici bir kez açılır, şifre rastgele ve geçicidir, defterde kayıt var;
+  - kayıtlı afetzede yükseltilir, eski şifresi geçersiz olur;
+  - şifre sıfırlama; komut satırı şifresi reddedilir;
+  - **boş sunucuda uçtan uca:** önce kimse giremez → araçla ilk yönetici → geçici şifreyle girer → şifre değiştirmeden hesap açamaz (403) → değiştirir → koordinatör ve saha hesabı açar → koordinatör aldığı şifreyle girer.
+- `pytest -q` 164/164.
+- Araç boş geçici veritabanında elle çalıştırıldı: ikinci `ilk-yonetici` reddedildi, Türkçe ad doğru kaydedildi.
+- Konsolda yerel demo yöneticiyle "Yeni hesap" çekmecesinde üç tür göründü.
+- `tsc` ve `kontrol:token` temiz.
+- Canlı sunucuda çalıştırılmadı (Deha'da).
+
+---
+
+## J-183 🟡 Ortak örnek hesap yoktu; profil simgesi tıklanınca doğrudan çıkış yapıyordu, hesap ayarları yoktu
+**Durum:** KAPALI (24 Kasım 2026) · **Bulundu:** 24 Kasım 2026 (kullanıcı: "her type için örnek hesaplar, herkes oradan girse; profil simgesi hesap ayarlarına götürsün, çıkış altında olsun") · **İlgili:** J-182, J-155, J-157
+
+**Bulgu.**
+- Tanıtım ve teslimde ekip ve değerlendiriciler her rol için ayrı hesap istiyordu. Yerel demo aracının şifresi depoda açık olduğu için canlıda kullanılamıyordu.
+- Sağ üstteki baş harf simgesine tıklamak onaysız çıkış yapıyordu. Hesap ayarları sayfası yoktu; şifre değiştirme yalnız zorunlu geçici şifre ekranındaydı.
+- Saha ekibi ve afetzede ekranlarında ayrı "Çıkış" düğmeleri vardı. Afetzede ekranının üst şeridi telefonda (375 px) 422 px'e taşıyor, sayfa yana kayıyordu.
+
+**Yapılan.**
+- `ornek_hesaplar.py`: dört rol için ortak hesap. API açılırken yalnız `QUAKEMIND_ORNEK_HESAP_SIFRESI` tanımlıysa kurulur ve şifre bu değere çekilir. Şifre en az 10 karakter olmalı ve depodaki demo şifresi olamaz; şifre depoda yazmaz.
+- Ortak hesabın şifresi uygulamadan değiştirilemez (403); konsoldan da sıfırlanamaz (409, ekranda açıklama). Biri değiştirseydi herkes dışarıda kalırdı.
+- `araclar_demo_hesaplari.py` aynı listeyi kullanır (yalnız yerel).
+- Profil menüsü (`kimlik/ProfilMenusu.tsx`): konsol, saha ve afetzede ekranlarında aynı. Ad, e-posta ve rol (ortak hesapsa belirtilir), "Hesap ayarları", altında "Çıkış yap".
+- Hesap ayarları (`/hesap`): kim olduğun, rolün ne yapabildiği, şifre değiştirme (ortak hesapta açıklama), çıkış. Şifre formu zorunlu şifre ekranıyla ortak (`SifreFormu`).
+- Telefonda afetzede ve saha ekranında logo yazısı gizlenir; taşma gitti (375 → 375 px).
+- `deploy/README.md`: "Ortak örnek hesaplar" bölümü.
+
+**Doğrulama.**
+- `tests/test_ornek_hesaplar.py` 2 test: değişken yok ya da zayıfsa kurulmaz; dört rol kurulur ve girilir, saha ekibe bağlı, ikinci açılışta tekrar yazılmaz, şifre değiştirme 403, sıfırlama 409, değişken değişince şifre değişir.
+- Tarayıcıda:
+  - menü konsolda, saha ekranında ve afetzede ekranında açılıyor;
+  - hesap ayarlarında ortak hesap açıklaması ve normal hesapta şifre formu görünüyor;
+  - menüden çıkış giriş ekranına götürüyor;
+  - telefon genişliğinde taşma yok.
+- `tsc` ve `kontrol:token` temiz.
+
+---
+
+## J-184 🔴 Canlıda hasar analizi kapalı yol bulamıyordu ("Yol katmanı alınamadı"); model listesinde 4 yerine 1 model vardı
+**Durum:** KOD TARAFI KAPALI (24 Kasım 2026); sunucuya dosya kurulumu Deha'da · **Bulundu:** 24 Kasım 2026 (kullanıcı ekran görüntüsü: canlıda Antakya Elektrik'te "Kapalı yol 0, açık yol 0 segment, yol katmanı alınamadı"; aynı alan yerelde kapalı yol buluyor) · **İlgili:** J-68, J-79, J-36
+
+**Bulgu.** Canlı sürüm `671dad0` (yanıt başlığı `x-quakemind-revision`), kod main ile aynı. Fark sunucudaki dosyalarda:
+- Yol maskesi önce yerel `roads.gpkg` (164 MB, `araclar_yerel_osm_kur.py` çıktısı) ile çizilir. Dosya `.gitignore`'da ve imajın içindeki `apps/road_damage/data/osm/` altında aranıyordu. İmaj temiz Git arşivinden kurulduğu için canlıda yok; elle kopyalansa her dağıtımda silinirdi.
+- Dosya yoksa analiz Overpass'a sorar; sunucudan yanıt gelmedi, maske boş kaldı. Sonuç "yol katmanı alınamadı" oldu ama nedeni yazmıyordu.
+- Dört uydu modeli künyesinden yalnız etkin olanın (MiT-B4) Hugging Face kaynağı var. MiT-B0, MiT-B2 ve U-Net MiT-B4 ağırlıkları yalnız geliştirici makinesinde; ağırlığı olmayan model konsolda listelenmez.
+- `/api/hazir` bu eksikleri göstermiyordu ("hazır: evet").
+
+**Yapılan.**
+- `yerel_yol.osm_dizini()`: `QUAKEMIND_OSM_DIZINI`, kalıcı veri dizini `veri/osm/` (canlıda `quakemind-data` birimi) ve eski yer sırayla; `roads.gpkg` içeren ilki. `local_osm` aynı dizini kullanır.
+- Yol katmanı boşsa sonuç ve not nedeni yazar: "sunucuda yerel yol dosyası kurulu değil, dış yol servisi yanıt vermedi" ya da "dosya bu alanı kapsamıyor".
+- `/api/hazir`: `yerelYolVerisi` (evet/hayır) ve `uyduModeli` (hazır/tanımlı sayısı); dosya yolu dönmez.
+- `deploy.sh`: künyesinde `hf` kaynağı olan bütün modeller indirilip SHA ile doğrulanır (bugün yalnız etkin model).
+- `deploy/README.md` "Analiz dosyaları": `roads.gpkg` ve üç ağırlığın canlı birimlere `docker cp` ile bir kez kopyalanması. Kalıcı çözüm Hugging Face.
+
+**Doğrulama.**
+- `tests/test_yerel_osm_dizini.py` 2 test; `test_hazir_ucu` yeni alanlarla.
+- Yerelde `/api/hazir`: `yerelYolVerisi: true`, `uyduModeli 4/4`; eski yerdeki dosya bulunmaya devam ediyor.
+- Canlıda **denenmedi**: dosyaların kopyalanması ve yeniden başlatma Deha'da. Kopyalandıktan sonra canlı `/api/hazir` `true` ve `4/4` demeli, Elektrik analizi kapalı yol bulmalı.
+- Overpass'ın sunucudan neden yanıt vermediği ölçülmedi (sunucuya erişimimiz yok).
+
+---
+
+## J-185 🟠 Tatbikat: canlıda koşmuyordu; sonuç paneli okunmuyor ve etkileşimsizdi, harita çizgileri üst üste biniyordu, iki yanlış değer
+**Durum:** KAPALI (24 Kasım 2026; canlı tarafı J-184'teki dosya kurulumuna bağlı) · **Bulundu:** 24 Kasım 2026 (kullanıcı ekran görüntüsü, Defne / Elektrik: "çok karmaşık çizgiler, sağ ekran aşağı uzayan okunaksız, etkileşimsiz; canlıda çalışmıyor") · **İlgili:** J-184, J-95, J-108, J-62
+
+**Bulgu.**
+- **Canlı.** Tatbikatın üç modeli (Hızlı = MiT-B0, Dengeli = MiT-B2, U-Net MiT-B4) ve yol ağının dayandığı `roads.gpkg` sunucuda yok (J-184). Ekran ağırlığı olmayan modelle de "başlat"a izin veriyordu.
+- **Yanlış değer 1.** Her görevde ekip üssü "gerçek tesis" yazıyordu (`tatbikat.py`'de sabit `True`). Oysa bu ekiplerin başlangıcı OSM'deki mahalle giriş ağzı (`ekipler[].gercekTesis: false`).
+- **Yanlış değer 2.** Kapanma kuralı "yalnız yolun üstündeki hasar kapatır" (r_h = 0) iken panel "Kapanma yarıçapı 0 m; hasar noktasına bu kadar yakın kenar kapalı sayıldı" yazıyordu.
+- **Harita.** 5 görev × 3 planlanan rota + sürülen yollar + kapalı ve cezalı kenarlar aynı anda açıktı: 20'ye yakın çizgi üst üste. Gösterge 11 satırdı ve kapalı çizgileri de listeliyordu.
+- **Görev seçme yok.** Sürülen yollar görev bilgisi taşımıyordu (ulaşılamayan görev listeden düşüyordu); bir görev seçilip yalnız o gösterilemezdi.
+- **Sağ panel.** Dokuz bölüm alt alta diziliyordu (kaynak, hasar, kapanma, kamera, metin, arama, süreler, ölçüm, kollar, görevler). Tatbikatın cevabı ("kapanmayı bilmek ne kazandırdı") en altta "Kıyas kolları"nda kalıyordu; hiçbir satır tıklanmıyordu.
+
+**Yapılan.**
+- **Backend.**
+  - `kiyas_kollari` görev başına her kolun sonucunu döner (`gorevKollari`: süre, mesafe, çıkmaz, U dönüşü, sürülen yol).
+  - Görevin `gercekTesis` alanı ekibin kaydından gelir.
+- **Sağ panel** soruya göre dört bölüm:
+  1. Sonuç: "kapanmaları önceden bilen ekip ortalama X daha erken ulaştı (%Y)", bilmeyen ekibin çıkmaz ve U dönüşü sayısı, üç kolun süre çubukları, modelin doğruluğunu ölçmediği notu.
+  2. Görevler: tıklanır; seçilen görevde harita yalnız o çifti çizer ve oraya yaklaşır. Satırda QuakeMind ve bilmeyen ekip süresi ile çıkmaz sayısı, açılınca mesafeler ve ekibin türü. "Tümünü göster" seçimi kaldırır.
+  3. Bulgular: dört kutu (hasar, kapalı yol, kamera, metin); kutu katmanı açıp kapatır. Kapanma kuralı doğru cümleyle.
+  4. Ayrıntılar katlanır (kapalı başlar): kamera tespitleri, metin ihbarları, görüntü ve model, ölçüm ve süreler.
+- **Harita.**
+  - Varsayılan iki çizgi: QuakeMind güzergâhı ve bilmeyen ekibin sürdüğü yol. "Kapanma olmasaydı" ve "Enkazdan uzak" sol panelde "Haritada göster" altından açılır.
+  - Etiketler kısa ("Ekip 4", "Afetzede 1").
+  - Gösterge yalnız açık çizgileri listeler.
+- **Sol panel.** "Fiilen sürülen yol" bölümü kaldırıldı (sağa taşındı). Ağırlığı kurulu olmayan modelle başlatma kapalı ve nedeni yazıyor.
+
+**Doğrulama.**
+- Yerelde Defne / Elektrik, Dengeli model, 5 ekip, 5 afetzede, tohum 42: koşu 23 sn.
+- Panel: "40 sn daha erken (%33)"; bilmeyen ekip 2,0 dk, telsizle paylaşan filo 1,7 dk, QuakeMind 1,3 dk; 10 çıkmaz, 2 U dönüşü.
+- Ekip 1'i seçince harita yalnız o çifte yaklaştı: bilmeyen 3,5 dk, 1 çıkmaz; QuakeMind 1,9 dk.
+- Hasar kutusu katmanı kapatıp açtı (`aria-pressed`).
+- Ham yanıtta `gorevKollari` 3 kol × 5 görev, `gercekTesis` hepsi `false` (ekip kayıtlarıyla aynı).
+- `pytest -q` 168/168, `tsc` ve `kontrol:token` temiz.
+- Canlıda denenmedi; dosyalar kurulunca canlıda da koşmalı.
+
+---
+
+## J-186 🔴 Tatbikatı kapatmanın görünür yolu yoktu; sunucu yeniden başlayınca tatbikat noktaları gerçek veriye karışıyordu
+**Durum:** KAPALI (24 Kasım 2026) · **Bulundu:** 24 Kasım 2026 (kullanıcı: "bu simülasyonu kapatacak bir mekanizmamız yok") · **İlgili:** J-185, J-74, J-104, CLAUDE.md kural 1
+
+**Bulgu.**
+- "Tatbikatı bitir" düğmesi yalnız tatbikat panelinin dibindeydi; ancak sol panel kaydırılınca görünüyordu. Bütün modlarda duran sarı TATBİKAT şeridinde yalnız "Tatbikat paneli" bağlantısı vardı. Başka moddaki kullanıcı tatbikatı kapatmanın yolunu bulamıyordu.
+- Tatbikat koşuları yalnız API sürecinin belleğinde yaşıyor. Süreç yeniden başlayınca (her dağıtım dahil) `/api/simulasyon/bitir` 404 veriyordu. Panel hata durumunda da ekranı temizliyordu; böylece tatbikat "bitti" görünüyor ama koşunun veritabanına yazdığı hasar noktaları gerçek olay verisinin içinde kalıyordu.
+- Kopya veritabanında API açılışında **296 sahipsiz tatbikat hasar noktası** bulundu [Ö]; ısı haritası ve genel durum bunları gerçek veri gibi sayıyordu.
+- Bitirince sol panelde "Koşu %0 · Tatbikat bitirildi" artığı kalıyordu.
+- İstemcinin gönderdiği kimlik doğrudan `LIKE` kalıbına giriyordu.
+
+**Yapılan.**
+- TATBİKAT şeridinde (her modda) "Tatbikatı bitir": tek satırda onay ("Bitirilsin mi? Koşunun hasar noktaları silinir." · Evet, bitir · Vazgeç). Yalnız tatbikatı yönetebilen rollere görünür; uyarının kendisi yine susturulamaz.
+- `/api/simulasyon/bitir`: sunucu koşuyu tanımasa da (yeniden başlatma) o koşunun noktalarını siler. Kimlik `sim_` + onaltılık biçiminde olmalı, yoksa 422.
+- API açılışında sahipsiz bütün tatbikat noktaları silinir (`depo.hasar_sil_tatbikat_hepsi`); tatbikat verisi onu üreten süreçten uzun yaşamaz.
+- Panel bitirme hata verirse ekranı temizlemez ve hatayı yazar.
+- Bitince ilerleme artığı görünmez.
+
+**Doğrulama.**
+- `tests/test_tatbikat_bitir.py` 3 test: tanınmayan koşunun noktaları silinir, gerçek analiz noktası kalır; geçersiz kimlikler (`%`, `sim_%`, boş) 422 alır ve hiçbir şey silinmez; açılış temizliği yalnız tatbikat noktalarını siler.
+- `pytest -q` 171/171.
+- Tarayıcıda Defne tatbikatı koşturuldu, SOS moduna geçildi, şeritten bitirildi: şerit kalktı, koşunun 15 noktası silindi (15 → 0).
+- Açılış günlüğü: "Önceki süreçten kalan 296 tatbikat hasar noktası silindi".
+- `tsc` ve `kontrol:token` temiz.
+
+---
+
+## J-187 🟠 Üç uydu modeli ve yerel OSM kesiti hiçbir yerden indirilemiyordu; sunucuya elle kopyalamak gerekiyordu
+**Durum:** KAPALI (24 Kasım 2026) · **Bulundu:** 24 Kasım 2026 (J-184'ün kalıcı çözümü; kullanıcı: "Hugging Face'e benim hesabımla yükle") · **İlgili:** J-184, J-185, J-36
+
+**Bulgu.**
+- MiT-B0, MiT-B2 ve U-Net MiT-B4 ağırlıklarının künyesinde indirme kaynağı yoktu; dosyalar yalnız geliştirici makinesindeydi.
+- `roads.gpkg` ve `tesisler.gpkg` de yalnız yerelde üretilmişti (`araclar_yerel_osm_kur.py`).
+- Yeni kurulan ya da sıfırlanan bir sunucuda bunlar ancak elle kopyalanabiliyordu.
+
+**Yapılan.**
+- Ağırlıklar `Furkei/quakemind-uydu-modelleri` deposuna yüklendi (herkese açık; lisans: projenin `LICENSE`'ı, tüm hakları saklı; kartta sınama ve dış küme ölçümleri). Sürüm `0230b29`.
+- OSM kesiti `Furkei/quakemind-osm-yollar` veri kümesine yüklendi (ODbL, "© OpenStreetMap katkıcıları"). Sürüm `0d4df25`.
+- Üç künyeye `hf` kaynağı ve sabit sürüm (`surum`) yazıldı. `agirligi_hazirla` sürümü kullanır: depoya aynı adla başka dosya yüklense de sabit commit iner.
+- `araclar_osm_indir.py`: kesiti kalıcı veri dizinine indirir. Dosya varsa ve parmak izi tutuyorsa atlar; tutmazsa kurmaz.
+- `deploy.sh` bu aracı ve künyesinde kaynak olan bütün modelleri hazırlar. `deploy/README.md` tablo ve elle kurulum yedeğiyle güncellendi.
+- Not: etkin model `Utbird` deposunda MIT lisansıyla duruyor; depodaki `LICENSE` ise "tüm hakları saklı". Bu çelişki ekibe bildirildi, karar ekibin.
+
+**Doğrulama.**
+- Yükleme öncesi yerel dosyaların SHA-256'sı künyelerle tuttu.
+- Yükleme sonrası beş dosya anahtarsız (sunucunun yapacağı gibi) boş klasöre indirildi; beşinin de parmak izi tuttu.
+- `araclar_osm_indir.py` gerçek depodan indirdi, ikinci çalıştırmada atladı.
+- `agirligi_hazirla` MiT-B0'ı künyedeki sürümle indirdi, parmak izi tuttu.
+- `tests/test_osm_indir.py` 2 test (sahte indirici: indirme, atlama, bozuk dosya kurulmaz).
+
+---
