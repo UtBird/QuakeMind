@@ -1,0 +1,742 @@
+{
+ "kaynak": {
+  "ad": "OpenStreetMap",
+  "atif": "© OpenStreetMap katkıcıları",
+  "lisans": "ODbL 1.0",
+  "dosya": "turkey-latest.osm.pbf",
+  "dosyaTarihi": "2026-08-12",
+  "yontem": "il siniri (admin_level=4) icindeki place=city noktasi"
+ },
+ "uretim": "2026-11-12T22:15:29",
+ "iller": [
+  {
+   "il": "Adana",
+   "merkez": "Adana",
+   "lat": 36.98636,
+   "lon": 35.32529,
+   "nufus": 2258718,
+   "osm": "node/26480399",
+   "sinirOsm": "relation/167216"
+  },
+  {
+   "il": "Adıyaman",
+   "merkez": "Adıyaman",
+   "lat": 37.7603,
+   "lon": 38.2773,
+   "nufus": 632459,
+   "osm": "node/26487468",
+   "sinirOsm": "relation/223141"
+  },
+  {
+   "il": "Afyonkarahisar",
+   "merkez": "Afyonkarahisar",
+   "lat": 38.75686,
+   "lon": 30.5387,
+   "nufus": 747555,
+   "osm": "node/25869720",
+   "sinirOsm": "relation/223171"
+  },
+  {
+   "il": "Ağrı",
+   "merkez": "Ağrı",
+   "lat": 39.71913,
+   "lon": 43.05049,
+   "nufus": 120390,
+   "osm": "node/26486334",
+   "sinirOsm": "relation/186433"
+  },
+  {
+   "il": "Aksaray",
+   "merkez": "Aksaray",
+   "lat": 38.37054,
+   "lon": 34.02691,
+   "nufus": 423011,
+   "osm": "node/26482228",
+   "sinirOsm": "relation/154454"
+  },
+  {
+   "il": "Amasya",
+   "merkez": "Amasya",
+   "lat": 40.65032,
+   "lon": 35.83291,
+   "nufus": 114921,
+   "osm": "node/26482974",
+   "sinirOsm": "relation/223452"
+  },
+  {
+   "il": "Ankara",
+   "merkez": "Ankara",
+   "lat": 39.92078,
+   "lon": 32.85405,
+   "nufus": 5864049,
+   "osm": "node/25869410",
+   "sinirOsm": "relation/223422"
+  },
+  {
+   "il": "Antalya",
+   "merkez": "Antalya",
+   "lat": 36.88657,
+   "lon": 30.70302,
+   "nufus": 2722103,
+   "osm": "node/428039517",
+   "sinirOsm": "relation/223132"
+  },
+  {
+   "il": "Ardahan",
+   "merkez": "Ardahan",
+   "lat": 41.1103,
+   "lon": 42.70356,
+   "nufus": 96161,
+   "osm": "node/26486338",
+   "sinirOsm": "relation/1251450"
+  },
+  {
+   "il": "Artvin",
+   "merkez": "Artvin",
+   "lat": 41.18308,
+   "lon": 41.82874,
+   "nufus": 25841,
+   "osm": "node/26482975",
+   "sinirOsm": "relation/223448"
+  },
+  {
+   "il": "Aydın",
+   "merkez": "Aydın",
+   "lat": 37.84838,
+   "lon": 27.84359,
+   "nufus": 1119084,
+   "osm": "node/8603453649",
+   "sinirOsm": "relation/223166"
+  },
+  {
+   "il": "Balıkesir",
+   "merkez": "Balıkesir",
+   "lat": 39.64739,
+   "lon": 27.88798,
+   "nufus": 1284517,
+   "osm": "node/25869582",
+   "sinirOsm": "relation/223464"
+  },
+  {
+   "il": "Bartın",
+   "merkez": "Bartın",
+   "lat": 41.63505,
+   "lon": 32.33662,
+   "nufus": 207634,
+   "osm": "node/26483113",
+   "sinirOsm": "relation/223458"
+  },
+  {
+   "il": "Batman",
+   "merkez": "Batman",
+   "lat": 37.88357,
+   "lon": 41.12776,
+   "nufus": 634491,
+   "osm": "node/26487469",
+   "sinirOsm": "relation/223437"
+  },
+  {
+   "il": "Bayburt",
+   "merkez": "Bayburt",
+   "lat": 40.25516,
+   "lon": 40.2205,
+   "nufus": 90154,
+   "osm": "node/26483234",
+   "sinirOsm": "relation/223446"
+  },
+  {
+   "il": "Bilecik",
+   "merkez": "Bilecik",
+   "lat": 40.14351,
+   "lon": 29.97529,
+   "nufus": 51260,
+   "osm": "node/25869729",
+   "sinirOsm": "relation/223420"
+  },
+  {
+   "il": "Bingöl",
+   "merkez": "Bingöl",
+   "lat": 38.88613,
+   "lon": 40.49723,
+   "nufus": 269560,
+   "osm": "node/26486414",
+   "sinirOsm": "relation/223444"
+  },
+  {
+   "il": "Bitlis",
+   "merkez": "Bitlis",
+   "lat": 38.40205,
+   "lon": 42.10846,
+   "nufus": 352277,
+   "osm": "node/26486498",
+   "sinirOsm": "relation/223441"
+  },
+  {
+   "il": "Bolu",
+   "merkez": "Bolu",
+   "lat": 40.7333,
+   "lon": 31.61105,
+   "nufus": 184682,
+   "osm": "node/3479054194",
+   "sinirOsm": "relation/223461"
+  },
+  {
+   "il": "Burdur",
+   "merkez": "Burdur",
+   "lat": 37.72484,
+   "lon": 30.28873,
+   "nufus": 261401,
+   "osm": "node/25869752",
+   "sinirOsm": "relation/2319368"
+  },
+  {
+   "il": "Bursa",
+   "merkez": "Bursa",
+   "lat": 40.18257,
+   "lon": 29.0675,
+   "nufus": 3238618,
+   "osm": "node/289534897",
+   "sinirOsm": "relation/223463"
+  },
+  {
+   "il": "Çanakkale",
+   "merkez": "Çanakkale",
+   "lat": 40.14627,
+   "lon": 26.40289,
+   "nufus": 143675,
+   "osm": "node/25869575",
+   "sinirOsm": "relation/223471"
+  },
+  {
+   "il": "Çankırı",
+   "merkez": "Çankırı",
+   "lat": 40.59719,
+   "lon": 33.62127,
+   "nufus": 186074,
+   "osm": "node/5798692759",
+   "sinirOsm": "relation/223454"
+  },
+  {
+   "il": "Çorum",
+   "merkez": "Çorum",
+   "lat": 40.54991,
+   "lon": 34.95373,
+   "nufus": 527863,
+   "osm": "node/26483306",
+   "sinirOsm": "relation/223453"
+  },
+  {
+   "il": "Denizli",
+   "merkez": "Denizli",
+   "lat": 37.78279,
+   "lon": 29.09665,
+   "nufus": 1051056,
+   "osm": "node/6196594141",
+   "sinirOsm": "relation/223169"
+  },
+  {
+   "il": "Diyarbakır",
+   "merkez": "Diyarbakır",
+   "lat": 37.91622,
+   "lon": 40.23635,
+   "nufus": 1804880,
+   "osm": "node/26487666",
+   "sinirOsm": "relation/223435"
+  },
+  {
+   "il": "Düzce",
+   "merkez": "Düzce",
+   "lat": 40.83915,
+   "lon": 31.15954,
+   "nufus": 370371,
+   "osm": "node/25869768",
+   "sinirOsm": "relation/223460"
+  },
+  {
+   "il": "Edirne",
+   "merkez": "Edirne",
+   "lat": 41.67593,
+   "lon": 26.55872,
+   "nufus": 180002,
+   "osm": "node/25869574",
+   "sinirOsm": "relation/223465"
+  },
+  {
+   "il": "Elâzığ",
+   "merkez": "Elâzığ",
+   "lat": 38.67472,
+   "lon": 39.22271,
+   "nufus": 578789,
+   "osm": "node/26486523",
+   "sinirOsm": "relation/223443"
+  },
+  {
+   "il": "Erzincan",
+   "merkez": "Erzincan",
+   "lat": 39.74676,
+   "lon": 39.49103,
+   "nufus": 226032,
+   "osm": "node/26486753",
+   "sinirOsm": "relation/223445"
+  },
+  {
+   "il": "Erzurum",
+   "merkez": "Erzurum",
+   "lat": 39.90632,
+   "lon": 41.27277,
+   "nufus": 762021,
+   "osm": "node/26486754",
+   "sinirOsm": "relation/186432"
+  },
+  {
+   "il": "Eskişehir",
+   "merkez": "Eskişehir",
+   "lat": 39.77439,
+   "lon": 30.51912,
+   "nufus": 888828,
+   "osm": "node/25869769",
+   "sinirOsm": "relation/223421"
+  },
+  {
+   "il": "Gaziantep",
+   "merkez": "Gaziantep",
+   "lat": 37.06283,
+   "lon": 37.37926,
+   "nufus": 2164134,
+   "osm": "node/26487670",
+   "sinirOsm": "relation/223139"
+  },
+  {
+   "il": "Giresun",
+   "merkez": "Giresun",
+   "lat": 40.91763,
+   "lon": 38.38415,
+   "nufus": 125682,
+   "osm": "node/26483307",
+   "sinirOsm": "relation/223449"
+  },
+  {
+   "il": "Gümüşhane",
+   "merkez": "Gümüşhane",
+   "lat": 40.46178,
+   "lon": 39.47573,
+   "nufus": 172034,
+   "osm": "node/26483350",
+   "sinirOsm": "relation/223541"
+  },
+  {
+   "il": "Hakkâri",
+   "merkez": "Hakkâri",
+   "lat": 37.5767,
+   "lon": 43.73779,
+   "nufus": 267813,
+   "osm": "node/26480484",
+   "sinirOsm": "relation/174742"
+  },
+  {
+   "il": "Hatay",
+   "merkez": "Hatay",
+   "lat": 36.20255,
+   "lon": 36.16029,
+   "nufus": 1544640,
+   "osm": "node/12110587584",
+   "sinirOsm": "relation/223122"
+  },
+  {
+   "il": "Iğdır",
+   "merkez": "Iğdır",
+   "lat": 39.92188,
+   "lon": 44.0468,
+   "nufus": 192785,
+   "osm": "node/26480597",
+   "sinirOsm": "relation/186434"
+  },
+  {
+   "il": "Isparta",
+   "merkez": "Isparta",
+   "lat": 37.76367,
+   "lon": 30.55506,
+   "nufus": 427324,
+   "osm": "node/212488422",
+   "sinirOsm": "relation/223134"
+  },
+  {
+   "il": "İstanbul",
+   "merkez": "İstanbul",
+   "lat": 41.00638,
+   "lon": 28.97587,
+   "nufus": 15701602,
+   "osm": "node/1882099475",
+   "sinirOsm": "relation/223474"
+  },
+  {
+   "il": "İzmir",
+   "merkez": "İzmir",
+   "lat": 38.41925,
+   "lon": 27.12847,
+   "nufus": 4493242,
+   "osm": "node/428039507",
+   "sinirOsm": "relation/223167"
+  },
+  {
+   "il": "Kahramanmaraş",
+   "merkez": "Kahramanmaraş",
+   "lat": 37.58127,
+   "lon": 36.92751,
+   "nufus": 1112634,
+   "osm": "node/26480875",
+   "sinirOsm": "relation/223138"
+  },
+  {
+   "il": "Karabük",
+   "merkez": "Karabük",
+   "lat": 41.19554,
+   "lon": 32.62312,
+   "nufus": 123309,
+   "osm": "node/26485694",
+   "sinirOsm": "relation/223455"
+  },
+  {
+   "il": "Karaman",
+   "merkez": "Karaman",
+   "lat": 37.18085,
+   "lon": 33.21946,
+   "nufus": 245610,
+   "osm": "node/26482281",
+   "sinirOsm": "relation/223137"
+  },
+  {
+   "il": "Kars",
+   "merkez": "Kars",
+   "lat": 40.60708,
+   "lon": 43.09475,
+   "nufus": 289786,
+   "osm": "node/26486777",
+   "sinirOsm": "relation/186431"
+  },
+  {
+   "il": "Kastamonu",
+   "merkez": "Kastamonu",
+   "lat": 41.37654,
+   "lon": 33.77701,
+   "nufus": 125622,
+   "osm": "node/26485876",
+   "sinirOsm": "relation/223456"
+  },
+  {
+   "il": "Kayseri",
+   "merkez": "Kayseri",
+   "lat": 38.7219,
+   "lon": 35.48732,
+   "nufus": 1389680,
+   "osm": "node/26482287",
+   "sinirOsm": "relation/154451"
+  },
+  {
+   "il": "Kilis",
+   "merkez": "Kilis",
+   "lat": 36.71656,
+   "lon": 37.11461,
+   "nufus": 130825,
+   "osm": "node/26487717",
+   "sinirOsm": "relation/223140"
+  },
+  {
+   "il": "Kocaeli",
+   "merkez": "Kocaeli",
+   "lat": 40.76539,
+   "lon": 29.94074,
+   "nufus": 2079072,
+   "osm": "node/11212606075",
+   "sinirOsm": "relation/223473"
+  },
+  {
+   "il": "Konya",
+   "merkez": "Konya",
+   "lat": 37.87273,
+   "lon": 32.49244,
+   "nufus": 2161303,
+   "osm": "node/25869814",
+   "sinirOsm": "relation/223133"
+  },
+  {
+   "il": "Kütahya",
+   "merkez": "Kütahya",
+   "lat": 39.41991,
+   "lon": 29.98579,
+   "nufus": 573642,
+   "osm": "node/25869815",
+   "sinirOsm": "relation/223172"
+  },
+  {
+   "il": "Kırklareli",
+   "merkez": "Kırklareli",
+   "lat": 41.73702,
+   "lon": 27.22355,
+   "nufus": 277984,
+   "osm": "node/25869577",
+   "sinirOsm": "relation/223469"
+  },
+  {
+   "il": "Kırşehir",
+   "merkez": "Kırşehir",
+   "lat": 39.14611,
+   "lon": 34.16056,
+   "nufus": 229975,
+   "osm": "node/26482519",
+   "sinirOsm": "relation/154452"
+  },
+  {
+   "il": "Kırıkkale",
+   "merkez": "Kırıkkale",
+   "lat": 39.84105,
+   "lon": 33.50585,
+   "nufus": 351684,
+   "osm": "node/26482294",
+   "sinirOsm": "relation/223423"
+  },
+  {
+   "il": "Malatya",
+   "merkez": "Malatya",
+   "lat": 38.34872,
+   "lon": 38.31907,
+   "nufus": 781305,
+   "osm": "node/26486997",
+   "sinirOsm": "relation/223426"
+  },
+  {
+   "il": "Manisa",
+   "merkez": "Manisa",
+   "lat": 38.61258,
+   "lon": 27.4334,
+   "nufus": 1475353,
+   "osm": "node/25869819",
+   "sinirOsm": "relation/223168"
+  },
+  {
+   "il": "Mardin",
+   "merkez": "Mardin",
+   "lat": 37.31326,
+   "lon": 40.73544,
+   "nufus": 133381,
+   "osm": "node/26487735",
+   "sinirOsm": "relation/223436"
+  },
+  {
+   "il": "Mersin",
+   "merkez": "Mersin",
+   "lat": 36.79784,
+   "lon": 34.62984,
+   "nufus": 1773852,
+   "osm": "node/26481523",
+   "sinirOsm": "relation/223131"
+  },
+  {
+   "il": "Muğla",
+   "merkez": "Muğla",
+   "lat": 37.21518,
+   "lon": 28.36373,
+   "nufus": 82717,
+   "osm": "node/25869694",
+   "sinirOsm": "relation/223136"
+  },
+  {
+   "il": "Muş",
+   "merkez": "Muş",
+   "lat": 38.73222,
+   "lon": 41.48989,
+   "nufus": 116707,
+   "osm": "node/26486736",
+   "sinirOsm": "relation/223440"
+  },
+  {
+   "il": "Nevşehir",
+   "merkez": "Nevşehir",
+   "lat": 38.62504,
+   "lon": 34.71507,
+   "nufus": 290895,
+   "osm": "node/26482523",
+   "sinirOsm": "relation/154449"
+  },
+  {
+   "il": "Niğde",
+   "merkez": "Niğde",
+   "lat": 37.96985,
+   "lon": 34.67645,
+   "nufus": 351468,
+   "osm": "node/26482716",
+   "sinirOsm": "relation/154456"
+  },
+  {
+   "il": "Ordu",
+   "merkez": "Ordu",
+   "lat": 40.98523,
+   "lon": 37.87977,
+   "nufus": 750588,
+   "osm": "node/26486071",
+   "sinirOsm": "relation/223450"
+  },
+  {
+   "il": "Osmaniye",
+   "merkez": "Osmaniye",
+   "lat": 37.07336,
+   "lon": 36.25077,
+   "nufus": 246720,
+   "osm": "node/26481742",
+   "sinirOsm": "relation/167232"
+  },
+  {
+   "il": "Rize",
+   "merkez": "Rize",
+   "lat": 41.02482,
+   "lon": 40.51991,
+   "nufus": 119828,
+   "osm": "node/26486097",
+   "sinirOsm": "relation/223542"
+  },
+  {
+   "il": "Sakarya",
+   "merkez": "Sakarya",
+   "lat": 40.77263,
+   "lon": 30.40386,
+   "nufus": 1110735,
+   "osm": "node/11212641962",
+   "sinirOsm": "relation/223462"
+  },
+  {
+   "il": "Samsun",
+   "merkez": "Samsun",
+   "lat": 41.29461,
+   "lon": 36.33206,
+   "nufus": 1295927,
+   "osm": "node/26486105",
+   "sinirOsm": "relation/223451"
+  },
+  {
+   "il": "Siirt",
+   "merkez": "Siirt",
+   "lat": 37.92736,
+   "lon": 41.94218,
+   "nufus": 331980,
+   "osm": "node/26487823",
+   "sinirOsm": "relation/223543"
+  },
+  {
+   "il": "Sinop",
+   "merkez": "Sinop",
+   "lat": 42.02658,
+   "lon": 35.15115,
+   "nufus": 56479,
+   "osm": "node/26486164",
+   "sinirOsm": "relation/223457"
+  },
+  {
+   "il": "Sivas",
+   "merkez": "Sivas",
+   "lat": 39.75036,
+   "lon": 37.01452,
+   "nufus": 621224,
+   "osm": "node/26482940",
+   "sinirOsm": "relation/223425"
+  },
+  {
+   "il": "Şanlıurfa",
+   "merkez": "Şanlıurfa",
+   "lat": 37.15962,
+   "lon": 38.79193,
+   "nufus": 2143020,
+   "osm": "node/26487743",
+   "sinirOsm": "relation/223434"
+  },
+  {
+   "il": "Şırnak",
+   "merkez": "Şırnak",
+   "lat": 37.52196,
+   "lon": 42.45703,
+   "nufus": 69338,
+   "osm": "node/26487882",
+   "sinirOsm": "relation/223438"
+  },
+  {
+   "il": "Tekirdağ",
+   "merkez": "Tekirdağ",
+   "lat": 40.97812,
+   "lon": 27.51078,
+   "nufus": 215558,
+   "osm": "node/1846826471",
+   "sinirOsm": "relation/223470"
+  },
+  {
+   "il": "Tokat",
+   "merkez": "Tokat",
+   "lat": 40.32335,
+   "lon": 36.55216,
+   "nufus": 164405,
+   "osm": "node/26486186",
+   "sinirOsm": "relation/223424"
+  },
+  {
+   "il": "Trabzon",
+   "merkez": "Trabzon",
+   "lat": 41.00546,
+   "lon": 39.73015,
+   "nufus": 816684,
+   "osm": "node/512552945",
+   "sinirOsm": "relation/223447"
+  },
+  {
+   "il": "Tunceli",
+   "merkez": "Tunceli",
+   "lat": 39.10606,
+   "lon": 39.54827,
+   "nufus": 34461,
+   "osm": "node/26487261",
+   "sinirOsm": "relation/223537"
+  },
+  {
+   "il": "Uşak",
+   "merkez": "Uşak",
+   "lat": 38.67404,
+   "lon": 29.40584,
+   "nufus": 374405,
+   "osm": "node/25869820",
+   "sinirOsm": "relation/223170"
+  },
+  {
+   "il": "Van",
+   "merkez": "Van",
+   "lat": 38.50088,
+   "lon": 43.39461,
+   "nufus": 1141015,
+   "osm": "node/26480571",
+   "sinirOsm": "relation/223442"
+  },
+  {
+   "il": "Yalova",
+   "merkez": "Yalova",
+   "lat": 40.65825,
+   "lon": 29.26999,
+   "nufus": 241665,
+   "osm": "node/25869857",
+   "sinirOsm": "relation/223472"
+  },
+  {
+   "il": "Yozgat",
+   "merkez": "Yozgat",
+   "lat": 39.8222,
+   "lon": 34.8081,
+   "nufus": 79611,
+   "osm": "node/26482958",
+   "sinirOsm": "relation/154450"
+  },
+  {
+   "il": "Zonguldak",
+   "merkez": "Zonguldak",
+   "lat": 41.45268,
+   "lon": 31.7876,
+   "nufus": 103079,
+   "osm": "node/26486267",
+   "sinirOsm": "relation/223459"
+  }
+ ]
+}

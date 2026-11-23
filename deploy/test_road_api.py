@@ -44,6 +44,14 @@ def postgis_offline(monkeypatch):
     monkeypatch.setattr(postgis_engine, "check_connection", lambda: False)
 
 
+@pytest.fixture(autouse=True)
+def legacy_endpoints_on(monkeypatch):
+    """nearest_debris and safe_route are legacy-web endpoints, closed by
+    default (QUAKEMIND_ESKI_UCLAR, J-53) and closed in production. The test
+    opens them only inside the test process, like tests/test_road_damage_api.py."""
+    monkeypatch.setenv("QUAKEMIND_ESKI_UCLAR", "1")
+
+
 def test_heatmap_offline_fallback_returns_200(client):
     resp = client.get(
         "/api/road_damage/heatmap",

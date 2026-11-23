@@ -25,7 +25,7 @@ import unicodedata
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parent
-CIKTI = BACKEND / "veri" / "il_merkezleri.json"
+CIKTI = BACKEND / "apps" / "earthquake_risk" / "data" / "il_merkezleri.json"  # depoda (J-188)
 IL_SAYISI = 81
 
 

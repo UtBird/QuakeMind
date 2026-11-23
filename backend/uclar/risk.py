@@ -27,7 +27,11 @@ log = logging.getLogger("quakemind.risk")
 #: islemler yalniz koordinasyona acik (J-152).
 _KOORDINASYON = ("koordinator", "yonetici")
 
-IL_MERKEZLERI = Path(__file__).resolve().parents[1] / "veri" / "il_merkezleri.json"
+# Depoda, imajin icinde (J-188). Eskiden `veri/` altindaydi: o dizin .gitignore'da
+# ve canlida kalici birimle ortulu oldugu icin sunucuda dosya yoktu, 81 il
+# siralamasi bos donuyordu. OSM'den uretilir (araclar_il_merkezleri_uret.py);
+# kaynak ve ODbL atfi dosyanin icinde.
+IL_MERKEZLERI = Path(__file__).resolve().parents[1] / "apps" / "earthquake_risk" / "data" / "il_merkezleri.json"
 
 
 class RiskIstegi(BaseModel):

@@ -55,7 +55,7 @@ BOLGELER = [
 ULKE_KUTU = (25.5, 35.5, 45.0, 42.5)
 ULKE_YOL_SINIFLARI = (0, 1)
 
-IL_MERKEZLERI = BACKEND / "veri" / "il_merkezleri.json"
+IL_MERKEZLERI = BACKEND / "apps" / "earthquake_risk" / "data" / "il_merkezleri.json"  # depoda (J-188)
 # Il altliginin yaricapi il nufusuna gore (OSM `population`; buyuksehirde ilin
 # tamami). 8 km'lik kare Konya gibi sehirleri kenardan kesiyordu (20 Ekim).
 IL_YARICAPI = ((300_000, 10.0), (1_000_000, 15.0), (float("inf"), 20.0))
