@@ -4356,3 +4356,21 @@ Veritabanının kopyasında koşar (`--api http://127.0.0.1:8001`), canlı veriy
 - `tests/test_osm_indir.py` 2 test (sahte indirici: indirme, atlama, bozuk dosya kurulmaz).
 
 ---
+
+## J-188 🟠 81 il risk sıralaması canlıda boştu (il merkezleri dosyası depoda yoktu); dağıtım kontrol testi eski uçlarda düşüyordu
+**Durum:** KAPALI (24 Kasım 2026) · **Bulundu:** 24 Kasım 2026, dağıtımdan önce sunucu imajının paket sürümleriyle (Python 3.12, PyTorch 2.5.1, huggingface-hub 0.36) temiz depo kopyasında testler koşulurken · **İlgili:** J-173, J-53, J-187
+
+**Bulgu.**
+- `veri/il_merkezleri.json` (81 il merkezi, OSM'den, 15 KB) `.gitignore`'daydı. Canlıda `veri/` kalıcı birimle örtülü; dosya oraya elle konmadıysa `/api/risk/siralama` "İl merkezleri üretilmedi" diyerek boş liste döner (risk ekranındaki 81 il sıralaması, J-173). Temiz kopyada `test_risk.py::test_siralama` bu yüzden düştü (0 ≠ 81).
+- `deploy/test_road_api.py`'nin üç testi `nearest_debris` ve `safe_route` uçlarını çağırıyor. Bu uçlar J-53'ten beri varsayılan kapalı (`QUAKEMIND_ESKI_UCLAR`), test bayrağı açmıyordu: 404. Aynı üç test canlıdaki `671dad0`'da da düşüyor; sunucudaki kontrol kopyası güncel olduğu için hazırlık geçmiş olmalı.
+- İkisi de bu oturumun değişikliklerinden önce vardı (aynı ortamda `671dad0` ile sınandı).
+
+**Yapılan.**
+- Dosya `apps/earthquake_risk/data/il_merkezleri.json`'a taşındı (depoda; kaynak ve ODbL atfı dosyanın içinde). `uclar/risk.py`, `araclar_il_merkezleri_uret.py` ve `araclar_altlik_uret.py` bu yolu kullanır.
+- `deploy/test_road_api.py`: eski uçların testi bayrağı yalnız test sürecinde açar, `tests/test_road_damage_api.py` gibi. Canlıda bayrak kapalı kalır.
+
+**Doğrulama.**
+- Sunucu imajının paket sürümleriyle kurulan Python 3.12 ortamında, depodan `git archive` ile alınan temiz kopyada (yerel model ve veri dosyası yok): risk modeli imajdaki gibi eğitildi, `pytest tests deploy-kontrolleri` 163 geçti, 2 atlandı, 0 hata.
+- Aynı ortamda `araclar_osm_indir.py` ve künyelerdeki üç model Hugging Face'ten anahtarsız indi, parmak izleri tuttu.
+
+---

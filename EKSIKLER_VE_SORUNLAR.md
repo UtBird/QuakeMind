@@ -2181,6 +2181,7 @@ kimlikle. Başka belgelerdeki "EKSIKLER J-xxx" atıfları için kimliği burada 
 | J-185 | 🟠 Tatbikat: canlıda koşmuyordu; sonuç paneli okunmuyor ve etkileşimsizdi, çizgiler üst üste, iki yanlış değer | 24 Kasım 2026 |
 | J-186 | 🔴 Tatbikatı kapatmanın görünür yolu yoktu; yeniden başlatmada tatbikat noktaları gerçek veriye karışıyordu | 24 Kasım 2026 |
 | J-187 | 🟠 Üç uydu modeli ve yerel OSM kesiti hiçbir yerden indirilemiyordu | 24 Kasım 2026 |
+| J-188 | 🟠 81 il risk sıralaması canlıda boştu (il merkezleri depoda yoktu); dağıtım kontrol testi eski uçlarda düşüyordu | 24 Kasım 2026 |
 
 ---
 
@@ -2420,3 +2421,4 @@ kimlikle. Başka belgelerdeki "EKSIKLER J-xxx" atıfları için kimliği burada 
 | 24 Kasım 2026 | **J-185** kapatıldı: tatbikat sağ paneli soruya göre (sonuç, tıklanır görevler, katman açan bulgu kutuları, katlanır ayrıntılar); görev seçince harita yalnız o çifti çizer; varsayılan iki çizgi; ekip 'gerçek tesis' ve kapanma yarıçapı metni düzeltildi; ağırlığı olmayan modelle başlatma kapalı. Canlıda koşması J-184'teki dosyalara bağlı. Madde arşivde. |
 | 24 Kasım 2026 | **J-186** kapatıldı: TATBİKAT şeridinde (her modda) onaylı "Tatbikatı bitir"; sunucu koşuyu tanımasa da noktaları siler; açılışta sahipsiz tatbikat noktaları silinir (kopya veritabanında 296 nokta bulundu); kimlik biçimi denetlenir. `pytest -q` 171/171. Madde arşivde. |
 | 24 Kasım 2026 | **J-187** kapatıldı: üç model `Furkei/quakemind-uydu-modelleri`, OSM kesiti `Furkei/quakemind-osm-yollar` (ODbL) depolarında; künyeler ve `araclar_osm_indir.py` sabit sürümle indirir, `deploy.sh` kurar. Anahtarsız indirme ve parmak izleri doğrulandı. J-184'teki elle kopyalama artık gerekmiyor. Madde arşivde. |
+| 24 Kasım 2026 | **J-188** kapatıldı: `il_merkezleri.json` depoya (`apps/earthquake_risk/data/`); `deploy/test_road_api.py` eski uçlarda bayrağı test içinde açar. Sunucu paket sürümleriyle temiz kopyada 163 geçti, 0 hata. Madde arşivde. |
