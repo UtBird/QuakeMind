@@ -9,7 +9,10 @@ import pandas as pd
 
 
 APP_DIR = Path(__file__).resolve().parents[1]
-OSM_DATA_DIR = APP_DIR / "data" / "osm"
+# Yerel OSM dizini yerel_yol ile ayni secilir (J-184): kalici veri dizini once.
+from .yerel_yol import osm_dizini  # noqa: E402
+
+OSM_DATA_DIR = osm_dizini()
 SAFETY_AREAS_PATH = OSM_DATA_DIR / "safety_areas.geojson"
 ROADS_PATH = OSM_DATA_DIR / "roads.gpkg"
 

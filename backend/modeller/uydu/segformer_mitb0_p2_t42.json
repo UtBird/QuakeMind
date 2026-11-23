@@ -26,7 +26,12 @@
  },
  "agirlik": {
   "dosya": "apps/road_damage/models/segformer_mitb0_p2_t42.pth",
-  "sha256": "a29a2e85c0684a4c050bb9ba27f4c6b8bc908037c4ee66b3b1e90e348e6eeb75"
+  "sha256": "a29a2e85c0684a4c050bb9ba27f4c6b8bc908037c4ee66b3b1e90e348e6eeb75",
+  "hf": {
+   "repo": "Furkei/quakemind-uydu-modelleri",
+   "dosya": "segformer_mitb0_p2_t42.pth",
+   "surum": "0230b2954fd447861da1ae7dc58360033c57724e"
+  }
  },
  "egitim": {
   "deney": "P2",

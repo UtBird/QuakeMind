@@ -658,11 +658,18 @@ def simulasyon_bitir(
     Açık bütün istemciler aynı anda çıksın diye canlı akışa `durum: "iptal"`
     gider; tek bir istemcinin ekranını temizlemek yetmez.
     """
+    import re
+
+    # Kimlik LIKE kalibina giriyor: yalniz kendi bicimimiz (sim_ + hex) kabul edilir.
+    if not re.fullmatch(r"sim_[0-9a-f]{6,32}", istek.isId):
+        raise HTTPException(status_code=422, detail="Geçersiz tatbikat kimliği.")
     with simulasyon_kilidi:
         sim = simulasyon_isleri.get(istek.isId)
-        if sim is None:
-            raise HTTPException(status_code=404, detail="Bilinmeyen ya da süresi dolmuş iş kimliği.")
-        sim["bitirildi"] = time.time()
+        # Sunucu yeniden basladiysa kosu bellekte yok; yine de bitirilir ve
+        # noktalari silinir (J-186). Eskiden 404 donuyor, istemci ekrani
+        # temizliyor ama noktalar gercek verinin icinde kaliyordu.
+        if sim is not None:
+            sim["bitirildi"] = time.time()
 
     silinen = 0
     try:
@@ -775,6 +782,8 @@ def simulasyon_kosusu(
         "donusMaliyetli": (sim.get("referansAjanlar") or {}).get("donusMaliyetli"),
         # Fiilen sürülen yollar: haritada "bilmeseydik böyle sürerdik" çizilir.
         "izlenenYollar": (sim.get("referansAjanlar") or {}).get("izlenenYollar"),
+        # Gorev basina her kolun suresi, cikmaz sayisi ve surdugu yol (J-185).
+        "gorevKollari": (sim.get("referansAjanlar") or {}).get("gorevKollari"),
         # Kıyas kutusu: aynı maske, farklı r_h. En sonda dolar; hazır değilse null.
         "yaricapKiyasi": sim.get("yaricapKiyasi"),
         # Yer seviyesi kanallar (kamera/YOLO ve metin/BERTurk). En sonda dolar;

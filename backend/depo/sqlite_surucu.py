@@ -200,6 +200,7 @@ CREATE TABLE IF NOT EXISTS yol_kapanmalari (
     ek          TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_kapanma_zaman ON yol_kapanmalari(zaman);
+CREATE INDEX IF NOT EXISTS ix_kapanma_konum ON yol_kapanmalari(lon, lat);
 
 -- Acil durum bildirimleri (J-45). Eskiden yalniz bellekteydi: sunucu yeniden
 -- baslayinca yayindaki bildirim kayboluyordu ve kimin gonderdigi tutulmuyordu.
@@ -920,6 +921,21 @@ class SqliteDepo:
             self._yaz("DELETE FROM hasar_noktalari WHERE id = ?", (satir["id"],))
         return len(satirlar)
 
+    def hasar_sil_tatbikat_hepsi(self) -> int:
+        """Butun tatbikat hasar noktalarini siler (J-186).
+
+        Tatbikat kosulari yalniz API surecinin belleginde yasar; surec yeniden
+        basladiginda hicbir kosu "bitirilemez" (404) ve noktalari gercek olay
+        verisinin icinde kaliyordu. Acilista cagrilir: tatbikat verisi kendisini
+        ureten surecten uzun yasamaz (CLAUDE.md 1)."""
+        satir = self._tek(
+            "SELECT COUNT(*) AS n FROM hasar_noktalari WHERE ek LIKE ?", ('%"tatbikat": "sim_%',)
+        )
+        n = int(satir["n"]) if satir else 0
+        if n:
+            self._yaz("DELETE FROM hasar_noktalari WHERE ek LIKE ?", ('%"tatbikat": "sim_%',))
+        return n
+
     def hasar_listele(
         self,
         baslangic: float | None = None,
@@ -936,6 +952,86 @@ class SqliteDepo:
         return self._oku(
             f"SELECT * FROM hasar_noktalari {nerede} ORDER BY zaman DESC LIMIT ?",
             (*parametreler, sinir),
+        )
+
+    # Rota motorunun tehlike verisi (J-181). Yurume ve arac rotasi ayni
+    # kurali kullanir: hasar noktasi = kamera ihbari, uydu (skor >= 0,5) ve
+    # enkaz bildiren yazili ihbar. SOS tehlike sayilmaz: yardim bekleyen insandir.
+    _ROTA_HASAR_KOSULU = (
+        "(kaynak = 'kamera' OR (kaynak = 'uydu' AND skor >= 0.5)"
+        " OR (kaynak = 'metin' AND etiket = 'Enkaz Bildirimi'))"
+    )
+
+    def rota_tehlike_imzasi(self, kutu: tuple[float, float, float, float]) -> tuple:
+        """Kutudaki kapanma ve hasar verisinin imzasi: sayi + son zaman, SQL'de.
+        Rota her istekte bunu sorar; satirlari yalniz imza degisince okur
+        (eskiden her istekte 100 000'e kadar satir Python'a cekiliyordu)."""
+        kosullar, parametreler = self._zaman_kutu_kosullari(None, None, kutu)
+        nerede = " AND ".join(kosullar)
+        k = self._tek(
+            f"SELECT COUNT(*) AS n, MAX(zaman) AS son FROM yol_kapanmalari WHERE {nerede}",
+            tuple(parametreler),
+        )
+        h = self._tek(
+            f"SELECT COUNT(*) AS n, MAX(zaman) AS son FROM hasar_noktalari"
+            f" WHERE {nerede} AND {self._ROTA_HASAR_KOSULU}",
+            tuple(parametreler),
+        )
+        return (int(k["n"]), k["son"], int(h["n"]), h["son"])
+
+    def rota_tehlike_noktalari(self, kutu: tuple[float, float, float, float]) -> tuple[list[dict], list[tuple]]:
+        """(kapanmalar: lon, lat, ek; hasar noktalari: (lon, lat)). Suzme SQL'de,
+        yalniz gereken sutunlar."""
+        kosullar, parametreler = self._zaman_kutu_kosullari(None, None, kutu)
+        nerede = " AND ".join(kosullar)
+        kapanmalar = self._oku(
+            f"SELECT lon, lat, ek FROM yol_kapanmalari WHERE {nerede} ORDER BY zaman DESC",
+            tuple(parametreler),
+        )
+        hasarlar = [
+            (r["lon"], r["lat"])
+            for r in self._oku(
+                f"SELECT lon, lat FROM hasar_noktalari WHERE {nerede} AND {self._ROTA_HASAR_KOSULU}",
+                tuple(parametreler),
+            )
+        ]
+        return kapanmalar, hasarlar
+
+    def hasar_hucreleri(
+        self,
+        kutu: tuple[float, float, float, float],
+        baslangic: float | None,
+        hucre_derece: float,
+        en_az: int,
+        haric_kaynak: tuple[str, ...] = ("sos",),
+    ) -> list[dict]:
+        """Hasar noktalarini sabit bir izgaranin karelerinde sayar (J-180).
+
+        Sayim SQL'de (CLAUDE.md 10). Izgaranin baslangici sabittir (30 K, 20 D),
+        sorgu kutusuna gore kaymaz: ayni kare her istekte ayni yerdedir. Yalniz
+        `en_az` ve ustu noktali kareler doner; tek bir kisinin bildirimi konum
+        olarak acilmasin diye. `haric_kaynak` (varsayilan SOS) sayilmaz.
+        """
+        kosullar, parametreler = self._zaman_kutu_kosullari(baslangic, None, kutu)
+        if haric_kaynak:
+            kosullar.append(f"kaynak NOT IN ({','.join('?' * len(haric_kaynak))})")
+            parametreler.extend(haric_kaynak)
+        nerede = " AND ".join(kosullar)
+        h = float(hucre_derece)
+        return self._oku(
+            f"""SELECT CAST((lat - 30.0) / ? AS INTEGER) AS gy,
+                       CAST((lon - 20.0) / ? AS INTEGER) AS gx,
+                       COUNT(*) AS sayi,
+                       SUM(kaynak = 'uydu') AS uydu,
+                       SUM(kaynak = 'kamera') AS kamera,
+                       SUM(kaynak = 'metin') AS metin,
+                       MAX(skor) AS en_yuksek_skor,
+                       MAX(zaman) AS son_zaman
+                FROM hasar_noktalari
+                WHERE {nerede}
+                GROUP BY gy, gx
+                HAVING COUNT(*) >= ?""",
+            (h, h, *parametreler, int(en_az)),
         )
 
     # ---- SOS cagrilari ----------------------------------------------------

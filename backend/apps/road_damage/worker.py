@@ -560,9 +560,13 @@ def run_analysis_job(req: dict) -> dict:
     # "yol katmani alinamadi" demektir; sonuc bunu yazmali.
     yol_katmani_yok = int(road_mask_binary.sum()) == 0
     if yol_katmani_yok:
+        from apps.road_damage.utils import yerel_yol as _yy
+
         imagery_notes.append(
-            "UYARI: OSM yol katmanı alınamadı (Overpass); yol kesişimi ve "
-            "'kapalı yol' sayıları bu koşuda ANLAMSIZDIR"
+            "UYARI: OSM yol katmanı alınamadı; yol kesişimi ve 'kapalı yol' sayıları bu koşuda ANLAMSIZDIR. "
+            + ("Yerel yol dosyası bu alanı kapsamıyor ve Overpass yanıt vermedi."
+               if _yy.veri_var() else
+               f"Sunucuda yerel yol dosyası yok ({_yy.YOLLAR.name}; bkz. deploy/README.md) ve Overpass yanıt vermedi.")
         )
     overpass_ms = (time.perf_counter() - t1) * 1000.0
     t2 = time.perf_counter()
@@ -754,8 +758,13 @@ def run_analysis_job(req: dict) -> dict:
     oran = f"{blocked_road_pct * 100:.1f}".replace(".", ",")
     kapali_metni = f"{blocked_count} sokak kapalı (kapalı yol pikseli oranı %{oran})"
     if yol_katmani_yok:
+        from apps.road_damage.utils import yerel_yol as _yy
+
         recommended = ("Yol katmanı alınamadı; kapalı yol hesaplanamadı. Bu sonuç bölgenin "
-                       "erişilebilir olduğunu göstermez.")
+                       "erişilebilir olduğunu göstermez. "
+                       + ("Neden: yerel yol dosyası bu alanı kapsamıyor, dış yol servisi (Overpass) yanıt vermedi."
+                          if _yy.veri_var() else
+                          "Neden: sunucuda yerel yol dosyası kurulu değil, dış yol servisi (Overpass) yanıt vermedi."))
     elif blocked_road_pct > 0.5:
         recommended = f"Kritik: {kapali_metni}. Alternatif rotalar planlanmalı."
     elif blocked_road_pct > 0.2:

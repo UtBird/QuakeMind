@@ -1,4 +1,4 @@
-import { PathLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers'
+import { PathLayer, PolygonLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers'
 import { PathStyleExtension } from '@deck.gl/extensions'
 import type { Layer, PickingInfo } from '@deck.gl/core'
 import type { KatmanId } from '@/durum/konsolDurumu'
@@ -11,7 +11,7 @@ import { dogruluk, saatte, sureMetni, tarihSaat } from '@/lib/bicim'
 import { mesafeMetni } from './konum'
 import { ISLEM_DURUMU } from './etiketler'
 import { YER_TURLERI, yerAdi } from './yerTurleri'
-import type { YakinYer } from './veri'
+import type { CevreYaniti, HasarBolgesi, KapaliYol, YakinYer } from './veri'
 
 /* ---------------------------------------------------------------------------
    Afetzede haritasının katmanları (J-50). Altlık konsolla aynı (kendi OSM
@@ -45,14 +45,82 @@ export type AfetzedeKatmanGirdisi = {
   cagrilar: SosCagrisi[]
   /** [lon, lat] dizisi: yürüme rotası (kendi yol ağımız ya da yedek dış servis). */
   rota: [number, number][] | null
+  /** Çevredeki tehlike (J-180): kapalı yollar ve hasar bölgeleri; gizlenebilir. */
+  cevre?: CevreYaniti | null
 }
 
 export function afetzedeKatmanlari(g: AfetzedeKatmanGirdisi): Layer[] {
-  const L: Layer[] = [
-    ...altlikKatmanlari(g.altlik, ALTLIK_ACIK, g.altlikYapiGorunur),
-    ...adKatmanlari(g.altlik, g.bolgeAdlari, g.adSeviyesi),
-  ]
+  const L: Layer[] = [...altlikKatmanlari(g.altlik, ALTLIK_ACIK, g.altlikYapiGorunur)]
   const zemin = tokenRenk('--color-ground')
+
+  // Çevredeki tehlike (J-180): altlığın üstünde, adların ve rotanın altında.
+  // Kırmızı ve turuncu burada hasar anlamında (ARAYUZ §6).
+  if (g.cevre) {
+    const kritik = tokenRenk('--color-crit')
+    const yuksek = tokenRenk('--color-high')
+    if (g.cevre.hasarBolgeleri.length) {
+      L.push(
+        new PolygonLayer<HasarBolgesi>({
+          id: 'cevre-hasar',
+          data: g.cevre.hasarBolgeleri,
+          getPolygon: ({ kare: [s, w, n, e] }) => [
+            [w, s],
+            [e, s],
+            [e, n],
+            [w, n],
+          ],
+          getFillColor: (d) => (d.seviye === 3 ? [...kritik, 110] : d.seviye === 2 ? [...yuksek, 95] : [...yuksek, 55]),
+          getLineColor: (d) => (d.seviye === 3 ? [...kritik, 220] : [...yuksek, 200]),
+          lineWidthMinPixels: 1,
+          stroked: true,
+          pickable: true,
+        }),
+      )
+    }
+    const cizgili = g.cevre.kapaliYollar.filter((d) => (d.cizgi?.length ?? 0) >= 2)
+    const noktali = g.cevre.kapaliYollar.filter((d) => (d.cizgi?.length ?? 0) < 2)
+    const yol = (d: KapaliYol) => (d.cizgi ?? []).map(([enlem, boylam]) => [boylam, enlem] as [number, number])
+    if (cizgili.length) {
+      L.push(
+        new PathLayer<KapaliYol>({
+          id: 'cevre-kapali-zemin',
+          data: cizgili,
+          getPath: yol,
+          getColor: [...zemin, 255],
+          getWidth: 9,
+          widthUnits: 'pixels',
+          capRounded: true,
+        }),
+        new PathLayer<KapaliYol>({
+          id: 'cevre-kapali',
+          data: cizgili,
+          getPath: yol,
+          getColor: [...kritik, 255],
+          getWidth: 5,
+          widthUnits: 'pixels',
+          capRounded: true,
+          pickable: true,
+        }),
+      )
+    }
+    if (noktali.length) {
+      L.push(
+        new ScatterplotLayer<KapaliYol>({
+          id: 'cevre-kapali',
+          data: noktali,
+          getPosition: (d) => [d.lon, d.lat],
+          getRadius: 6,
+          radiusUnits: 'pixels',
+          getFillColor: [...kritik, 255],
+          stroked: true,
+          getLineColor: [...zemin, 255],
+          lineWidthMinPixels: 2,
+          pickable: true,
+        }),
+      )
+    }
+  }
+  L.push(...adKatmanlari(g.altlik, g.bolgeAdlari, g.adSeviyesi))
 
   // Yürüme rotası yolların üstünden: zemin renginde kenar + vurgu rengi.
   if (g.rota && g.rota.length > 1) {
@@ -278,6 +346,27 @@ function gelenEkipler(cagrilar: SosCagrisi[]): GelenEkip[] {
 /** Üstüne gelince bilgi: ne, ne kadar uzak, kaynak ne. */
 export function afetzedeIpucu({ object, layer }: PickingInfo) {
   if (!object || !layer) return null
+  if (layer.id === 'cevre-hasar') {
+    const h = object as HasarBolgesi
+    const k = h.kaynaklar
+    return ipucuKutusu(
+      h.seviye === 3 ? 'Çok hasar bildirilen bölge' : 'Hasar bildirilen bölge',
+      [
+        `${h.sayi} bildirim (yaklaşık 250 m'lik alan)`,
+        [k.uydu && `uydu ${k.uydu}`, k.fotograf && `fotoğraf ${k.fotograf}`, k.metin && `yazılı ihbar ${k.metin}`]
+          .filter(Boolean)
+          .join(' · '),
+        `Son bildirim ${tarihSaat(h.sonZaman)}`,
+        'Binalara girme, yıkıntıdan uzak dur.',
+      ],
+    )
+  }
+  if (layer.id === 'cevre-kapali') {
+    return ipucuKutusu('Kapalı yol', [
+      'Uydu görüntüsünden hasar analiziyle bulundu',
+      'Yürüme rotası bilinen kapalı yollardan kaçınır.',
+    ])
+  }
   if (layer.id === 'gelen-ekip') {
     const { gorev: x } = object as GelenEkip
     return ipucuKutusu(x.ekip.ad, [

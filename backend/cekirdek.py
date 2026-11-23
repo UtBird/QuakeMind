@@ -728,6 +728,19 @@ async def lifespan(app: FastAPI):
     # kullanicilar, SOS cagrilari ve ekipler yeniden baslatmada kaybolmaz.
     depo = depo_ac()
     print(f"Depo hazir: {depo.yol} ({depo.kullanici_sayisi()} kullanici)", flush=True)
+    # Ortak ornek hesaplar (J-183): yalniz QUAKEMIND_ORNEK_HESAP_SIFRESI varsa.
+    import ornek_hesaplar
+
+    ornek_hesaplar.acilista_kur(depo)
+
+    # Tatbikat kosulari yalniz bu surecin belleginde yasar; onceki surecten
+    # kalan tatbikat hasar noktalarinin sahibi yok, gercek veriye karismasin (J-186).
+    try:
+        silinen = depo.hasar_sil_tatbikat_hepsi()
+        if silinen:
+            print(f"Onceki surecten kalan {silinen} tatbikat hasar noktasi silindi", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"Tatbikat noktalari temizlenemedi: {e}", flush=True)
 
     # PostGIS yoklamasi 2 sn zaman asimina dusebiliyor; ilk kullanici bunu
     # beklemesin diye acilista ayri bir is parcaciginda yapilir ve sonuc

@@ -18,6 +18,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 import cekirdek as ck
 from uclar import (
+    afetzede_cevre,
     altlik,
     bildirim,
     canli,
@@ -77,6 +78,7 @@ for modul in (
     bildirim,
     altlik,
     yerler,
+    afetzede_cevre,
     ihbar,
     guvenlik,
     gorev,

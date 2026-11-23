@@ -142,7 +142,8 @@ export function HesapYonetimi() {
           }}
           className={anaDugme}
         >
-          Yeni ekip hesabı
+          {/* Yönetici koordinatör ve yönetici de açar; koordinatör yalnız saha (J-182). */}
+          {liste.data?.verebilecegiRoller.includes('koordinator') ? 'Yeni hesap' : 'Yeni ekip hesabı'}
         </button>
       </header>
 
@@ -236,7 +237,7 @@ export function HesapYonetimi() {
 
             {cekmece && (
               <aside
-                aria-label={cekmece.tur === 'yeni' ? 'Yeni ekip hesabı' : 'Hesabı düzenle'}
+                aria-label={cekmece.tur === 'yeni' ? 'Yeni hesap' : 'Hesabı düzenle'}
                 className="w-full shrink-0 rounded-panel border border-line bg-panel genis:sticky genis:top-gutter genis:w-panel-r"
               >
                 {cekmece.tur === 'yeni' ? (
@@ -518,7 +519,11 @@ function YeniHesap({
 
   return (
     <>
-      <CekmeceBasligi baslik="Yeni ekip hesabı" alt="Şifreyi sunucu üretir" onKapat={onKapat} />
+      <CekmeceBasligi
+        baslik={verebilir.includes('koordinator') ? 'Yeni hesap' : 'Yeni ekip hesabı'}
+        alt="Şifreyi sunucu üretir"
+        onKapat={onKapat}
+      />
       <form onSubmit={gonder} className="p-3" aria-label="Yeni hesap aç">
         <Micro>Hesap türü</Micro>
         <HazirSecenekler
@@ -840,6 +845,10 @@ function HesapDuzenle({
                   onKapat={() => setYeniSifre(null)}
                 />
               </div>
+            ) : k.ortakHesap ? (
+              <p className="mt-1.5 text-small text-ink-3">
+                Ortak örnek hesap: şifresi sunucu ayarından gelir, buradan sıfırlanmaz (herkes dışarıda kalırdı).
+              </p>
             ) : sifreSor ? (
               <div className="mt-1.5 rounded-control border border-line-2 px-2.5 py-2">
                 <p className="text-small text-ink">

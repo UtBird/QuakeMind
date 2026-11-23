@@ -21,6 +21,7 @@ import canli_yayin
 import hiz_siniri
 import islem_kaydi
 import kimlik
+import ornek_hesaplar
 from depo import aktif_depo
 
 yonlendirici = APIRouter(prefix="/api/oturum", tags=["oturum"])
@@ -86,6 +87,8 @@ def _profil(kayit: dict) -> dict:
         "misafir": kayit["eposta"].endswith(f"@{MISAFIR_EPOSTA_ALANI}"),
         # J-157: gecici sifreyle girildi; istemci zorunlu degistirme ekranina gider.
         "sifreDegismeli": bool(kayit.get("sifre_degismeli")),
+        # Ortak ornek hesap (J-183): sifresi uygulamadan degismez.
+        "ortakHesap": ornek_hesaplar.ortak_mi(kayit.get("eposta")),
     }
 
 
@@ -254,6 +257,7 @@ def _kullanici_satiri(k: dict) -> dict:
         "sonGiris": int(k["son_giris"] * 1000) if k.get("son_giris") else None,
         "askida": bool(k.get("askida")),
         "sifreDegismeli": bool(k.get("sifre_degismeli")),
+        "ortakHesap": ornek_hesaplar.ortak_mi(k.get("eposta")),
     }
 
 
@@ -270,13 +274,14 @@ def kullanicilar(kul: dict = Depends(kimlik.rol_gerektir("koordinator", "yonetic
     }
 
 
-#: Gecici sifre alfabesi: karistirilan karakterler (0/O, 1/l/I) yok; telefonda
-#: okunup elle yazilacak.
-_SIFRE_ALFABESI = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+ORTAK_HESAP_MESAJI = (
+    "Bu ortak örnek hesap; şifresi uygulamadan değiştirilemez, yoksa herkes dışarıda kalır. "
+    "Kendi hesabın için yöneticiden hesap iste."
+)
 
 
 def _gecici_sifre(uzunluk: int = 12) -> str:
-    return "".join(secrets.choice(_SIFRE_ALFABESI) for _ in range(uzunluk))
+    return kimlik.gecici_sifre(uzunluk)
 
 
 def _yonetebilir_mi(veren: dict, hedef: dict) -> None:
@@ -347,6 +352,8 @@ def sifre_sifirla(
     if hedef is None:
         raise HTTPException(status_code=404, detail="Kullanici bulunamadi.")
     _yonetebilir_mi(veren, hedef)
+    if ornek_hesaplar.ortak_mi(hedef["eposta"]):
+        raise HTTPException(status_code=409, detail=ORTAK_HESAP_MESAJI)
     sifre = _gecici_sifre()
     depo.sifre_ata(kullanici_id, kimlik.sifre_ozetle(sifre), degismeli=True)
     depo.oturumlari_iptal(kullanici_id)
@@ -440,6 +447,8 @@ def sifre_degistir(
     duser, bu cihaza yeni oturum verilir."""
     depo = aktif_depo()
     tam = depo.kullanici_id(kul["id"])
+    if ornek_hesaplar.ortak_mi(tam["eposta"]):
+        raise HTTPException(status_code=403, detail=ORTAK_HESAP_MESAJI)
     if not kimlik.sifre_dogrula(istek.eskiSifre, tam["sifre_ozeti"]):
         # 400: 401 olsaydi istemci jeton yenileyip ayni istegi tekrar gonderirdi.
         raise HTTPException(status_code=400, detail="Şu anki şifre hatalı.")

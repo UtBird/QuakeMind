@@ -22,6 +22,8 @@ export type KullaniciSatiri = {
   askida: boolean
   /** Geçici şifreyle açıldı / şifresi yenilendi; henüz kendi şifresini koymadı. */
   sifreDegismeli: boolean
+  /** Ortak örnek hesap (J-183): şifresi sunucu ayarından gelir, sıfırlanamaz. */
+  ortakHesap?: boolean
 }
 
 export type KullaniciListesi = {

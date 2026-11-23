@@ -77,6 +77,96 @@ Kod dağıtan veya yeni commit'i kendiliğinden aktive eden zamanlayıcı yoktur
 Konteyner logları döndürülür.
 API tek worker kullanır; süreç içi SSE ve iş durumu paylaşımı korunur.
 
+## İlk hesaplar (canlıya ilk çıkış)
+
+Kayıt ekranı yalnız afetzede hesabı açar; istemci rol seçemez (CLAUDE.md
+kural 5). Saha ekibi, koordinatör ve yönetici hesaplarını konsoldaki
+**Kullanıcılar** sayfası açar: yönetici her rolü, koordinatör saha hesabını.
+Boş veritabanında henüz yönetici olmadığı için ilk yönetici sunucuda,
+çalışan konteynerin içinde bir kez açılır:
+
+```bash
+docker exec -it "$(cat ~/opt/quakemind/active-container)" python araclar_kullanici.py ilk-yonetici eposta@kurum.gov.tr "Ad Soyad"
+```
+
+- Araç rastgele bir geçici şifre üretip yalnız bir kez ekrana yazar. Kişi
+  ilk girişte şifresini değiştirmeden hiçbir işlem yapamaz.
+- Şifre komut satırından verilmez (kabuk geçmişine düşmesin diye).
+- Yönetici zaten varsa araç çalışmaz; hesaplar konsoldan açılır.
+- E-posta kayıtlı bir afetzede hesabıysa o hesap yönetici yapılır ve
+  şifresi yenilenir.
+- İşlem hesap kayıt defterine yazılır.
+
+Sonra yönetici konsola girer: **Kullanıcılar → Hesap aç** ile koordinatörleri
+ve saha ekiplerini açar ve her birine ekranda bir kez görünen geçici şifreyi
+iletir.
+
+Tek yönetici şifresini unutursa:
+
+```bash
+docker exec -it "$(cat ~/opt/quakemind/active-container)" python araclar_kullanici.py sifre-sifirla eposta@kurum.gov.tr
+```
+
+`araclar_kullanici.py listele` hesapları ve geçici şifresi duranları gösterir.
+**`araclar_demo_hesaplari.py` canlıda çalıştırılmaz:** demo şifresi depoda
+açıktır.
+
+## Ortak örnek hesaplar (tanıtım ve teslim)
+
+Ekip, hoca ve değerlendiriciler her rol için aynı hesapla girebilsin diye API
+açılırken dört ortak hesap kurulur:
+
+| E-posta | Rol |
+|---|---|
+| `yonetici-demo@quakemind.local` | Yönetici |
+| `demo@quakemind.local` | Koordinatör |
+| `saha-demo@quakemind.local` | Saha ekibi ("Demo Ekip"e bağlı) |
+| `afetzede-demo@quakemind.local` | Afetzede |
+
+Bunun için `backend.env` dosyasına bir satır eklenir; şifre depoda yazmaz:
+
+```bash
+echo 'QUAKEMIND_ORNEK_HESAP_SIFRESI=<en az 10 karakter, ekiple paylaşılacak şifre>' >> ~/opt/quakemind/backend.env
+```
+
+- Değişken yoksa hesap kurulmaz.
+- Şifre 10 karakterden kısaysa ya da depodaki demo şifresiyse (`degistir1234`) hesap kurulmaz; açılış günlüğü nedenini yazar.
+- Değişken bir sonraki API açılışında (dağıtım ya da yeniden başlatma) uygulanır.
+- Şifre değişkenden değiştirilir; uygulamadan ya da konsoldan değiştirilemez, yoksa herkes dışarıda kalır.
+- Veriler zaten tek veritabanında ve herkese ortak; kimin neyi göreceğini rol belirler.
+
+## Analiz dosyaları (yol verisi ve uydu modelleri)
+
+Hasar analizi ve tatbikat iki büyük dosya grubuna dayanır. İkisi de depoya
+girmez; `deploy.sh` ikisini de Hugging Face'ten sabit sürümle indirir ve
+SHA-256 ile doğrular. Eksikleri `/api/hazir` gösterir:
+`"yerelYolVerisi": false` ya da `"uyduModeli": {"hazir": 1, "tanimli": 4}`.
+
+| Dosya | Hugging Face | Nereye |
+|---|---|---|
+| Etkin model (MiT-B4) | `Utbird/dispath_optimized_mitb4_focal_dice30` | `quakemind-road-models` |
+| MiT-B0, MiT-B2, U-Net MiT-B4 | `Furkei/quakemind-uydu-modelleri` | `quakemind-road-models` |
+| `roads.gpkg`, `tesisler.gpkg` (OSM, ODbL) | `Furkei/quakemind-osm-yollar` (veri kümesi) | `quakemind-data` → `veri/osm/` |
+
+- Sürüm ve parmak izi modellerin künyesinde (`backend/modeller/uydu/*.json`)
+  ve `backend/araclar_osm_indir.py` içinde yazılıdır.
+- Dosya zaten varsa ve parmak izi tutuyorsa indirilmez.
+- Parmak izi tutmayan dosya kurulmaz; model yüklenmez.
+
+Yol dosyası yoksa analiz yolları Overpass'a sorar. Sunucudan yanıt alamayınca
+sonuç "Yol katmanı alınamadı; kapalı yol hesaplanamadı" olur. Dosyanın
+kendisi kalıcı veri biriminde durduğu için dağıtımlarda silinmez.
+
+Elle kurulum gerekirse (ör. Hugging Face'e ulaşılamıyorsa):
+
+```bash
+c="$(cat ~/opt/quakemind/active-container)"
+docker exec "$c" python araclar_osm_indir.py
+docker exec "$c" python -c 'from apps.road_damage.utils import model_kunyesi as m
+for f in sorted(m.KUNYE_DIZINI.glob("*.json")): m.agirligi_hazirla(m.kunye_oku(f.stem))'
+docker restart "$c"
+```
+
 ## Veri ve sırlar
 
 - `quakemind-data`: SQLite, analiz dosyaları ve Hugging Face önbelleği.

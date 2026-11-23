@@ -125,7 +125,12 @@ export function useFaylar(acik: boolean) {
 
 /** `bolgeler`: haritada görünen altlık bölgeleri (useGorunenAltlik). Boşsa
     (bölge ölçeğinin altında) istek atılmaz; katman zaten şehir ölçeğinde çizilir. */
-export function useToplanmaAlanlari(acik: boolean, bolgeler: AltlikBolgesi[]) {
+export function useToplanmaAlanlari(acik: boolean, gorunen: AltlikBolgesi[]) {
+  // Ülke iskeleti (J-180) kutuya katılmaz: her zaman görünür ve bütün Türkiye'yi
+  // kapsar; sunucu o kutuyu fazla geniş bulup (en çok 8°) 422 veriyordu ve
+  // toplanma alanları hiçbir modda yüklenmiyordu. Uzakta (yalnız ülke
+  // görünürken) istek gitmez; simgeler zaten z11 ve üstünde çizilir.
+  const bolgeler = gorunen.filter((b) => b.tur !== 'ulke')
   const kimlikler = bolgeler.map((b) => b.id).sort()
   const kutu = bolgeler.length
     ? [

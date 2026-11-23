@@ -64,9 +64,24 @@ def hazir():
     # None: metin iscisi kurulmadi (testler); False: isiniyor ya da yuklenemedi.
     metin = metin_iscisi.hazir_mi()
     hazir_mi = veritabani and isci
+    # Analizin dosya bagimliliklari (J-184): eksikse sunucu ayakta ama sonuc
+    # eksik ("yol katmani alinamadi", model listesi kisa). Yalniz evet/hayir
+    # ve sayi; dosya yolu donmez.
+    from apps.road_damage.utils import model_kunyesi, yerel_yol
+
+    modeller = []
+    for kunye in sorted(model_kunyesi.KUNYE_DIZINI.glob("*.json")):
+        try:
+            modeller.append(model_kunyesi.agirlik_yolu(model_kunyesi.kunye_oku(kunye.stem)).exists())
+        except Exception:  # noqa: BLE001
+            modeller.append(False)
     return JSONResponse(
         status_code=200 if hazir_mi else 503,
-        content={"hazir": hazir_mi, "veritabani": veritabani, "analizIscisi": isci, "metinModeli": metin},
+        content={
+            "hazir": hazir_mi, "veritabani": veritabani, "analizIscisi": isci, "metinModeli": metin,
+            "yerelYolVerisi": yerel_yol.veri_var(),
+            "uyduModeli": {"hazir": sum(modeller), "tanimli": len(modeller)},
+        },
     )
 
 

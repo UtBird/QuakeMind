@@ -269,6 +269,8 @@ function KatmanKopru() {
   // tazelenir, maske jetonla indirilip ImageBitmap'e çevrilir.
   const simIsId = useSimulasyon((d) => d.isId)
   const simVaryantlar = useSimulasyon((d) => d.varyantlar)
+  const simIzlenenGoster = useSimulasyon((d) => d.izlenenGoster)
+  const simSeciliGorev = useSimulasyon((d) => d.seciliGorev)
   const simSonuc = useSimSonuc(simIsId)
   const simMaske = useSimMaske(katmanlar.simHasar ? simSonuc.data?.hasar?.maskeUrl : undefined)
   // Tatbikat zemini: MODELİN BAKTIĞI görüntü. Bu alanların çoğunda üretilmiş
@@ -306,8 +308,10 @@ function KatmanKopru() {
       varyantlar: simVaryantlar,
       goruntu: simGoruntu,
       izlenenYollar: simSonuc.data?.izlenenYollar ?? null,
+      izlenenGoster: simIzlenenGoster,
+      seciliGorev: simSeciliGorev,
     }),
-    [katmanlar, simSonuc.data, simMaske.data, simVaryantlar, simGoruntu],
+    [katmanlar, simSonuc.data, simMaske.data, simVaryantlar, simGoruntu, simIzlenenGoster, simSeciliGorev],
   )
 
   // TATBİKAT BAŞLAYINCA HARİTA ORAYA UÇAR. Önce uçmuyordu: koşu Nurdağı'nda
@@ -329,6 +333,28 @@ function KatmanKopru() {
     ucurulanKosu.current = simIsId
     kutuyaUc(simKutu)
   }, [hazir, simIsId, simKutu, kutuyaUc, haritaAl])
+
+  // Görev seçilince harita o çiftin yollarına yaklaşır (J-185); seçim
+  // kalkınca bütün alana döner.
+  useEffect(() => {
+    if (!hazir || !simSonuc.data) return
+    if (!simSeciliGorev) {
+      if (simKutu && ucurulanKosu.current === simIsId) kutuyaUc(simKutu)
+      return
+    }
+    const rota = simSonuc.data.rotalar?.find((r) => r.gorevId === simSeciliGorev)
+    const kol = simSonuc.data.gorevKollari?.['Kapanmayı bilmeyen ekip']?.find((k) => k.gorevId === simSeciliGorev)
+    const noktalar = [
+      ...Object.values(rota?.varyantlar ?? {}).flatMap((v) => v?.cizgi ?? []),
+      ...(kol?.cizgi ?? []),
+    ]
+    if (!noktalar.length) return
+    const enlem = noktalar.map((p) => p[0])
+    const boylam = noktalar.map((p) => p[1])
+    kutuyaUc([Math.min(...boylam), Math.min(...enlem), Math.max(...boylam), Math.max(...enlem)])
+    // simKutu ve simIsId bilerek dışarıda: yalnız seçim değişince uçulur.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simSeciliGorev, hazir, simSonuc.data?.isId])
   // Tatbikat bitince görünüm geri alınır: tatbikat alanlarının çoğunda üretilmiş
   // altlık paketi yok, bitirince kullanıcı kapkara bir haritayla kalıyordu.
   useEffect(() => {

@@ -247,13 +247,72 @@ def afetzede_rotasi(istek: YurumeRotasiIstegi, _kul: dict = Depends(kimlik.kulla
 
 
 class SokakRotasiIstegi(BaseModel):
-    baslangicLat: float
-    baslangicLon: float
-    hedefLat: float
-    hedefLon: float
+    baslangicLat: float = Field(..., ge=-90, le=90)
+    baslangicLon: float = Field(..., ge=-180, le=180)
+    hedefLat: float = Field(..., ge=-90, le=90)
+    hedefLon: float = Field(..., ge=-180, le=180)
 
 
 YAYA_HIZI_M_DK = 80.0  # ~4,8 km/sa
+
+# Dis servis (J-181). FOSSGIS'in OSRM sunucusu herkese acik ve agir kullanim
+# icin degil: istekler arasinda en az ARALIK_SN, ayni istek ONBELLEK_SN boyunca
+# yeniden gitmez. Bir rota istegi en cok 1 + SAPMA_DENEMESI cagri yapar.
+OSRM_ADRESI = "https://routing.openstreetmap.de/routed-foot/route/v1/foot/"
+OSRM_ARALIK_SN = 1.0
+OSRM_ONBELLEK_SN = 600.0
+SAPMA_M = 150.0
+KAPANMA_PAYI_DERECE = 0.01  # rota kutusunun cevresi (~1 km), kapanma aramasi icin
+_osrm_kilit = threading.Lock()
+_osrm_son = [0.0]
+_osrm_onbellek: "dict[str, tuple[float, list]]" = {}
+
+
+def _osrm(noktalar: list[tuple[float, float]], alternatif: bool) -> list[dict]:
+    """OSRM yaya rotalari (en cok 3). Hata: HTTPException 503. Konumdan
+    baska bir sey gitmez; User-Agent genel."""
+    import time as _time
+
+    import requests
+
+    yol = ";".join(f"{lon:.6f},{lat:.6f}" for lon, lat in noktalar)
+    url = f"{OSRM_ADRESI}{yol}?overview=full&geometries=geojson" + ("&alternatives=3" if alternatif else "")
+    simdi = _time.monotonic()
+    with _osrm_kilit:
+        kayit = _osrm_onbellek.get(url)
+        if kayit and simdi - kayit[0] < OSRM_ONBELLEK_SN:
+            return kayit[1]
+        bekle = _osrm_son[0] + OSRM_ARALIK_SN - simdi
+        if bekle > 0:
+            _time.sleep(bekle)
+        _osrm_son[0] = _time.monotonic()
+    try:
+        y = requests.get(url, timeout=10, headers={"User-Agent": "QuakeMind/0.1 (afet karar destek, akademik)"})
+    except requests.RequestException:
+        raise HTTPException(status_code=503, detail="Rota servisine ulaşılamadı.")
+    if y.status_code == 429:
+        raise HTTPException(status_code=503, detail="Rota servisi şu an yoğun; biraz sonra yeniden dene.")
+    rotalar = (y.json().get("routes") or []) if y.status_code == 200 else []
+    with _osrm_kilit:
+        if len(_osrm_onbellek) > 500:
+            _osrm_onbellek.clear()
+        _osrm_onbellek[url] = (_time.monotonic(), rotalar)
+    return rotalar
+
+
+def _sapma_noktalari(koordinatlar: list, cizgi: tuple) -> list[tuple[float, float]]:
+    """Kapanmanin iki yaninda, rotaya dik SAPMA_M uzakta birer ara nokta."""
+    lon0, lat0 = float(np.mean([p[0] for p in cizgi])), float(np.mean([p[1] for p in cizgi]))
+    kx, ky = 111320.0 * math.cos(math.radians(lat0)), 110574.0
+    k = np.asarray(koordinatlar, dtype=np.float64)
+    xy = np.column_stack(((k[:, 0] - lon0) * kx, (k[:, 1] - lat0) * ky))
+    i = int(np.argmin(np.hypot(xy[:, 0], xy[:, 1])))
+    j = min(i + 1, len(xy) - 1)
+    yon = xy[j] - xy[max(j - 1, 0)]
+    if float(np.hypot(*yon)) < 1e-6:
+        yon = xy[-1] - xy[0]
+    dik = np.array([-yon[1], yon[0]]) / max(float(np.hypot(*yon)), 1e-6)
+    return [(lon0 + s * dik[0] * SAPMA_M / kx, lat0 + s * dik[1] * SAPMA_M / ky) for s in (1, -1)]
 
 
 @yonlendirici.post("/api/afetzede/sokak-rotasi")
@@ -263,32 +322,59 @@ def sokak_rotasi(istek: SokakRotasiIstegi, _kul: dict = Depends(kimlik.kullanici
 
     YEDEK: asil rota kendi yol agimizdan gelir (`/api/afetzede/rota`, J-44).
     Bu uc yalniz yol agi uretilmemis bolgede ve kullanici acikca istediginde
-    cagrilir; baslangic ve hedef bu servise gider. Rota yikik ve kapali
-    yollari BILMEZ. Servis yanit vermezse duz cizgi uydurulmaz, hata doner
-    (eski /calculate_custom_route kus ucusu cizgiyi rota diye donduruyordu)."""
-    import requests
+    cagrilir; baslangic ve hedef bu servise gider.
 
-    for d in (istek.baslangicLat, istek.hedefLat):
-        if not -90 <= d <= 90:
-            raise HTTPException(status_code=422, detail="Geçersiz enlem.")
-    url = (
-        "https://routing.openstreetmap.de/routed-foot/route/v1/foot/"
-        f"{istek.baslangicLon:.6f},{istek.baslangicLat:.6f};{istek.hedefLon:.6f},{istek.hedefLat:.6f}"
-        "?overview=full&geometries=geojson"
-    )
-    try:
-        y = requests.get(url, timeout=10, headers={"User-Agent": "QuakeMind/0.1 (afet karar destek, akademik)"})
-    except requests.RequestException:
-        raise HTTPException(status_code=503, detail="Rota servisine ulaşılamadı.")
-    rotalar = y.json().get("routes") if y.status_code == 200 else None
-    if not rotalar:
+    OSRM istekte "su noktadan gecme" kabul etmez. Bu yuzden (J-181): en cok 3
+    alternatif istenir, her biri bilinen kapanmalara (cizgisine 25 m) karsi
+    denetlenir. Hepsi kapanmadan geciyorsa ilk gecilen kapanmanin iki yanina
+    birer ara noktayla yeniden istenir. En az kapanmadan, esitse en kisa olan
+    secilir; secilen rota kapanmadan geciyorsa yanit bunu acikca yazar. Hasar
+    noktalarini ve bilinmeyen yikik yolu BILMEZ. Servis yanit vermezse duz
+    cizgi uydurulmaz, hata doner."""
+    from depo import aktif_depo
+
+    bas = (istek.baslangicLon, istek.baslangicLat)
+    son = (istek.hedefLon, istek.hedefLat)
+    pay = KAPANMA_PAYI_DERECE
+    kutu = (min(bas[0], son[0]) - pay, min(bas[1], son[1]) - pay, max(bas[0], son[0]) + pay, max(bas[1], son[1]) + pay)
+    kapanmalar = yol_agi.kapanma_listesi(aktif_depo().kapanma_listele(kutu=kutu, sinir=5000))
+
+    def degerlendir(r: dict) -> tuple:
+        gecilen = yol_agi.rotadaki_kapanmalar(r["geometry"]["coordinates"], kapanmalar)
+        return (len(gecilen), float(r["distance"])), gecilen, r
+
+    adaylar = [degerlendir(r) for r in _osrm([bas, son], alternatif=True)]
+    if not adaylar:
         raise HTTPException(status_code=503, detail="Rota servisi bu iki nokta için rota vermedi.")
-    r = rotalar[0]
-    uzunluk = float(r["distance"])
+    adaylar.sort(key=lambda a: a[0])
+    sapma = False
+    if adaylar[0][1]:
+        ilk = kapanmalar[adaylar[0][1][0]]
+        for ara in _sapma_noktalari(adaylar[0][2]["geometry"]["coordinates"], ilk):
+            adaylar += [degerlendir(r) for r in _osrm([bas, ara, son], alternatif=False)]
+            adaylar.sort(key=lambda a: a[0])
+            if not adaylar[0][1]:
+                break
+        sapma = True
+    (gecilen_sayi, uzunluk), _gecilen, r = adaylar[0]
+
+    if not kapanmalar:
+        uyari = "Bu çevrede kayıtlı kapalı yol yok. Rota yıkık yolları ve hasarı bilmez."
+    elif gecilen_sayi == 0:
+        uyari = (
+            f"Çevredeki {len(kapanmalar)} bilinen kapalı yoldan geçmeyen rota seçildi. "
+            "Rota hasarı ve bilinmeyen yıkık yolları bilmez."
+        )
+    else:
+        uyari = (
+            f"Dikkat: bu rota bilinen {gecilen_sayi} kapalı yoldan geçiyor; servis başka yol vermedi. "
+            "Kırmızı çizgili yerlerden geçme, yakınında yön sor."
+        )
     return {
         "koordinatlar": r["geometry"]["coordinates"],  # [lon, lat]
         "uzunlukM": round(uzunluk),
         "yuruyusDk": max(1, round(uzunluk / YAYA_HIZI_M_DK)),
         "kaynak": "OSRM yaya profili, routing.openstreetmap.de (OpenStreetMap verisi)",
-        "uyari": "Bu rota yıkık ve kapalı yolları bilmez.",
+        "kapanma": {"cevrede": len(kapanmalar), "rotada": gecilen_sayi, "denenenRota": len(adaylar), "sapmaDenendi": sapma},
+        "uyari": uyari,
     }

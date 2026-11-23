@@ -49,6 +49,9 @@ export type Oturum = {
   /** Geçici şifreyle girdi (J-157): kendi şifresini koymadan başka ekrana geçemez.
       Sunucu da korunan her uçta 403 verir; buradaki yönlendirme yalnız görünüm. */
   sifreDegismeli?: boolean
+  /** Ortak örnek hesap (J-183): ekip ve değerlendiriciler aynı hesapla girer;
+      şifresi uygulamadan değişmez (sunucu reddeder). */
+  ortakHesap?: boolean
   /** Oturumun kaynağı; bugün tek seçenek imzalı erişim jetonu. */
   kaynak: 'jwt'
 }

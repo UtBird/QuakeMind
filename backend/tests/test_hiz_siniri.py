@@ -265,8 +265,12 @@ def test_hazir_ucu(monkeypatch):
     c = TestClient(u)
     monkeypatch.setattr(ck, "road_damage_pool", None)
     y = c.get("/api/hazir")
-    assert y.status_code == 503 and y.json() == {"hazir": False, "veritabani": True, "analizIscisi": False,
-                                                 "metinModeli": None}
+    g = y.json()
+    assert y.status_code == 503 and {k: g[k] for k in ("hazir", "veritabani", "analizIscisi", "metinModeli")} == {
+        "hazir": False, "veritabani": True, "analizIscisi": False, "metinModeli": None}
+    # J-184: analizin dosya bagimliliklari; yalniz evet/hayir ve sayi, yol yok.
+    assert isinstance(g["yerelYolVerisi"], bool)
+    assert g["uyduModeli"]["tanimli"] == 4 and 0 <= g["uyduModeli"]["hazir"] <= 4
     monkeypatch.setattr(ck, "road_damage_pool", object())
     y = c.get("/api/hazir")
     assert y.status_code == 200 and y.json()["hazir"] is True

@@ -21,7 +21,29 @@ from pathlib import Path
 
 import numpy as np
 
-VERI = Path(__file__).resolve().parents[1] / "data" / "osm"
+def osm_dizini() -> Path:
+    """Yerel OSM dosyalarinin dizini (J-184).
+
+    Sira: `QUAKEMIND_OSM_DIZINI` ortam degiskeni, kalici veri dizini
+    (`veri/osm`, canlida `quakemind-data` birimi) ve eski yer
+    (`apps/road_damage/data/osm`). Ilki `roads.gpkg` iceren dizin secilir.
+    Eski yer imajin icinde kaldigi icin canlida her dagitimda bos geliyordu;
+    yol maskesi Overpass'a dusuyor, o da yanit vermeyince "yol katmani
+    alinamadi" cikiyordu."""
+    import os
+
+    adaylar = [
+        os.environ.get("QUAKEMIND_OSM_DIZINI"),
+        Path(__file__).resolve().parents[3] / "veri" / "osm",
+        Path(__file__).resolve().parents[1] / "data" / "osm",
+    ]
+    for aday in adaylar:
+        if aday and (Path(aday) / "roads.gpkg").exists():
+            return Path(aday)
+    return Path(__file__).resolve().parents[1] / "data" / "osm"
+
+
+VERI = osm_dizini()
 YOLLAR = VERI / "roads.gpkg"
 
 # Yol sinifina gore serbest akis hizi (km/sa). `maxspeed` etiketi varsa O

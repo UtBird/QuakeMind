@@ -6,8 +6,9 @@ import { OturumSaglayici, useOturum } from '@/kimlik/oturum'
 import { Bekleme, RolKapisi } from '@/kimlik/RolKapisi'
 import { GirisEkrani } from '@/kimlik/GirisEkrani'
 import { SifreDegistirmeEkrani } from '@/kimlik/SifreDegistirmeEkrani'
+import { HesapAyarlari } from '@/kimlik/HesapAyarlari'
 import { CanliSaglayici } from '@/canli/CanliSaglayici'
-import { KONSOL_ROLLERI, acilisYolu } from '@/kimlik/roller'
+import { KONSOL_ROLLERI, ROLLER, acilisYolu } from '@/kimlik/roller'
 import { VARSAYILAN_MOD } from '@/modlar/modlar'
 
 // Rota bazlı kod bölme: afetzede ekranı harita motorunu indirmez (MIMARI §7).
@@ -30,6 +31,14 @@ export function App() {
               <Routes>
                 <Route path="/giris" element={<GirisEkrani />} />
                 <Route path="/sifre-degistir" element={<SifreDegistirmeEkrani />} />
+                <Route
+                  path="/hesap"
+                  element={
+                    <RolKapisi izinli={[...ROLLER]}>
+                      <HesapAyarlari />
+                    </RolKapisi>
+                  }
+                />
                 <Route
                   path="/konsol/:mod"
                   element={

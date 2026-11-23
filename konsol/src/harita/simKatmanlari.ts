@@ -54,6 +54,10 @@ export type SimHaritaGirdisi = {
   varyantlar: Record<SimVaryantId, boolean>
   /** Kolların fiilen sürdüğü yollar (uç: `izlenenYollar`). */
   izlenenYollar?: Record<string, LatLonCizgi[]> | null
+  /** Bilmeyen ekibin sürdüğü yol görünsün mü (J-185). */
+  izlenenGoster?: boolean
+  /** Seçili görev: yalnız o ekip–afetzede çiftinin yolları ve uçları (J-185). */
+  seciliGorev?: string | null
   /** Koşulan alanın görüntü kaynağı: tatbikatta zemine MODELİN BAKTIĞI
       görüntü serilir. Bu alanların çoğunda üretilmiş altlık paketi yok
       (ölçüldü, 26 Eylül: Nurdağı'nda zemin bomboş siyahtı) ve zaten doğru
@@ -117,12 +121,17 @@ export function simKatmanlari(g: SimHaritaGirdisi): Layer[] {
     )
   }
 
+  // Seçili görev varsa yalnız o çift çizilir (J-185): 5 görevin bütün
+  // çizgileri üst üste binince hangi yolun hangi ekibe ait olduğu okunmuyordu.
+  const secili = g.seciliGorev ?? null
+  const rotalar = (s.rotalar ?? []).filter((r) => !secili || r.gorevId === secili)
+
   // 3. Üç rota varyantı. Her varyant tek katman: 5 rota için 5 katman değil.
-  if (g.katmanlar.simRota && s.rotalar?.length) {
+  if (g.katmanlar.simRota && rotalar.length) {
     for (const varyant of CIZIM_SIRASI) {
       if (!g.varyantlar[varyant]) continue
       const stil = VARYANT_STILI[varyant]
-      const veri: RotaCizgisi[] = s.rotalar
+      const veri: RotaCizgisi[] = rotalar
         .map((rota) => ({ rota, varyant, cizgi: cevir(rota.varyantlar[varyant]?.cizgi ?? []) }))
         .filter((r) => r.cizgi.length > 1)
       if (!veri.length) continue
@@ -149,8 +158,16 @@ export function simKatmanlari(g: SimHaritaGirdisi): Layer[] {
   // geri dönmesi dahil) ve bu haritada hiç çizilmiyordu — kullanıcı hangi
   // çizginin "bilmeseydik" olduğunu soramıyordu (27 Eylül). Sönük ve kalın:
   // altta durur, planlanan güzergâhlar üstünde okunur.
-  if (g.katmanlar.simRota && s.izlenenYollar) {
-    const hatlar = s.izlenenYollar['Kapanmayı bilmeyen ekip'] ?? []
+  if (g.katmanlar.simRota && g.izlenenGoster !== false) {
+    // Görev başına yol (J-185) varsa ondan; eski koşularda görev bilgisi yok.
+    const kollar = s.gorevKollari?.['Kapanmayı bilmeyen ekip']
+    const hatlar: LatLonCizgi[] = kollar
+      ? kollar
+          .filter((k) => (!secili || k.gorevId === secili) && (k.cizgi?.length ?? 0) > 1)
+          .map((k) => k.cizgi!)
+      : secili
+        ? []
+        : (s.izlenenYollar?.['Kapanmayı bilmeyen ekip'] ?? [])
     if (hatlar.length) {
       L.push(
         new PathLayer<LatLonCizgi>({
@@ -169,8 +186,8 @@ export function simKatmanlari(g: SimHaritaGirdisi): Layer[] {
 
   // 4. Görevler: ekip üssü gerçek bir tesis (dolu), afetzede üretilen senaryo
   // (içi boş halka). Ayrım renkle değil biçimle de yapılır (§6, ARAYUZ §12).
-  if (g.katmanlar.simGorev && s.gorevler?.length && s.rotalar?.length) {
-    const uclar = eslestir(s.gorevler, s.rotalar)
+  if (g.katmanlar.simGorev && s.gorevler?.length && rotalar.length) {
+    const uclar = eslestir(s.gorevler, rotalar)
     L.push(
       new ScatterplotLayer<GorevUcu>({
         id: 'sim-gorev-afetzede',
@@ -206,7 +223,9 @@ export function simKatmanlari(g: SimHaritaGirdisi): Layer[] {
         id: 'sim-gorev-adlari',
         data: uclar,
         getPosition: (d) => [d.lon, d.lat],
-        getText: (d) => (d.tur === 'afetzede' ? `${d.ad} · senaryo` : d.ad),
+        // Kısa ad (J-185): "Ekip 4 · mahalle girişi · senaryo" etiketleri
+        // birbirinin üstüne biniyordu. Ne olduğu gösterge ve bilgi kartında yazar.
+        getText: (d) => d.ad.split(' · ')[0],
         getSize: tokenPx('--text-small'),
         getColor: [...tokenRenk('--color-ink'), 255],
         getPixelOffset: [0, -14],

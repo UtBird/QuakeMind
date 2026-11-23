@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CaretDown } from '@phosphor-icons/react'
 import { Micro } from './parcalar'
 import { useSimulasyon } from '@/durum/simulasyonDurumu'
+import type { SimVaryantId } from '@/veri/simulasyon'
 import { sn } from '@/lib/sinif'
 
 /* ---------------------------------------------------------------------------
@@ -28,16 +29,17 @@ type Bicim =
   | 'daire'
   | 'kare'
 
-type Satir = { renk: string; bicim: Bicim; ad: string; not?: string }
+/** `anahtar`: satır yalnız o çizgi açıkken görünür (J-185). */
+type Satir = { renk: string; bicim: Bicim; ad: string; not?: string; anahtar?: 'izlenen' | SimVaryantId }
 
 const SATIRLAR: Satir[] = [
   { renk: 'var(--color-crit)', bicim: 'alan', ad: 'Hasarlı alan', not: 'modelin bulduğu' },
   { renk: 'var(--color-crit)', bicim: 'cizgi-kalin', ad: 'Kapalı yol', not: 'hasar yola taşıyor' },
   { renk: 'var(--color-high)', bicim: 'cizgi', ad: 'Cezalı yol', not: 'hasara yakın' },
-  { renk: 'var(--color-crit)', bicim: 'cizgi-sonuk', ad: 'Bilmeyen ekibin sürdüğü yol', not: 'çıkmazlar dahil' },
-  { renk: 'var(--color-accent)', bicim: 'cizgi-kalin', ad: 'QuakeMind güzergâhı', not: 'kapalılar çıkarılmış' },
-  { renk: 'var(--color-mid)', bicim: 'cizgi', ad: 'Enkazdan uzak', not: 'hasara yakın kenar pahalı' },
-  { renk: 'var(--color-ink-3)', bicim: 'cizgi-kesik', ad: 'Kapanma olmasaydı', not: 'kıyas çizgisi' },
+  { renk: 'var(--color-crit)', bicim: 'cizgi-sonuk', ad: 'Bilmeyen ekibin sürdüğü yol', not: 'çıkmazlar dahil', anahtar: 'izlenen' },
+  { renk: 'var(--color-accent)', bicim: 'cizgi-kalin', ad: 'QuakeMind güzergâhı', not: 'kapalılar çıkarılmış', anahtar: 'kapanmali' },
+  { renk: 'var(--color-mid)', bicim: 'cizgi', ad: 'Enkazdan uzak', not: 'hasara yakın kenar pahalı', anahtar: 'riskli' },
+  { renk: 'var(--color-ink-3)', bicim: 'cizgi-kesik', ad: 'Kapanma olmasaydı', not: 'kıyas çizgisi', anahtar: 'depremOncesi' },
   { renk: 'var(--color-accent)', bicim: 'daire', ad: 'Ekip', not: 'mahalle girişi' },
   { renk: 'var(--color-crit)', bicim: 'halka', ad: 'Afetzede', not: 'senaryo' },
   { renk: 'var(--color-ch-cam)', bicim: 'kare', ad: 'Kamera tespiti', not: 'gerçek foto · YOLO' },
@@ -81,6 +83,11 @@ function Isaret({ renk, bicim }: { renk: string; bicim: Bicim }) {
 
 export function HaritaGostergesi() {
   const isId = useSimulasyon((d) => d.isId)
+  const varyantlar = useSimulasyon((d) => d.varyantlar)
+  const izlenenGoster = useSimulasyon((d) => d.izlenenGoster)
+  const satirlar = SATIRLAR.filter(
+    (s) => !s.anahtar || (s.anahtar === 'izlenen' ? izlenenGoster : varyantlar[s.anahtar]),
+  )
   // Varsayılan KAPALI (J-167 U-4): açıkken haritanın yaklaşık üçte birini
   // kapatıyordu. Başlık ("Haritada ne var") her zaman görünür, tek tıkla açılır.
   const [acik, setAcik] = useState(false)
@@ -103,7 +110,7 @@ export function HaritaGostergesi() {
       </button>
       {acik && (
         <ul className="flex flex-col gap-1.5 border-t border-line px-3 py-2">
-          {SATIRLAR.map((s, i) => (
+          {satirlar.map((s, i) => (
             <li key={`${s.ad}-${i}`} className="flex items-center gap-2">
               <Isaret renk={s.renk} bicim={s.bicim} />
               <span className="text-small text-ink">{s.ad}</span>

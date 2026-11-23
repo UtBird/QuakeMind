@@ -273,7 +273,12 @@ function YerSatiri({ y, ...p }: Props & { y: YakinYer }) {
             disRota ? (
               <p className="text-small text-ink">
                 Yürüyerek {mesafeMetni(disRota.uzunlukM)} · ~{disRota.yuruyusDk} dk.{' '}
-                <span className="text-ink-2">{disRota.uyari}</span>
+                <span
+                  role={disRota.kapanma.rotada > 0 ? 'alert' : undefined}
+                  className={disRota.kapanma.rotada > 0 ? 'font-semibold text-crit' : 'text-ink-2'}
+                >
+                  {disRota.uyari}
+                </span>
               </p>
             ) : (
               <>
@@ -290,8 +295,8 @@ function YerSatiri({ y, ...p }: Props & { y: YakinYer }) {
                   {p.rotaBekliyor ? 'Yol tarifi isteniyor…' : 'Dış servisten yol tarifi iste'}
                 </button>
                 <p className="mt-1 text-small text-ink-3">
-                  OpenStreetMap'in yol tarifi servisi; konumun o servise gider. Yıkık ve kapalı yolları
-                  bilmez.
+                  OpenStreetMap'in yol tarifi servisi; konumun o servise gider. Servisin önerdiği
+                  rotalardan bilinen kapalı yollardan geçmeyeni seçilir; hasarı bilmez.
                 </p>
                 {p.rotaHatasi != null && (
                   <p role="alert" className="mt-1 text-small text-crit">

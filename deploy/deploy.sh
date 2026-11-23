@@ -104,6 +104,15 @@ docker run --rm -i -e HF_HUB_DISABLE_PROGRESS_BARS=1 \
     --mount "source=quakemind-data,target=$backend_path/veri" \
     --entrypoint python "$image" - "$backend_path/veri" < "$ROOT/prepare_basemap.py"
 
+# Local OSM road/facility extract (J-187): road mask and drill network use it;
+# without it analysis falls back to Overpass and reports "road layer missing".
+# Pinned revision and SHA-256 in the tool; skipped when already present.
+if docker run --rm --entrypoint test "$image" -f araclar_osm_indir.py; then
+    docker run --rm -e HF_HUB_DISABLE_PROGRESS_BARS=1 \
+        --mount "source=quakemind-data,target=$backend_path/veri" \
+        --entrypoint python "$image" araclar_osm_indir.py "$backend_path/veri/osm"
+fi
+
 # Download and verify the satellite checkpoint before the API's bounded
 # startup window. A new installation can take longer than that window.
 docker run --rm --memory=1g --cpus=1 \
@@ -111,7 +120,14 @@ docker run --rm --memory=1g --cpus=1 \
     --mount "source=quakemind-data,target=$backend_path/veri" \
     --mount "source=quakemind-road-models,target=$backend_path/apps/road_damage/models" \
     --entrypoint python "$image" -c \
-    'from apps.road_damage.utils import model_kunyesi as m; k=m.kunye_oku(); p=m.agirligi_hazirla(k); assert m.sha256(p)==k["agirlik"]["sha256"], "Satellite model checksum mismatch"'
+    'from apps.road_damage.utils import model_kunyesi as m
+k=m.kunye_oku(); p=m.agirligi_hazirla(k); assert m.sha256(p)==k["agirlik"]["sha256"], "Satellite model checksum mismatch"
+# Other selectable models whose card names a Hugging Face source (J-184).
+for f in sorted(m.KUNYE_DIZINI.glob("*.json")):
+    x=m.kunye_oku(f.stem)
+    if x["agirlik"].get("hf"):
+        q=m.agirligi_hazirla(x); assert m.sha256(q)==x["agirlik"]["sha256"], "Checksum mismatch: "+f.stem
+        print("Satellite model ready:", f.stem)'
 
 # The upstream NER loader writes apps/models/ner, separately from the
 # classifier's apps/disaster_nlp/models. Persist and prepare both locations.

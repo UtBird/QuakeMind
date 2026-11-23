@@ -20,13 +20,17 @@ kendi yol agimizda hesaplanir:
     Hasar noktasi: uydu analizi (skor >= 0,5), kamera ihbari ve enkaz
     bildiren yazili ihbar. SOS cagrisi tehlike sayilmaz: yardim bekleyen
     insandir.
-  * Bilinen kapanma (uydu analizi, `yol_kapanmalari`): 25 m icindeki kenar
-    SILINMEZ, maliyeti 20 kat olur (yumusak maliyet, J-34). Baska yol yoksa
-    rota yine bulunur ve yanit bunu soyler. Tasarim karari [T]: yaya, arac
-    icin kapali yoldan cogu zaman gecebilir ama tehlikelidir.
+  * Bilinen kapanma (uydu analizi, `yol_kapanmalari`): kapali parcanin
+    CIZGISINE 25 m icindeki kenar SILINMEZ, maliyeti 20 kat olur (yumusak
+    maliyet, J-34). Cizgi 5 m'de bir orneklenir (J-181); eskiden yalniz
+    parcanin orta noktasina bakiliyordu ve Antakya'da 47 kapali kenarin 4'u
+    kaciyordu. Ayni parca birden cok analizde kaydedildiyse bir kez sayilir.
+    Baska yol yoksa rota yine bulunur ve yanit bunu soyler. Tasarim karari
+    [T]: yaya, arac icin kapali yoldan cogu zaman gecebilir ama tehlikelidir.
 
-Istek basina maliyet: bir Dijkstra ve hasar verisi degistiyse carpan
-yeniden hesabi. Olculen degerler J-44'te.
+Istek basina maliyet: imza sorgusu (SQL'de sayi + son zaman), bir Dijkstra;
+satirlar ve carpan yalniz veri degisince yeniden okunur/hesaplanir (J-181).
+Olculen degerler J-44 ve J-181'de.
 """
 
 from __future__ import annotations
@@ -45,6 +49,7 @@ AG_DIZINI = Path(__file__).resolve().parent / "veri" / "yol_agi"
 YAYA_HIZI_M_DK = 80.0  # ~4,8 km/sa; sokak rotasiyla ayni
 KAPANMA_YARICAPI_M = 25.0
 KAPANMA_CARPANI = 20.0
+KAPANMA_ADIM_M = 5.0  # kapanma cizgisinin ornekleme araligi
 HASAR_YARICAPI_M = 400.0  # risk_weight'in en genis kademesi
 OTURMA_UYARI_M = 300.0  # konum yol agina bundan uzaksa ekran uyarir
 
@@ -165,12 +170,16 @@ class Ag:
                 # Arac motorunun kurali, ayni islev (kademeler tek yerde).
                 carpan[yakin] = [risk_weight(float(d)) for d in en_az[yakin]]
             if kapanmalar:
-                noktalar = self.xy([k[0] for k in kapanmalar], [k[1] for k in kapanmalar])
+                noktalar = self._kapanma_noktalari(kapanmalar)
                 for _p, k, d in self._adaylar(noktalar, KAPANMA_YARICAPI_M):
                     kapali[k[d <= KAPANMA_YARICAPI_M]] = True
                 carpan[kapali] *= KAPANMA_CARPANI
             self._imza, self._carpan, self._kapali = imza, carpan, kapali
             return carpan, kapali
+
+    def _kapanma_noktalari(self, kapanmalar) -> np.ndarray:
+        """Her kapanma bir nokta dizisi ((lon, lat), ...); cizgi orneklenir."""
+        return np.vstack([_ornekle(self.xy([p[0] for p in c], [p[1] for p in c])) for c in kapanmalar])
 
     def _matris(self, carpan: np.ndarray):
         from scipy.sparse import csr_matrix
@@ -209,21 +218,99 @@ def ag_yukle(bolge_id: str) -> Ag:
     return Ag(bilgi)
 
 
+def _ornekle(xy: np.ndarray) -> np.ndarray:
+    """Metre cinsinden cizgiyi KAPANMA_ADIM_M aralikla orneklenmis noktalara
+    cevirir; tek nokta oldugu gibi kalir."""
+    parcalar = [xy[:1]]
+    for a, b in zip(xy, xy[1:]):
+        n = max(1, int(math.ceil(float(np.hypot(*(b - a))) / KAPANMA_ADIM_M)))
+        parcalar.append(a + (b - a) * (np.arange(1, n + 1)[:, None] / n))
+    return np.vstack(parcalar)
+
+
+def kapanma_listesi(satirlar) -> list[tuple]:
+    """Depo satirlarindan kapanma nokta dizileri; ayni parca (ayni orta nokta)
+    birden cok analizde kaydedildiyse bir kez."""
+    kapanmalar, gorulen = [], set()
+    for k in satirlar:
+        anahtar = (round(float(k["lon"]), 6), round(float(k["lat"]), 6))
+        if anahtar in gorulen:
+            continue
+        gorulen.add(anahtar)
+        kapanmalar.append(_kapanma_cizgisi(k))
+    return kapanmalar
+
+
+def rotadaki_kapanmalar(koordinatlar, kapanmalar, yaricap: float = KAPANMA_YARICAPI_M) -> list[int]:
+    """Cizgisi rotaya `yaricap` metreden yakin gecen kapanmalarin sirasi.
+
+    Dis servis rotasi (OSRM) icin: o servis kapanmalari bilmez, sonucunu
+    burada denetleriz. Rota ve kapanma ayni yerel metre izdusumunde; uzaklik
+    rotanin dogru parcalarina tam olculur."""
+    if not kapanmalar or len(koordinatlar) < 2:
+        return []
+    k = np.asarray(koordinatlar, dtype=np.float64)
+    lon0, lat0 = float(k[:, 0].mean()), float(k[:, 1].mean())
+    kx, ky = 111320.0 * math.cos(math.radians(lat0)), 110574.0
+
+    def yerel(nokta):
+        n = np.asarray(nokta, dtype=np.float64).reshape(-1, 2)
+        return np.column_stack(((n[:, 0] - lon0) * kx, (n[:, 1] - lat0) * ky))
+
+    r = yerel(k)
+    a, ab = r[:-1], r[1:] - r[:-1]
+    uzunluk2 = np.maximum((ab * ab).sum(axis=1), 1e-9)
+    alt, ust = r.min(axis=0) - yaricap, r.max(axis=0) + yaricap
+    sonuc = []
+    for i, cizgi in enumerate(kapanmalar):
+        p = _ornekle(yerel(cizgi))
+        if not ((p >= alt) & (p <= ust)).all(axis=1).any():
+            continue  # rotanin kutusunun disinda
+        t = np.clip(((p[:, None, :] - a[None]) * ab[None]).sum(axis=2) / uzunluk2, 0.0, 1.0)
+        fark = a[None] + ab[None] * t[..., None] - p[:, None, :]
+        if float(np.hypot(fark[..., 0], fark[..., 1]).min()) <= yaricap:
+            sonuc.append(i)
+    return sonuc
+
+
+_tehlike_kilit = threading.Lock()
+_tehlike: dict[tuple, tuple] = {}
+
+
+def _kapanma_cizgisi(k: dict) -> tuple:
+    """Kapanmanin nokta dizisi ((lon, lat), ...). `ek.cizgi` [[enlem, boylam]]
+    olarak saklanir (J-58); yoksa orta nokta."""
+    try:
+        cizgi = (json.loads(k["ek"]) or {}).get("cizgi") if k.get("ek") else None
+    except (TypeError, ValueError, AttributeError):
+        cizgi = None
+    if isinstance(cizgi, list) and len(cizgi) >= 2:
+        return tuple((float(p[1]), float(p[0])) for p in cizgi)
+    return ((float(k["lon"]), float(k["lat"])),)
+
+
 def hasar_verisi(kutu) -> tuple[tuple, list, list, Optional[float]]:
-    """Bolgedeki bilinen kapanmalar ve hasar noktalari (lon, lat)."""
+    """Bolgedeki bilinen kapanmalar (nokta dizisi) ve hasar noktalari (lon, lat).
+
+    Her cagrida yalniz imza sorulur (SQL'de sayi + son zaman); satirlar imza
+    degisince bir kez okunur (J-181). Ayni kapanma parcasi (ayni orta nokta)
+    birden cok analizde kaydedildiyse bir kez doner."""
     from depo import aktif_depo
 
     depo = aktif_depo()
-    kapanma = depo.kapanma_listele(kutu=tuple(kutu), sinir=50000)
-    hasar = [
-        h for h in depo.hasar_listele(kutu=tuple(kutu), sinir=100000)
-        if h["kaynak"] == "kamera"
-        or (h["kaynak"] == "uydu" and h["skor"] >= 0.5)
-        or (h["kaynak"] == "metin" and h.get("etiket") == "Enkaz Bildirimi")
-    ]
-    son = max([k["zaman"] for k in kapanma] + [h["zaman"] for h in hasar], default=None)
-    imza = (len(kapanma), len(hasar), son)
-    return imza, [(k["lon"], k["lat"]) for k in kapanma], [(h["lon"], h["lat"]) for h in hasar], son
+    kutu = tuple(kutu)
+    imza = depo.rota_tehlike_imzasi(kutu)
+    with _tehlike_kilit:
+        kayit = _tehlike.get(kutu)
+        if kayit is not None and kayit[0] == imza:
+            return kayit
+    satirlar, hasarlar = depo.rota_tehlike_noktalari(kutu)
+    kapanmalar = kapanma_listesi(satirlar)
+    son = max((z for z in (imza[1], imza[3]) if z is not None), default=None)
+    sonuc = (imza, kapanmalar, hasarlar, son)
+    with _tehlike_kilit:
+        _tehlike[kutu] = sonuc
+    return sonuc
 
 
 class Arama:

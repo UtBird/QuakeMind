@@ -630,9 +630,36 @@ def kiyas_kollari(G, kapali_anahtarlar, ekip_listesi, afetzede_listesi,
         if hatlar:
             izlenen[ad] = hatlar
 
+    # GOREV BASINA kollar (J-185): ilk turda ekip i -> afetzede i; bu ekranda
+    # cizilen gorev g{i+1}'dir. `izlenenYollar` hangi gorevin yolu oldugunu
+    # tasimiyordu (ulasamayan gorev listeden dusuyordu); arayuz bir gorevi
+    # secip yalniz onu gosteremiyordu.
+    gorev_kollari = {}
+    for ad in kosular:
+        satirlar = ilk_tur.get(ad)
+        if not isinstance(satirlar, list):
+            continue
+        liste = []
+        for i, r in enumerate(satirlar):
+            if not r:
+                liste.append({"gorevId": f"g{i + 1}", "ulasti": False})
+                continue
+            cizgi = (_kenarlardan_cizgi(G, [tuple(e) for e in r["izlenenKenar"]])
+                     if r.get("izlenenKenar") else None)
+            liste.append({
+                "gorevId": f"g{i + 1}", "ulasti": True,
+                "sureDk": round(float(r["arrivalMin"]), 2),
+                "mesafeM": round(float(r["distanceMeters"])),
+                "cikmaz": int(r.get("discoveries", 0)),
+                "uDonusu": int((r.get("donusler") or {}).get("u", 0)),
+                "cizgi": cizgi or None,
+            })
+        gorev_kollari[ad] = liste
+
     return {
         "varyantlar": cikti,
         "izlenenYollar": izlenen,
+        "gorevKollari": gorev_kollari,
         "gorusMesafesiM": gorus_m,
         "donusMaliyetli": donus_maliyetli,
         "degerlendirmeDk": degerlendirme_dk,
@@ -915,7 +942,9 @@ def rota_kosusu(tam_G, guvenli_G, ekip_listesi, afetzede_listesi, hasar_noktalar
             if i == j and len(gorevler) < ekranda:
                 gorevler.append({
                     "id": f"g{i + 1}",
-                    "ekipId": ekip["id"], "ekipAd": ekip["ad"], "gercekTesis": True,
+                    # Ekibin kendi kaydindan (J-185): mahalle giris agzi gercek tesis
+                    # DEGILDIR; burada sabit True yaziyordu.
+                    "ekipId": ekip["id"], "ekipAd": ekip["ad"], "gercekTesis": bool(ekip.get("gercekTesis")),
                     "afetzedeId": afetzede["id"], "afetzedeAd": afetzede["ad"], "senaryo": True,
                     "baslangic": {"lat": ekip["lat"], "lon": ekip["lon"], "ad": ekip["ad"]},
                     "hedef": {"lat": afetzede["lat"], "lon": afetzede["lon"], "ad": afetzede["ad"]},

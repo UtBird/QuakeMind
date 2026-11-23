@@ -1,18 +1,24 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Warning } from '@phosphor-icons/react'
 import { Micro } from './parcalar'
 import { useSimulasyon } from '@/durum/simulasyonDurumu'
 import { sonIsSec, useIsler } from '@/durum/islerDurumu'
-import { useSimSonuc } from '@/veri/simulasyon'
+import { useSimBitir, useSimSonuc } from '@/veri/simulasyon'
 import { useOturum } from '@/kimlik/oturum'
 import { modBul, modGorunur } from '@/modlar/modlar'
 
 /* ---------------------------------------------------------------------------
    TATBİKAT şeridi (SIMULASYON_SOZLESMESI.md §5 madde 1).
 
-   Koşu varken KALICIDIR: kapatma düğmesi yoktur ve mod değişince kaybolmaz,
-   çünkü asıl işi "ekrandaki bu şey gerçek olay değil" demektir. Şerit kabukta
-   durur, mod panelinde değil; bu yüzden SOS moduna geçilse de görünür.
+   Koşu varken KALICIDIR: uyarıyı susturan bir "kapat" yoktur ve mod değişince
+   kaybolmaz, çünkü asıl işi "ekrandaki bu şey gerçek olay değil" demektir.
+   Şerit kabukta durur, mod panelinde değil; SOS moduna geçilse de görünür.
+
+   "Tatbikatı bitir" ise şeritte durur (J-186): uyarıyı susturmaz, tatbikatı
+   SONA ERDİRİR (koşunun hasar noktaları silinir, katmanlar düşer). Eskiden
+   yalnız tatbikat panelinin dibindeydi; başka moddaki kullanıcı tatbikatı
+   kapatmanın yolunu bulamıyordu.
 
    Yanıp sönmez, renk geçişi yapmaz (ARAYUZ §6: sürekli yanıp sönen öğe yok).
 --------------------------------------------------------------------------- */
@@ -27,8 +33,21 @@ export function TatbikatSeridi() {
   // tatbikatı yönetebilene (J-163).
   const sim = modBul('simulasyon')
   const panelGorunur = !!sim && modGorunur(sim, oturum?.rol)
+  const bitir = useSimBitir()
+  const temizle = useSimulasyon((d) => d.temizle)
+  const [soruyor, setSoruyor] = useState(false)
 
   if (!isId) return null
+
+  function tatbikatiBitir() {
+    if (!isId) return
+    bitir.mutate(isId, {
+      onSuccess: () => {
+        setSoruyor(false)
+        temizle()
+      },
+    })
+  }
 
   const simIs = is?.isTipi === 'simulasyon' ? is : null
   // `alan` OPSIYONEL: bayat bir is kimliginle yenilendiginde sunucu 404 doner
@@ -68,12 +87,49 @@ export function TatbikatSeridi() {
             : `%${Math.round(simIs?.ilerleme ?? sonuc.data?.ilerleme ?? 0)}`}
       </Micro>
       {panelGorunur && (
-      <Link
-        to="/konsol/simulasyon"
-        className="ml-auto rounded-control border border-line-2 px-2 py-1 text-small text-ink-2 hover:bg-hover hover:text-ink"
-      >
-        Tatbikat paneli
-      </Link>
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          {soruyor ? (
+            <>
+              <span className="text-small text-ink-2">Bitirilsin mi? Koşunun hasar noktaları silinir.</span>
+              <button
+                type="button"
+                onClick={tatbikatiBitir}
+                disabled={bitir.isPending}
+                className="rounded-control bg-accent px-2.5 py-1 text-small font-semibold text-accent-ink disabled:opacity-50"
+              >
+                {bitir.isPending ? 'Bitiriliyor…' : 'Evet, bitir'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSoruyor(false)}
+                className="rounded-control border border-line-2 px-2 py-1 text-small text-ink-2 hover:bg-hover hover:text-ink"
+              >
+                Vazgeç
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/konsol/simulasyon"
+                className="rounded-control border border-line-2 px-2 py-1 text-small text-ink-2 hover:bg-hover hover:text-ink"
+              >
+                Tatbikat paneli
+              </Link>
+              <button
+                type="button"
+                onClick={() => setSoruyor(true)}
+                className="rounded-control border border-mid px-2 py-1 text-small text-ink hover:bg-hover"
+              >
+                Tatbikatı bitir
+              </button>
+            </>
+          )}
+          {bitir.isError && (
+            <span role="alert" className="text-small text-crit">
+              Bitirilemedi; yeniden dene.
+            </span>
+          )}
+        </span>
       )}
     </div>
   )

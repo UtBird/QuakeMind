@@ -119,7 +119,10 @@ def agirligi_hazirla(k: dict) -> Path:
     from huggingface_hub import hf_hub_download
 
     yol.parent.mkdir(parents=True, exist_ok=True)
-    return Path(hf_hub_download(repo_id=hf["repo"], filename=hf["dosya"], local_dir=str(yol.parent)))
+    # `surum`: sabit commit (J-187). Yoksa depodaki son hali iner; ayni adla
+    # baska dosya yuklenirse parmak izi tutmaz ve model yuklenmez.
+    return Path(hf_hub_download(repo_id=hf["repo"], filename=hf["dosya"], local_dir=str(yol.parent),
+                                revision=hf.get("surum")))
 
 
 def model_kur(k: dict):

@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Megaphone, Phone, SignOut } from '@phosphor-icons/react'
+import { Megaphone, Phone } from '@phosphor-icons/react'
 import { useOturum } from '@/kimlik/oturum'
 import { ROL_ADI } from '@/kimlik/roller'
 import { Marka } from '@/kabuk/Marka'
+import { ProfilMenusu } from '@/kimlik/ProfilMenusu'
 import { useCanliAkisDurumu } from '@/canli/canliAkis'
 import { enOnemli, onemi, useAktifBildirimler, type Bildirim } from '@/veri/bildirim'
 import type { IhbarTuru } from '@/veri/ihbar'
@@ -66,7 +67,7 @@ const PENCERE_BASLIGI: Record<IhbarTuru, string> = {
 }
 
 export function AfetzedeEkrani() {
-  const { oturum, cikisYap } = useOturum()
+  const { oturum } = useOturum()
   const cevrimici = useCevrimici()
   const { gps, iste } = useGpsKonumu()
   const [mahalle, setMahalle] = useState<Yer | null>(null)
@@ -145,7 +146,6 @@ export function AfetzedeEkrani() {
       <UstSerit
         onizleme={onizleme}
         rol={oturum ? ROL_ADI[oturum.rol] : null}
-        cikisYap={() => void cikisYap()}
         duyurular={duyuruListesi}
         duyurulariAc={() => setPencere('duyurular')}
       />
@@ -253,13 +253,11 @@ export function AfetzedeEkrani() {
 function UstSerit({
   onizleme,
   rol,
-  cikisYap,
   duyurular,
   duyurulariAc,
 }: {
   onizleme: boolean
   rol: string | null
-  cikisYap: () => void
   duyurular: Bildirim[]
   duyurulariAc: () => void
 }) {
@@ -269,7 +267,7 @@ function UstSerit({
   const o = onde ? onemi(onde.onem) : null
   return (
     <header className="flex h-topbar shrink-0 items-center gap-2 border-b border-line bg-panel px-3.5 sm:gap-gutter">
-      <Marka />
+      <Marka daraltilir="telefon" />
       <span className="hidden h-5 w-px bg-line-2 sm:block" />
       <span className="hidden text-body text-ink-2 sm:inline">Afetzede</span>
       {onizleme && rol && (
@@ -318,15 +316,7 @@ function UstSerit({
         <Phone size={18} weight="fill" aria-hidden />
         112'yi ara
       </a>
-      <button
-        type="button"
-        onClick={cikisYap}
-        aria-label="Çıkış"
-        className="flex h-9 shrink-0 items-center gap-1.5 rounded-control border border-line-2 px-2.5 text-body text-ink-2 hover:bg-hover hover:text-ink"
-      >
-        <SignOut size={18} aria-hidden />
-        <span className="hidden sm:inline">Çıkış</span>
-      </button>
+      <ProfilMenusu boyut="buyuk" />
     </header>
   )
 }

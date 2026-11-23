@@ -1,7 +1,8 @@
 import { sn } from '@/lib/sinif'
 
-/** `daraltilir`: dar ekranda (< 1280 px) yalnız simge kalır; üst çubuk sığsın. */
-export function Marka({ daraltilir = false }: { daraltilir?: boolean }) {
+/** `daraltilir`: dar ekranda (< 1280 px) yalnız simge kalır; üst çubuk sığsın.
+    `'telefon'`: yalnız telefonda (< 640 px) simge kalır (afetzede ve saha ekranı, J-183). */
+export function Marka({ daraltilir = false }: { daraltilir?: boolean | 'telefon' }) {
   return (
     <div className="flex shrink-0 items-center gap-2.5" title="QuakeMind">
       <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none">
@@ -38,7 +39,7 @@ export function Marka({ daraltilir = false }: { daraltilir?: boolean }) {
       <b
         className={sn(
           'font-cond text-subtitle font-semibold tracking-marka uppercase',
-          daraltilir && 'hidden xl:inline',
+          daraltilir === 'telefon' ? 'hidden sm:inline' : daraltilir && 'hidden xl:inline',
         )}
       >
         QuakeMind

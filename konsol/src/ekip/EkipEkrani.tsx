@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Crosshair, MapPin, MapTrifold, NavigationArrow, UsersThree, Warning } from '@phosphor-icons/react'
 import { Marka } from '@/kabuk/Marka'
 import { Rozet } from '@/kabuk/parcalar'
 import { useOturum } from '@/kimlik/oturum'
+import { ProfilMenusu } from '@/kimlik/ProfilMenusu'
 import { useCanliAkisDurumu } from '@/canli/canliAkis'
 import { useZaman } from '@/durum/zamanDurumu'
 import { dogruluk, mesafe, once, saat, sureMetni, tarihSaat } from '@/lib/bicim'
@@ -108,8 +109,7 @@ function useKonumPaylasimi(ekipId: string | null) {
 }
 
 export function EkipEkrani() {
-  const { oturum, cikisYap } = useOturum()
-  const git = useNavigate()
+  const { oturum } = useOturum()
   const ekibim = useEkibim()
   const akis = useCanliAkisDurumu((d) => d.durum)
   const ekip = ekibim.data?.ekip ?? null
@@ -123,7 +123,7 @@ export function EkipEkrani() {
     <div className="flex h-full flex-col bg-ground">
       <YeniDuyuruUyarisi oku={() => setDuyuruAcik(true)} />
       <header className="flex h-topbar shrink-0 items-center gap-2 border-b border-line bg-panel px-3.5">
-        <Marka />
+        <Marka daraltilir="telefon" />
         <span className="text-body text-ink-2">Saha ekibi</span>
         <span className="flex-1" />
         <span className="flex items-center gap-1.5 text-small text-ink-2" title="Görevin canlı gelir">
@@ -139,13 +139,7 @@ export function EkipEkrani() {
         >
           Konsol
         </Link>
-        <button
-          type="button"
-          onClick={() => void cikisYap().then(() => git('/giris', { replace: true }))}
-          className="h-9 rounded-control border border-line-2 px-3 text-body text-ink-2 hover:bg-hover hover:text-ink"
-        >
-          Çıkış
-        </button>
+        <ProfilMenusu boyut="buyuk" />
       </header>
       <SonDuyuru duyurular={duyurular} tumunuAc={() => setDuyuruAcik((a) => !a)} />
 

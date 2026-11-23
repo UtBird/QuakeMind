@@ -43,11 +43,17 @@ type SimDurumu = {
   hazir: SimKatman[]
   /** Haritada hangi rota varyantları görünsün. */
   varyantlar: Record<SimVaryantId, boolean>
+  /** Kapanmayı bilmeyen ekibin FİİLEN sürdüğü yol (çıkmazlar dahil). */
+  izlenenGoster: boolean
+  /** Sağ panelde seçilen görev (J-185): haritada yalnız o çiftin yolları. */
+  seciliGorev: string | null
 
   secimYaz: (yama: Partial<SimSecim>) => void
   kosuBasladi: (isId: string, parmakIzi: string, onbellekten: boolean) => void
   katmanHazir: (isId: string, katman: SimKatman) => void
   varyantDegistir: (id: SimVaryantId) => void
+  izlenenDegistir: () => void
+  gorevSec: (id: string | null) => void
   temizle: () => void
 }
 
@@ -87,9 +93,13 @@ export const useSimulasyon = create<SimDurumu>((set) => ({
   // Yenileme sonrası katmanların hangisinin hazır olduğu bilinmez; sonuç ucu
   // kısmi sonuç döndüğü için ekran eldekini çizer ve eksik bölüm boş kalır.
   hazir: [],
-  // Üçü de açık: sözleşme "üç rota" diyor (§5 madde 4). Kalabalık gelirse
-  // kullanıcı kapatır; varsayılanı biz daraltmayız.
-  varyantlar: { depremOncesi: true, kapanmali: true, riskli: true },
+  // Varsayılan YALNIZ iki çizgi (J-185): QuakeMind'ın güzergâhı ve kapanmayı
+  // bilmeyen ekibin sürdüğü yol — tatbikatın sorusu bu ikisinin farkı. Üç
+  // varyant + sürülen yol birlikte açıkken 5 görevde 20 çizgi üst üste
+  // biniyordu ve kullanıcı "çok karmaşık" dedi (24 Kasım). Öbür ikisi panelden açılır.
+  varyantlar: { depremOncesi: false, kapanmali: true, riskli: false },
+  izlenenGoster: true,
+  seciliGorev: null,
 
   secimYaz: (yama) => set((d) => ({ secim: { ...d.secim, ...yama } })),
 
@@ -99,6 +109,7 @@ export const useSimulasyon = create<SimDurumu>((set) => ({
       isId,
       parmakIzi,
       onbellekten,
+      seciliGorev: null,
       // Önbellekten gelen koşuda katman mesajı beklenmez: sonuç hazırdır.
       hazir: onbellekten ? ['hasar', 'kapanma', 'rota', 'gorev'] : [],
     })
@@ -111,10 +122,12 @@ export const useSimulasyon = create<SimDurumu>((set) => ({
 
   varyantDegistir: (id) =>
     set((d) => ({ varyantlar: { ...d.varyantlar, [id]: !d.varyantlar[id] } })),
+  izlenenDegistir: () => set((d) => ({ izlenenGoster: !d.izlenenGoster })),
+  gorevSec: (id) => set((d) => ({ seciliGorev: d.seciliGorev === id ? null : id })),
 
   temizle: () => {
     sakla(null)
-    return set({ isId: null, parmakIzi: null, onbellekten: false, hazir: [] })
+    return set({ isId: null, parmakIzi: null, onbellekten: false, hazir: [], seciliGorev: null })
   },
 }))
 

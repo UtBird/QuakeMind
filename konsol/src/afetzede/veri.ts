@@ -129,6 +129,9 @@ export type SokakRotasi = {
   uzunlukM: number
   yuruyusDk: number
   kaynak: string
+  /** Bilinen kapanmalara karşı denetim (J-181): servis kapanmayı bilmez,
+      sunucu adayları denetleyip en az kapanmadan geçeni seçer. */
+  kapanma: { cevrede: number; rotada: number; denenenRota: number; sapmaDenendi: boolean }
   uyari: string
 }
 
@@ -178,7 +181,8 @@ export function useYurumeRotasi(konum: { lon: number; lat: number } | null, hede
 }
 
 /** Yedek yol tarifi: dış servis (OSRM), yalnız afetzede isteyince ve yalnız
-    kendi yol ağımızın olmadığı yerde. Bilinen kapanmaları bilmez. */
+    kendi yol ağımızın olmadığı yerde. Servis kapanmaları bilmez; sunucu
+    alternatifleri bilinen kapanmalara karşı denetler (J-181). */
 export function useSokakRotasi() {
   return useMutation({
     mutationFn: (g: { baslangicLat: number; baslangicLon: number; hedefLat: number; hedefLon: number }) =>
@@ -255,4 +259,41 @@ export function konumAlanlari(k: EtkinKonum): Pick<
   return k.kaynak === 'gps'
     ? { lon: k.lon, lat: k.lat, konumKaynagi: 'gps', konumDogrulukM: Math.round(k.dogrulukM) }
     : { lon: k.lon, lat: k.lat, konumKaynagi: 'mahalle', mahalle: k.yer.ad }
+}
+
+/* ---- Çevredeki tehlike (J-180) --------------------------------------------
+   Kapalı yollar ve hasar bildirilen bölgeler. Koordinatörün ısı haritası
+   afetzedeye açık değil (SOS konumları içerir, J-42); bu uç SOS'u saymaz ve
+   yalnız en az 3 bildirimli ~250 m'lik kareleri döner. */
+
+export type HasarBolgesi = {
+  /** [güney, batı, kuzey, doğu] */
+  kare: [number, number, number, number]
+  sayi: number
+  seviye: 1 | 2 | 3
+  kaynaklar: { uydu: number; fotograf: number; metin: number }
+  sonZaman: number
+}
+
+export type KapaliYol = { id: string; lon: number; lat: number; cizgi: [number, number][] | null }
+
+export type CevreYaniti = {
+  kapaliYollar: KapaliYol[]
+  hasarBolgeleri: HasarBolgesi[]
+  kaynak: { kapaliYollar: string; hasarBolgeleri: string; uyari: string }
+  esik: { enAzBildirim: number; kareDerece: number; gun: number }
+}
+
+export const CEVRE_YARICAP_KM = 3
+
+export function useCevre(konum: { lon: number; lat: number } | null) {
+  // ~100 m'ye yuvarlanır: GPS'in her küçük oynamasında yeniden istenmesin.
+  const k = konum ? { lat: Math.round(konum.lat * 1000) / 1000, lon: Math.round(konum.lon * 1000) / 1000 } : null
+  return useQuery({
+    queryKey: ['afetzede', 'cevre', k?.lat, k?.lon],
+    enabled: !!k,
+    staleTime: 5 * 60_000,
+    placeholderData: (onceki) => onceki,
+    queryFn: () => apiGet<CevreYaniti>('/api/afetzede/cevre', { lat: k!.lat, lon: k!.lon, yaricapKm: CEVRE_YARICAP_KM }),
+  })
 }

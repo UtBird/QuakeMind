@@ -49,6 +49,17 @@ ALGORITMA = "HS256"
 
 # --- sifre -----------------------------------------------------------------
 
+#: Gecici sifre alfabesi: karistirilan karakterler (0/O, 1/l/I) yok; telefonda
+#: okunup elle yazilacak.
+GECICI_SIFRE_ALFABESI = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def gecici_sifre(uzunluk: int = 12) -> str:
+    """Konsolun ve hesap aracinin urettigi tek kullanimlik sifre (ilk giriste
+    degistirilir). Tek kaynak: uclar/oturum.py ve araclar_kullanici.py."""
+    return "".join(secrets.choice(GECICI_SIFRE_ALFABESI) for _ in range(uzunluk))
+
+
 def sifre_ozetle(sifre: str) -> str:
     return bcrypt.hashpw(sifre.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 

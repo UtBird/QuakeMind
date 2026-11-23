@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+import { CaretDown } from '@phosphor-icons/react'
 import { Amac, Bolum, HazirSecenekler, InceAyar, SuAn, Teknik, VeriYok } from '@/kabuk/Panel'
 import { Anahtar, Kaydirici, Micro, Rozet } from '@/kabuk/parcalar'
 import { useSimulasyon } from '@/durum/simulasyonDurumu'
@@ -14,10 +16,12 @@ import {
   VARYANT_ACIKLAMA,
   VARYANT_ADI,
   VARYANT_SIRASI,
+  KOL_SIRASI,
   type SimAlan,
   type SimSonuc,
 } from '@/veri/simulasyon'
-import { mesafe, sayi, sayiVeyaYok, sureMetni } from '@/lib/bicim'
+import { mesafe, sayi } from '@/lib/bicim'
+import { sn } from '@/lib/sinif'
 
 /* ---------------------------------------------------------------------------
    Simülasyon (tatbikat) modu — SIMULASYON_SOZLESMESI.md §5.
@@ -39,6 +43,8 @@ export function SimulasyonSol() {
   const hazir = useSimulasyon((d) => d.hazir)
   const varyantlar = useSimulasyon((d) => d.varyantlar)
   const varyantDegistir = useSimulasyon((d) => d.varyantDegistir)
+  const izlenenGoster = useSimulasyon((d) => d.izlenenGoster)
+  const izlenenDegistir = useSimulasyon((d) => d.izlenenDegistir)
 
   const alanlar = useSimAlanlar()
   const modeller = useSimModeller()
@@ -57,7 +63,9 @@ export function SimulasyonSol() {
       şerit kalkar, tatbikat katmanları düşer, konsol normal akışa döner. */
   function tatbikatiBitir() {
     if (!isId) return
-    bitir.mutate(isId, { onSuccess: () => temizle(), onError: () => temizle() })
+    // Hata olursa ekran temizlenmez (J-186): eskiden onError da temizliyordu,
+    // sunucu noktaları silemeden tatbikat "bitti" görünüyordu.
+    bitir.mutate(isId, { onSuccess: () => temizle() })
   }
 
   function baslat() {
@@ -170,7 +178,9 @@ export function SimulasyonSol() {
         <button
           type="button"
           onClick={baslat}
-          disabled={!secim.alanId || !secim.katmanId || !secim.modelId || kos.isPending || koşuyor}
+          disabled={
+            !secim.alanId || !secim.katmanId || !secim.modelId || model?.hazir === false || kos.isPending || koşuyor
+          }
           className="mt-3 w-full rounded-control bg-accent px-3 py-2.5 text-body font-semibold text-accent-ink disabled:opacity-40"
         >
           {koşuyor ? 'Tatbikat koşuyor…' : isId ? 'Yeniden koştur' : 'Tatbikatı başlat'}
@@ -188,6 +198,17 @@ export function SimulasyonSol() {
           >
             {bitir.isPending ? 'Bitiriliyor…' : 'Tatbikatı bitir'}
           </button>
+        )}
+        {bitir.isError && (
+          <p role="alert" className="mt-2 text-small text-crit">
+            Tatbikat bitirilemedi; yeniden dene.
+          </p>
+        )}
+        {model?.hazir === false && (
+          <p className="mt-2 text-small text-ink-2">
+            Bu modelin ağırlığı sunucuda kurulu değil; başka bir model seç ya da ağırlığı kur
+            (deploy/README.md, "Analiz dosyaları").
+          </p>
         )}
         {kos.isError && (
           <p role="alert" className="mt-2 text-small text-crit">
@@ -210,11 +231,21 @@ export function SimulasyonSol() {
 
       <IlerlemeBolumu />
 
-      <Bolum baslik="Rota varyantları">
+      {/* Haritada hangi çizgiler (J-185). Varsayılan iki: QuakeMind'ın güzergâhı
+          ve kapanmayı bilmeyen ekibin fiilen sürdüğü yol. Dört çizgi birlikte
+          açıkken 5 görevde 20 çizgi üst üste biniyordu. */}
+      <Bolum baslik="Haritada göster">
         <Amac>
-          Aynı ekip–afetzede çifti, üç planlama kuralıyla. Üçü de PLANLANAN yoldur;
-          ekibin fiilen sürdüğü yol ayrı çizilir (aşağıya bakınız).
+          Varsayılan iki çizgi: QuakeMind'ın kapalı yolları bilerek bulduğu güzergâh ve kapanmayı
+          bilmeyen ekibin fiilen sürdüğü yol. Sağdaki görev listesinden bir görev seçince yalnız o
+          görünür.
         </Amac>
+        <Anahtar
+          acik={izlenenGoster}
+          etiket="Bilmeyen ekibin sürdüğü yol"
+          onDegis={izlenenDegistir}
+          ek={<Micro>çıkmazlar dahil</Micro>}
+        />
         {VARYANT_SIRASI.map((v) => (
           <Anahtar
             key={v}
@@ -230,22 +261,6 @@ export function SimulasyonSol() {
           />
         ))}
       </Bolum>
-
-      {sonuc.data?.izlenenYollar && (
-        <Bolum baslik="Fiilen sürülen yol">
-          <Amac>
-            Manşet sayı buradan gelir: kapanmayı bilmeyen ekip yola çıkar, kapalı
-            sokağa varınca öğrenir ve geri döner. Haritada o yolun tamamı çizilir —
-            çıkmazlar dahil.
-          </Amac>
-          {Object.entries(sonuc.data.izlenenYollar).map(([ad, hatlar]) => (
-            <div key={ad} className="flex items-baseline justify-between gap-2 py-0.5">
-              <span className="text-small text-ink">{ad}</span>
-              <Micro>{sayi(hatlar.length)} ekip</Micro>
-            </div>
-          ))}
-        </Bolum>
-      )}
     </>
   )
 }
@@ -253,7 +268,9 @@ export function SimulasyonSol() {
 /** Madde 6: ilerleme YALNIZ canlı akıştan; burada zamanlayıcı yok. */
 function IlerlemeBolumu() {
   const is = useIsler(sonIsSec)
-  if (!is || is.isTipi !== 'simulasyon') return null
+  const isId = useSimulasyon((d) => d.isId)
+  // Tatbikat bitince eski iş kaydı "%0 · Tatbikat bitirildi" diye kalıyordu (J-186).
+  if (!isId || !is || is.isTipi !== 'simulasyon') return null
   const bitti = is.durum === 'bitti'
   return (
     <Bolum baslik="Koşu">
@@ -306,12 +323,30 @@ function VaryantOzeti({ sonuc, varyant }: { sonuc: SimSonuc | undefined; varyant
   return <Micro>ort. {mesafe(ortalama)}</Micro>
 }
 
-/* ---- sağ panel ---------------------------------------------------------- */
+/* ---- sağ panel (J-185) ----------------------------------------------------
+   Eski panel dokuz bölümü alt alta diziyordu (kaynak, hasar, kapanma, kamera,
+   metin, arama, süreler, ölçüm, kollar, görevler); manşet sonuç en altta,
+   hiçbir satır tıklanmıyordu. Kullanıcı "aşağı doğru uzayan, okunaksız,
+   etkileşimsiz" dedi (24 Kasım). Yeni sıra soruya göre:
+
+     1. Sonuç    — tatbikatın tek cevabı: kapanmayı bilmek ne kazandırdı.
+     2. Görevler — tıkla: haritada yalnız o ekip–afetzede çifti, harita yaklaşır.
+     3. Bulgular — dört kutu; kutu o katmanı açıp kapatır.
+     4. Ayrıntı  — kamera, metin, kaynak, ölçüm: kapalı başlar.
+--------------------------------------------------------------------------- */
+
+const dakika = (dk: number) =>
+  dk < 1 ? `${Math.round(dk * 60)} sn` : `${dk.toFixed(1).replace('.', ',')} dk`
+
+const KOL_KISA: Record<string, string> = {
+  'Kapanmayı bilmeyen ekip': 'Bilmeyen ekip',
+  'Telsizle paylaşan filo': 'Telsizle paylaşan filo',
+  QuakeMind: 'QuakeMind',
+}
 
 export function SimulasyonSag() {
   const isId = useSimulasyon((d) => d.isId)
   const sonuc = useSimSonuc(isId)
-  const katmanlar = useKonsol((d) => d.katmanlar)
   const s = sonuc.data
 
   if (!isId) {
@@ -335,14 +370,12 @@ export function SimulasyonSag() {
       </Bolum>
     )
   }
-  // Koşu kuyruktayken ya da hata verdiğinde yanıtta künye alanları YOKTUR;
-  // tip artık bunu söylüyor (J-104). Eskiden burada `s.kaynak.gercek`
-  // okunuyordu ve bayat bir iş kimliğiyle yenileyince panel çöküyordu.
+  // Koşu kuyruktayken ya da hata verdiğinde yanıtta künye alanları YOKTUR (J-104).
   if (!s.alan || !s.kaynak || !s.model) {
     return (
       <Bolum baslik="Tatbikat">
         {s.durum === 'hata' ? (
-          <VeriYok ne="Koşu" neden="koşu hata verdi; yeniden başlat" />
+          <VeriYok ne="Koşu" neden={s.mesaj ? `koşu hata verdi: ${s.mesaj}` : 'koşu hata verdi; yeniden başlat'} />
         ) : (
           <p className="text-small text-ink-3">Künye bekleniyor…</p>
         )}
@@ -352,257 +385,383 @@ export function SimulasyonSag() {
 
   return (
     <>
-      {/* Madde 3: her katmanın sağlayıcısı, tarihi, GSD'si; üretilen her şey etiketli. */}
-      <Bolum baslik="Kaynak" ek={<Rozet ton={s.kaynak.gercek ? 'ok' : 'mid'}>{s.kaynak.gercek ? 'Gerçek' : 'Senaryo'}</Rozet>}>
-        <p className="text-body text-ink">{s.alan.ad}</p>
-        <p className="mt-1 text-small text-ink-2">
-          {s.kaynak.saglayici} · çekim {s.kaynak.cekimTarihi}
-          {s.kaynak.gsdM != null && ` · ${s.kaynak.gsdM} m/piksel`}
-        </p>
-        <p className="mt-2 text-small text-ink-3">
-          Model: {s.model.mimari} · eşik {s.model.esik.toString().replace('.', ',')}
-        </p>
-        <Teknik>Parmak izi {s.parmakIzi.slice(0, 20)}… — aynı parmak izi aynı sonucu verir.</Teknik>
-      </Bolum>
+      <SonucBolumu s={s} />
+      <GorevBolumu s={s} />
+      <BulguBolumu s={s} />
+      <Ayrintilar s={s} />
+    </>
+  )
+}
 
-      {s.hasar && (
-        <Bolum baslik="Hasar" ek={<Micro>{katmanlar.simHasar ? 'katman açık' : 'katman kapalı'}</Micro>}>
-          <p className="text-body text-ink">{ORAN(s.hasar.hasarliPikselOrani)} piksel hasarlı</p>
-          {s.hasar.noktaSayisi != null && (
-            <p className="mt-1 text-small text-ink-2">{sayi(s.hasar.noktaSayisi)} hasar noktası</p>
-          )}
-          {s.hasar.oncesiKontrol?.kosuldu && (
-            <p className="mt-2 text-small text-ink-3">
-              Kontrol koşusu (deprem öncesi görüntü): {ORAN(s.hasar.oncesiKontrol.hasarliPikselOrani)} —
-              yanlış alarm tabanı.
-            </p>
-          )}
-        </Bolum>
+/** 1. Tatbikatın cevabı ve üç kolun karşılaştırması. */
+function SonucBolumu({ s }: { s: SimSonuc }) {
+  const kollar = s.referansAjanlar ?? {}
+  const bilmeyen = kollar['Kapanmayı bilmeyen ekip']
+  const qm = kollar['QuakeMind']
+  const satirlar = KOL_SIRASI.filter((ad) => kollar[ad]?.ortalamaSureDk != null).map((ad) => ({
+    ad,
+    ...kollar[ad],
+  }))
+  const enUzun = Math.max(...satirlar.map((k) => k.ortalamaSureDk ?? 0), 0.001)
+  const kazanc =
+    bilmeyen?.ortalamaSureDk != null && qm?.ortalamaSureDk != null
+      ? bilmeyen.ortalamaSureDk - qm.ortalamaSureDk
+      : null
+  const yuzde = kazanc != null && bilmeyen?.ortalamaSureDk ? (kazanc / bilmeyen.ortalamaSureDk) * 100 : null
+
+  return (
+    <Bolum
+      baslik="Sonuç"
+      ek={<Rozet ton={s.kaynak!.gercek ? 'ok' : 'mid'}>{s.kaynak!.gercek ? 'Gerçek görüntü' : 'Senaryo'}</Rozet>}
+    >
+      {kazanc == null ? (
+        <p className="text-small text-ink-2">Kıyas hesaplanamadı: araçla ulaşılan ortak görev yok.</p>
+      ) : kazanc > 0.005 ? (
+        <p className="text-subtitle leading-snug text-ink">
+          Kapanmaları önceden bilen ekip ortalama{' '}
+          <span className="font-semibold text-accent">{dakika(kazanc)}</span> daha erken ulaştı
+          {yuzde != null && <span className="text-ink-2"> (%{Math.round(yuzde)})</span>}.
+        </p>
+      ) : (
+        <p className="text-subtitle leading-snug text-ink">
+          Bu alanda kapanmalar ekipleri yavaşlatmadı: yol ağı her görev için açık bir yol bıraktı.
+        </p>
+      )}
+      {bilmeyen && (bilmeyen.toplamKesif ?? 0) > 0 && (
+        <p className="mt-1.5 text-small text-ink-2">
+          Bilmeyen ekip {sayi(bilmeyen.toplamKesif ?? 0)} kez kapalı sokağa girip döndü
+          {(bilmeyen.uDonusuSayisi ?? 0) > 0 && `, ${sayi(bilmeyen.uDonusuSayisi ?? 0)} U dönüşü yaptı`}
+          {qm && (qm.toplamKesif ?? 0) === 0 && '; QuakeMind ekibi hiç'}.
+        </p>
       )}
 
+      {satirlar.length > 0 && (
+        <ul className="mt-3 flex flex-col gap-2" aria-label="Kolların ortalama varış süresi">
+          {satirlar.map((k) => (
+            <li key={k.ad}>
+              <div className="flex items-baseline justify-between gap-2 text-small">
+                <span className={k.ad === 'QuakeMind' ? 'text-ink' : 'text-ink-2'}>{KOL_KISA[k.ad] ?? k.ad}</span>
+                <span className="font-mono text-ink">{dakika(k.ortalamaSureDk!)}</span>
+              </div>
+              <div className="mt-1 h-1.5 overflow-hidden rounded-badge bg-raised">
+                <div
+                  className={sn('h-full rounded-badge', k.ad === 'QuakeMind' ? 'bg-accent' : 'bg-ink-3')}
+                  style={{ width: `${((k.ortalamaSureDk ?? 0) / enUzun) * 100}%` }}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-3 text-small text-ink-3">
+        {bilmeyen?.ortakGorev != null && `${sayi(bilmeyen.ortakGorev)} ortak görevin ortalaması`}
+        {s.olcum?.hizKmh != null && `, ${s.olcum.hizKmh} km/sa varsayımıyla`}. Tatbikatta kapanmalar
+        modelin bulduklarıdır: bu, modelin doğruluğunu değil, kapanmayı önceden bilmenin kazandırdığı
+        süreyi ölçer.
+      </p>
+    </Bolum>
+  )
+}
+
+/** 2. Görevler: satıra tıkla, haritada yalnız o çift. */
+function GorevBolumu({ s }: { s: SimSonuc }) {
+  const secili = useSimulasyon((d) => d.seciliGorev)
+  const gorevSec = useSimulasyon((d) => d.gorevSec)
+  const gorevler = s.gorevler ?? []
+  if (!gorevler.length) return null
+  const kol = (ad: string, id: string) => s.gorevKollari?.[ad]?.find((k) => k.gorevId === id)
+
+  return (
+    <Bolum
+      baslik="Görevler"
+      ek={
+        secili ? (
+          <button type="button" onClick={() => gorevSec(null)} className="text-small text-accent hover:underline">
+            Tümünü göster
+          </button>
+        ) : (
+          <Micro>tıkla: haritada yalnız o</Micro>
+        )
+      }
+    >
+      <ul className="-mx-1 flex flex-col gap-1">
+        {gorevler.map((g) => {
+          const q = kol('QuakeMind', g.id)
+          const b = kol('Kapanmayı bilmeyen ekip', g.id)
+          const rota = s.rotalar?.find((r) => r.gorevId === g.id)
+          const acik = secili === g.id
+          return (
+            <li key={g.id}>
+              <button
+                type="button"
+                aria-pressed={acik}
+                onClick={() => gorevSec(g.id)}
+                className={sn(
+                  'w-full rounded-control border px-2 py-1.5 text-left transition-colors duration-150 ease-out-qm',
+                  acik ? 'border-accent bg-raised' : 'border-transparent hover:bg-hover',
+                )}
+              >
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className="text-body text-ink">
+                    {g.ekipAd.split(' · ')[0]} → {g.afetzedeAd}
+                  </span>
+                  <span className="font-mono text-small text-ink">
+                    {q?.ulasti && q.sureDk != null ? dakika(q.sureDk) : '—'}
+                  </span>
+                </span>
+                <span className="mt-0.5 flex items-baseline justify-between gap-2 text-small text-ink-3">
+                  <span>
+                    {b?.ulasti && b.sureDk != null
+                      ? `bilmeyen ${dakika(b.sureDk)}${b.cikmaz ? ` · ${b.cikmaz} çıkmaz` : ''}`
+                      : q?.ulasti === false
+                        ? 'araçla ulaşılamadı'
+                        : 'kıyas yok'}
+                  </span>
+                  {g.sonAdimYurumeM != null && <span>son {mesafe(g.sonAdimYurumeM)} yürüyerek</span>}
+                </span>
+              </button>
+              {acik && (
+                <div className="mx-2 mt-1 mb-1.5 space-y-0.5 text-small text-ink-2">
+                  {q?.mesafeM != null && <p>QuakeMind güzergâhı {mesafe(q.mesafeM)}</p>}
+                  {b?.mesafeM != null && (
+                    <p>
+                      Bilmeyen ekip {mesafe(b.mesafeM)} sürdü
+                      {b.uDonusu ? `, ${b.uDonusu} U dönüşü` : ''}
+                    </p>
+                  )}
+                  {rota?.varyantlar.depremOncesi?.uzunlukM != null && (
+                    <p>Kapanma olmasaydı {mesafe(rota.varyantlar.depremOncesi.uzunlukM)}</p>
+                  )}
+                  <p className="text-ink-3">
+                    Ekip: {g.gercekTesis ? 'gerçek tesis' : 'mahalle giriş ağzı (OSM)'} · afetzede konumu senaryo
+                  </p>
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </Bolum>
+  )
+}
+
+type BulguKatmani = 'simHasar' | 'simKapanma' | 'simKamera' | 'simMetin'
+
+/** 3. Bulgular: dört kutu; kutu haritadaki katmanı açıp kapatır. */
+function BulguBolumu({ s }: { s: SimSonuc }) {
+  const katmanlar = useKonsol((d) => d.katmanlar)
+  const katmanDegistir = useKonsol((d) => d.katmanDegistir)
+  const kamera = s.kanallar?.kamera?.kayitlar ?? []
+  const metin = s.kanallar?.metin?.kayitlar ?? []
+  const kutular: { id: BulguKatmani; deger: string; ad: string; yok: boolean }[] = [
+    { id: 'simHasar', deger: s.hasar ? ORAN(s.hasar.hasarliPikselOrani) : '—', ad: 'piksel hasarlı', yok: !s.hasar },
+    {
+      id: 'simKapanma',
+      deger: s.kapanma?.kapaliKenarSayisi != null ? sayi(s.kapanma.kapaliKenarSayisi) : '—',
+      ad: 'kapalı sokak parçası',
+      yok: !s.kapanma,
+    },
+    {
+      id: 'simKamera',
+      deger: sayi(kamera.length),
+      ad: `fotoğraf · ${sayi(kamera.reduce((n, k) => n + (k.catlakSayisi ?? 0), 0))} çatlak`,
+      yok: !kamera.length,
+    },
+    {
+      id: 'simMetin',
+      deger: sayi(metin.length),
+      ad: `metin ihbarı · ${sayi(metin.filter((k) => k.elendi).length)} elendi`,
+      yok: !metin.length,
+    },
+  ]
+  return (
+    <Bolum baslik="Bulgular" ek={<Micro>kutu: katmanı aç / kapat</Micro>}>
+      <div className="grid grid-cols-2 gap-1.5">
+        {kutular.map((k) => (
+          <button
+            key={k.id}
+            type="button"
+            aria-pressed={katmanlar[k.id]}
+            disabled={k.yok}
+            onClick={() => katmanDegistir(k.id)}
+            className={sn(
+              'rounded-control border px-2.5 py-2 text-left transition-colors duration-150 ease-out-qm disabled:opacity-50',
+              katmanlar[k.id] ? 'border-line-2 bg-raised' : 'border-line bg-panel opacity-70',
+              !k.yok && 'hover:border-accent',
+            )}
+          >
+            <span className="block text-subtitle text-ink">{k.deger}</span>
+            <span className="block text-small text-ink-2">{k.ad}</span>
+            <span className="mt-0.5 block text-small text-ink-3">{katmanlar[k.id] ? 'haritada' : 'gizli'}</span>
+          </button>
+        ))}
+      </div>
       {s.kapanma && (
-        <Bolum baslik="Kapanan yollar">
-          <p className="text-body text-ink">
-            {sayiVeyaYok(s.kapanma.kapaliKenarSayisi)} kapalı kenar
-            {s.kapanma.cezaliKenarSayisi != null && ` · ${sayi(s.kapanma.cezaliKenarSayisi)} cezalı`}
-          </p>
-          <p className="mt-1 text-small text-ink-3">
-            Kapanma yarıçapı {s.kapanma.yaricapM} m; hasar noktasına bu kadar yakın kenar kapalı sayıldı.
-          </p>
-        </Bolum>
+        <p className="mt-2 text-small text-ink-3">
+          {s.kapanma.yaricapM > 0
+            ? `Kapalı yol: hasar noktasına ${s.kapanma.yaricapM} m'den yakın sokak parçası.`
+            : 'Kapalı yol: modelin bulduğu hasar sokağın üstüne taşıyor (yalnız yol üstündeki hasar kapatır).'}
+        </p>
       )}
+    </Bolum>
+  )
+}
 
-      {/* Yer seviyesi kanallar (J-108). Uydu mahalleye yukarıdan baktı; bu
-          ikisi yerden bakıyor. Neyin gerçek neyin üretilmiş olduğu her
-          satırda yazar — kural 1. */}
-      {s.kanallar?.kamera && (
-        <Bolum
-          baslik="Kamera tespiti"
-          ek={<Micro>{katmanlar.simKamera ? 'katman açık' : 'katman kapalı'}</Micro>}
-        >
-          {s.kanallar.kamera.hata ? (
-            <p className="text-small text-crit">{s.kanallar.kamera.hata}</p>
-          ) : s.kanallar.kamera.kayitlar.length === 0 ? (
-            <p className="text-small text-ink-3">{s.kanallar.kamera.not ?? 'Kayıt yok.'}</p>
+function Ayrinti({ baslik, ek, children }: { baslik: string; ek?: ReactNode; children: ReactNode }) {
+  return (
+    <details className="group border-b border-line last:border-b-0">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-small text-ink-2 hover:text-ink">
+        <span>{baslik}</span>
+        <span className="flex items-center gap-2">
+          {ek}
+          <CaretDown size={14} className="transition-transform group-open:rotate-180" aria-hidden />
+        </span>
+      </summary>
+      <div className="px-3 pb-3">{children}</div>
+    </details>
+  )
+}
+
+/** 4. Ayrıntılar: kapalı başlar; yalnız merak eden açar. */
+function Ayrintilar({ s }: { s: SimSonuc }) {
+  const kamera = s.kanallar?.kamera
+  const metin = s.kanallar?.metin
+  return (
+    <>
+      {kamera && (
+        <Ayrinti baslik="Kamera tespitleri" ek={<Micro>{sayi(kamera.kayitlar.length)}</Micro>}>
+          {kamera.hata ? (
+            <p className="text-small text-crit">{kamera.hata}</p>
+          ) : kamera.kayitlar.length === 0 ? (
+            <p className="text-small text-ink-3">{kamera.not ?? 'Kayıt yok.'}</p>
           ) : (
             <>
-              <p className="text-body text-ink">
-                {sayi(s.kanallar.kamera.kayitlar.length)} fotoğraf ·{' '}
-                {sayi(s.kanallar.kamera.kayitlar.reduce((n, k) => n + k.catlakSayisi, 0))} çatlak ·{' '}
-                {sayi(s.kanallar.kamera.kayitlar.reduce((n, k) => n + k.binaSayisi, 0))} bina
-              </p>
-              <ul className="mt-2 flex flex-col gap-1.5">
-                {s.kanallar.kamera.kayitlar.map((k) => (
+              <ul className="flex flex-col gap-1.5">
+                {kamera.kayitlar.map((k) => (
                   <li key={k.id} className="flex flex-col">
                     <span className="text-small text-ink">{k.etiket}</span>
-                    <Micro>
-                      güven %{(k.guven * 100).toFixed(0)} · çıkarım {Math.round(k.cikarimMs)} ms ·{' '}
-                      {k.foto.lisans} / {k.foto.yazar}
-                    </Micro>
+                    <span className="text-small text-ink-3">
+                      güven %{(k.guven * 100).toFixed(0)} · {sayi(k.catlakSayisi ?? 0)} çatlak ·{' '}
+                      {sayi(k.binaSayisi ?? 0)} bina ·{' '}
+                      {k.foto.lisans}
+                    </span>
                   </li>
                 ))}
               </ul>
               <Teknik>
-                Fotoğraflar gerçek: 6 Şubat 2023 depremi, Wikimedia Commons (Public domain ve CC
-                BY-SA 4.0), künyeleri SHA-256 ile kayıtlı. Model çıktısı da gerçek. Haritadaki
-                konumları ÜRETİLDİ — tohumla, modelin hasarlı bulduğu alanlardan seçildi.
+                Fotoğraflar gerçek (6 Şubat 2023, Wikimedia Commons) ve model çıktısı gerçek; haritadaki
+                konumları tohumla, modelin hasarlı bulduğu alanlardan seçildi.
               </Teknik>
             </>
           )}
-        </Bolum>
+        </Ayrinti>
       )}
 
-      {s.kanallar?.metin && (
-        <Bolum
-          baslik="Metin ihbarı"
-          ek={<Micro>{katmanlar.simMetin ? 'katman açık' : 'katman kapalı'}</Micro>}
-        >
-          {s.kanallar.metin.hata ? (
-            <p className="text-small text-crit">{s.kanallar.metin.hata}</p>
-          ) : s.kanallar.metin.kayitlar.length === 0 ? (
-            <p className="text-small text-ink-3">{s.kanallar.metin.not ?? 'Kayıt yok.'}</p>
+      {metin && (
+        <Ayrinti baslik="Metin ihbarları" ek={<Micro>{sayi(metin.kayitlar.length)}</Micro>}>
+          {metin.hata ? (
+            <p className="text-small text-crit">{metin.hata}</p>
+          ) : metin.kayitlar.length === 0 ? (
+            <p className="text-small text-ink-3">{metin.not ?? 'Kayıt yok.'}</p>
           ) : (
             <>
-              <p className="text-body text-ink">
-                {sayi(s.kanallar.metin.kayitlar.length)} ihbar ·{' '}
-                {sayi(s.kanallar.metin.kayitlar.filter((k) => k.elendi).length)} elendi
-              </p>
-              <ul className="mt-2 flex flex-col gap-2">
-                {s.kanallar.metin.kayitlar.map((k) => (
+              <ul className="flex flex-col gap-2">
+                {metin.kayitlar.map((k) => (
                   <li key={k.id} className="flex flex-col">
-                    <span className="text-small text-ink">{k.etiket}</span>
-                    <Micro>
-                      aciliyet {k.aciliyet}/5 · güven %{(k.guven * 100).toFixed(0)} ·{' '}
-                      {Math.round(k.cikarimMs)} ms
-                    </Micro>
+                    <span className="text-small text-ink">
+                      {k.etiket} <span className="text-ink-3">· aciliyet {k.aciliyet}/5</span>
+                    </span>
                     <span className="mt-0.5 text-small text-ink-2">“{k.metin}”</span>
                   </li>
                 ))}
               </ul>
               <Teknik>
-                Metinler ÜRETİLMİŞTİR — elle yazıldı, gerçek çağrı değil. BERTurk sınıflandırması ve
-                varlık ismi tanıma gerçek olarak koştu. Haritadaki konumları da üretildi: modelin
-                coğrafi kodlayıcısı mahalle merkezine düşürüyor ve 500 m&apos;lik tatbikat kutusunun
-                dışında kalıyor.
+                Metinler üretilmiştir (elle yazıldı); BERTurk sınıflandırması gerçek koştu. Konumları da
+                üretildi.
               </Teknik>
             </>
           )}
-        </Bolum>
+        </Ayrinti>
       )}
 
-      {/* Madde 5: iki arama yan yana. Uç rotaları henüz vermiyorsa kart çıkmaz. */}
-      {s.rotalar?.length ? <AramaKarti sonuc={s} /> : null}
-
-      {/* Sunucunun verdiği aşama süreleri (sözleşmede yok, ucun ölçümü). */}
-      {s.sureler && (
-        <Bolum baslik="Koşu süreleri" ek={<Micro>sunucunun ölçümü</Micro>}>
-          {Object.entries(s.sureler)
-            .filter(([ad]) => ad !== 'total')
-            .map(([ad, ms]) => (
-              <div key={ad} className="flex items-baseline justify-between gap-2 py-0.5">
-                <span className="text-small text-ink-2">{ASAMA_ADI[ad] ?? ad}</span>
-                <span className="font-mono text-small text-ink">{(ms / 1000).toFixed(1).replace('.', ',')} sn</span>
-              </div>
-            ))}
-          {s.sureler.total != null && (
-            <p className="mt-1 text-small text-ink-3">
-              Toplam {(s.sureler.total / 1000).toFixed(1).replace('.', ',')} sn
-            </p>
-          )}
-          {s.gunluk?.length ? <Teknik>{s.gunluk[s.gunluk.length - 1]}</Teknik> : null}
-        </Bolum>
-      )}
-
-      {s.olcum && (
-        <Bolum baslik="Ölçüm" ek={<Micro>{sayi(s.olcum.ciftSayisi)} çift</Micro>}>
-          {s.olcum.ortalamaUzamaM != null && s.olcum.ortalamaUzamaYuzde != null ? (
-            <p className="text-body text-ink">
-              Ortalama uzama {mesafe(s.olcum.ortalamaUzamaM)} (%
-              {s.olcum.ortalamaUzamaYuzde.toFixed(1).replace('.', ',')})
-            </p>
-          ) : (
-            <p className="text-body text-ink-2">
-              Uzama hesaplanamadı: uzama yalnız araçla ulaşılan çiftlerden alınır, bu koşuda öyle
-              çift yok.
-            </p>
-          )}
-          {s.olcum.enBuyukUzamaM != null && (
-            <p className="mt-1 text-small text-ink-2">En çok uzama {mesafe(s.olcum.enBuyukUzamaM)}</p>
-          )}
-          {s.olcum.ortalamaYurumeM != null && (
-            <p className="mt-1 text-small text-ink-2">
-              Son adım yürüme, ortalama {mesafe(s.olcum.ortalamaYurumeM)}
-              {s.olcum.yurumeGerekenCift != null && ` (${sayi(s.olcum.yurumeGerekenCift)} çiftte)`}
-            </p>
-          )}
-          <p className="mt-1 text-small text-ink-3">
-            Ekranda {sayi(s.gorevler?.length ?? 0)} görev çizili; ölçüm bütün çiftlerden.
-            {s.olcum.ulasilamayanCift > 0 && ` ${sayi(s.olcum.ulasilamayanCift)} çifte ulaşılamadı.`}
-            {s.olcum.hizKmh != null && ` Süreler ${s.olcum.hizKmh} km/sa varsayımıyla.`}
+      <Ayrinti baslik="Görüntü ve model">
+        <p className="text-small text-ink">{s.alan!.ad}</p>
+        <p className="mt-1 text-small text-ink-2">
+          {s.kaynak!.saglayici} · çekim {s.kaynak!.cekimTarihi}
+          {s.kaynak!.gsdM != null && ` · ${s.kaynak!.gsdM} m/piksel`}
+        </p>
+        <p className="mt-1 text-small text-ink-2">
+          Model {s.model!.mimari} · eşik {s.model!.esik.toString().replace('.', ',')}
+        </p>
+        {s.hasar?.oncesiKontrol?.kosuldu && (
+          <p className="mt-1 text-small text-ink-2">
+            Deprem öncesi görüntüde {ORAN(s.hasar.oncesiKontrol.hasarliPikselOrani)} (yanlış alarm tabanı)
           </p>
-        </Bolum>
-      )}
+        )}
+        <Teknik>Parmak izi {s.parmakIzi.slice(0, 20)}… — aynı parmak izi aynı sonucu verir.</Teknik>
+      </Ayrinti>
 
-      {s.referansAjanlar && (
-        <Bolum baslik="Kıyas kolları">
-          {Object.entries(s.referansAjanlar).map(([ad, deger]) => (
-            <div key={ad} className="flex items-baseline justify-between gap-2 py-0.5">
-              <span className="text-small text-ink-2">{ad}</span>
-              <span className="text-small text-ink">
-                {/* Kollar dakikanın altında ayrışıyor (ör. 2,4 · 2,2 · 1,6 dk): tam
-                    sayıya yuvarlamak üçünü de "2 dk" yapıp farkı siliyordu (J-154). */}
-                {deger.ortalamaSureDk == null
-                  ? 'araçla ulaşılan görev yok'
-                  : deger.ortalamaSureDk < 10
-                    ? `${deger.ortalamaSureDk.toFixed(1).replace('.', ',')} dk`
-                    : sureMetni(Math.round(deger.ortalamaSureDk))}
-                {deger.ortalamaSureDk != null &&
-                  deger.uDonusuSayisi != null &&
-                  ` · ${sayi(deger.uDonusuSayisi)} U dönüşü`}
-              </span>
-            </div>
-          ))}
-        </Bolum>
-      )}
-
-      {s.gorevler?.length ? (
-        <Bolum baslik="Görevler">
-          {s.gorevler.map((g) => (
-            <div key={g.id} className="border-b border-line py-2 last:border-b-0">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-body text-ink">{g.ekipAd}</span>
-                <Micro>{sureMetni(Math.round(g.etaDk))}</Micro>
-              </div>
-              <p className="text-small text-ink-3">
-                {g.afetzedeAd}
-                {g.senaryo && ' · senaryo'}
-                {g.sonAdimYurumeM != null && ` · son ${mesafe(g.sonAdimYurumeM)} yürüyerek`}
+      {(s.olcum || s.sureler) && (
+        <Ayrinti baslik="Ölçüm ve süreler" ek={s.olcum ? <Micro>{sayi(s.olcum.ciftSayisi)} çift</Micro> : undefined}>
+          {s.olcum && (
+            <div className="space-y-1 text-small text-ink-2">
+              <p>
+                Bütün {sayi(s.olcum.ciftSayisi)} ekip–afetzede çifti ölçüldü; listede ilk tur (
+                {sayi(s.gorevler?.length ?? 0)} görev).
               </p>
+              {s.olcum.ortalamaUzamaM != null && s.olcum.ortalamaUzamaYuzde != null && (
+                <p>
+                  Kapanmalar yolu ortalama {mesafe(s.olcum.ortalamaUzamaM)} (%
+                  {s.olcum.ortalamaUzamaYuzde.toFixed(1).replace('.', ',')}) uzattı
+                  {s.olcum.enBuyukUzamaM != null && `, en çok ${mesafe(s.olcum.enBuyukUzamaM)}`}.
+                </p>
+              )}
+              {s.olcum.yurumeGerekenCift ? (
+                <p>
+                  {sayi(s.olcum.yurumeGerekenCift)} çiftte son adım yürüyerek
+                  {s.olcum.ortalamaYurumeM != null && `, ortalama ${mesafe(s.olcum.ortalamaYurumeM)}`}.
+                </p>
+              ) : null}
+              {s.olcum.ulasilamayanCift > 0 && <p>{sayi(s.olcum.ulasilamayanCift)} çifte ulaşılamadı.</p>}
             </div>
-          ))}
-        </Bolum>
-      ) : null}
+          )}
+          {s.sureler && (
+            <div className="mt-2">
+              {Object.entries(s.sureler)
+                .filter(([ad]) => ad !== 'total')
+                .map(([ad, ms]) => (
+                  <div key={ad} className="flex items-baseline justify-between gap-2 py-0.5">
+                    <span className="text-small text-ink-2">{ASAMA_ADI[ad] ?? ad}</span>
+                    <span className="font-mono text-small text-ink">{(ms / 1000).toFixed(1).replace('.', ',')} sn</span>
+                  </div>
+                ))}
+              {s.sureler.total != null && (
+                <p className="mt-1 text-small text-ink-3">
+                  Koşu toplam {(s.sureler.total / 1000).toFixed(1).replace('.', ',')} sn (sunucunun ölçümü)
+                </p>
+              )}
+            </div>
+          )}
+          {s.rotalar?.length ? <AramaOzeti sonuc={s} /> : null}
+        </Ayrinti>
+      )}
     </>
   )
 }
 
-/** Madde 5: Dijkstra ve A* yan yana; aynı yolu bulduysa bunu yazar. */
-function AramaKarti({ sonuc }: { sonuc: SimSonuc }) {
+/** Dijkstra ve A* (madde 5): aynı yolu bulduysa bunu yazar. */
+function AramaOzeti({ sonuc }: { sonuc: SimSonuc }) {
   const rotalar = sonuc.rotalar ?? []
-  // Rota BAŞINA ortalama: toplam yazılsaydı tek arama o kadar sürmüş gibi
-  // okunurdu. Karşılaştırılan şey iki algoritmanın aynı iş için süresi.
   const ortalama = (sec: (r: (typeof rotalar)[number]) => number) =>
     rotalar.length ? rotalar.reduce((t, r) => t + sec(r), 0) / rotalar.length : 0
-  const dijkstra = ortalama((r) => r.arama.dijkstra.sureSn)
-  const astar = ortalama((r) => r.arama.astar.sureSn)
-  const ayni = rotalar.length > 0 && rotalar.every((r) => r.arama.ayniYol === true)
-  const bilinmiyor = rotalar.some((r) => r.arama.ayniYol == null)
-  const uzunlukAyni =
-    rotalar.length > 0 && rotalar.every((r) => r.arama.dijkstra.uzunlukM === r.arama.astar.uzunlukM)
   const ms = (sn: number) => `${(sn * 1000).toFixed(0)} ms`
-
+  const ayni = rotalar.length > 0 && rotalar.every((r) => r.arama.ayniYol === true)
   return (
-    <Bolum baslik="Arama" ek={<Micro>rota başına · {sayi(rotalar.length)} rota</Micro>}>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-control bg-raised px-2.5 py-2">
-          <Micro>Dijkstra</Micro>
-          <p className="text-body text-ink">{ms(dijkstra)}</p>
-        </div>
-        <div className="rounded-control bg-raised px-2.5 py-2">
-          <Micro>A*</Micro>
-          <p className="text-body text-ink">{ms(astar)}</p>
-        </div>
-      </div>
-      <p className="mt-2 text-small text-ink-2">
-        {ayni
-          ? 'İkisi de aynı yolu buldu; A* daha az düğüm açtığı için hızlı.'
-          : bilinmiyor
-            ? uzunlukAyni
-              ? 'Uç "aynı yol mu" demiyor; iki aramanın uzunlukları aynı çıktı.'
-              : 'Uç "aynı yol mu" demiyor; uzunluklar da farklı.'
-            : 'İki arama farklı yol buldu — sebebi incelenmeli.'}
-      </p>
-    </Bolum>
+    <p className="mt-2 text-small text-ink-3">
+      Rota araması (rota başına): Dijkstra {ms(ortalama((r) => r.arama.dijkstra.sureSn))}, A*{' '}
+      {ms(ortalama((r) => r.arama.astar.sureSn))}
+      {ayni ? '; ikisi de aynı yolu buldu.' : '.'}
+    </p>
   )
 }
 

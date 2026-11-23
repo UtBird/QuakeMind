@@ -1,10 +1,10 @@
 import { Crosshair } from '@phosphor-icons/react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { HaritaKabugu, useHarita } from '@/harita/HaritaKabugu'
 import { useAltlikGirdisi } from '@/harita/altlikGorunumu'
 import type { SosCagrisi } from '@/veri/sorgular'
 import { afetzedeIpucu, afetzedeKatmanlari, type HaritaKonumu } from './haritaKatmanlari'
-import type { YakinYer } from './veri'
+import { CEVRE_YARICAP_KM, useCevre, type YakinYer } from './veri'
 
 /* ---------------------------------------------------------------------------
    Afetzede haritası (J-50): "Nereye gidebilirim?" kartının yanında, küçük.
@@ -25,23 +25,30 @@ export type AfetzedeHaritasiProps = {
 
 export default function AfetzedeHaritasi(p: AfetzedeHaritasiProps) {
   const baslangic = p.konum ? { lon: p.konum.lon, lat: p.konum.lat, zoom: 15 } : undefined
+  // Çevredeki tehlike (J-180) varsayılan açık; kişi haritayı sadeleştirmek
+  // isterse lejanttan kapatır.
+  const [tehlike, setTehlike] = useState(true)
+  const q = { ...p, tehlike, setTehlike }
   return (
     <div className="relative h-full w-full">
       {/* isolate: harita kendi katman bağlamında kalır. Yoksa deck.gl tuvali
           (z-index'li) "Konumuma dön" düğmesinin üstüne boyanıyor, sokak adları
           düğmeyi örtüyordu (J-51, kullanıcı). */}
       <HaritaKabugu className="absolute inset-0 isolate" ipucu={afetzedeIpucu} baslangic={baslangic}>
-        <Kopru {...p} />
-        <Ustyazi {...p} />
+        <Kopru {...q} />
+        <Ustyazi {...q} />
       </HaritaKabugu>
     </div>
   )
 }
 
+type IcProps = AfetzedeHaritasiProps & { tehlike: boolean; setTehlike: (t: boolean) => void }
+
 /** Veri → katmanlar; seçim ve konum değişince harita oraya uçar. */
-function Kopru(p: AfetzedeHaritasiProps) {
+function Kopru(p: IcProps) {
   const { hazir, katmanlariYaz, tiklamaYaz, ucus, haritaAl } = useHarita()
   const { altlik, altlikYapiGorunur, bolgeAdlari, adSeviyesi } = useAltlikGirdisi()
+  const cevre = useCevre(p.konum)
 
   const katmanlar = useMemo(
     () =>
@@ -55,8 +62,9 @@ function Kopru(p: AfetzedeHaritasiProps) {
         konum: p.konum,
         cagrilar: p.cagrilar,
         rota: p.rota,
+        cevre: p.tehlike ? (cevre.data ?? null) : null,
       }),
-    [altlik, altlikYapiGorunur, bolgeAdlari, adSeviyesi, p.yerler, p.secili, p.konum, p.cagrilar, p.rota],
+    [altlik, altlikYapiGorunur, bolgeAdlari, adSeviyesi, p.yerler, p.secili, p.konum, p.cagrilar, p.rota, p.tehlike, cevre.data],
   )
 
   useEffect(() => {
@@ -111,9 +119,11 @@ function Kopru(p: AfetzedeHaritasiProps) {
   return null
 }
 
-/** Harita üstü: konuma dön ve kaynak künyesi (ARAYUZ §11: künye hep ekranda). */
-function Ustyazi(p: AfetzedeHaritasiProps) {
+/** Harita üstü: konuma dön, tehlike lejantı ve kaynak künyesi (ARAYUZ §11). */
+function Ustyazi(p: IcProps) {
   const { ucus } = useHarita()
+  const cevre = useCevre(p.konum)
+  const c = cevre.data
   const { gorunen, katalog } = useAltlikGirdisi()
   const kaynak = gorunen[0]?.kaynak ?? katalog.data?.[0]?.kaynak
   const k = p.konum
@@ -133,6 +143,35 @@ function Ustyazi(p: AfetzedeHaritasiProps) {
           <Crosshair size={16} className="text-accent" aria-hidden />
           {k.kaynak === 'gps' ? 'Konumuma dön' : 'Mahalleme dön'}
         </button>
+      )}
+      {k && (
+        // Tek satırlık lejant: küçük haritayı kapatmasın. Ayrıntı üzerine gelince.
+        <label
+          title={c ? `${c.kaynak.kapaliYollar}
+${c.kaynak.hasarBolgeleri}
+${c.kaynak.uyari}` : undefined}
+          className="absolute top-2 left-2 z-10 flex h-9 cursor-pointer items-center gap-2 rounded-control border border-line-2 bg-panel px-2.5 text-small text-ink-2 shadow-float"
+        >
+          <input type="checkbox" checked={p.tehlike} onChange={(e) => p.setTehlike(e.target.checked)} aria-label="Çevremdeki tehlikeyi göster" />
+          {!p.tehlike ? (
+            <span className="text-ink">Tehlike</span>
+          ) : cevre.isError ? (
+            'Tehlike bilgisi alınamadı'
+          ) : c && c.kapaliYollar.length + c.hasarBolgeleri.length === 0 ? (
+            `${CEVRE_YARICAP_KM} km içinde bilinen tehlike yok`
+          ) : (
+            <>
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                <span aria-hidden className="h-1 w-3.5 rounded-badge bg-crit" />
+                Kapalı yol{c ? ` ${c.kapaliYollar.length}` : ''}
+              </span>
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                <span aria-hidden className="h-3 w-3 rounded-badge border border-high bg-high/40" />
+                Hasar{c ? ` ${c.hasarBolgeleri.length}` : ''}
+              </span>
+            </>
+          )}
+        </label>
       )}
       <p className="pointer-events-none absolute bottom-0 left-0 z-10 m-2 max-w-full rounded-control border border-line-2 bg-panel px-2.5 py-1 text-small text-ink-2 shadow-float">
         {kaynak ? `${kaynak.atif} (${kaynak.lisans})` : 'Altlık yükleniyor'}

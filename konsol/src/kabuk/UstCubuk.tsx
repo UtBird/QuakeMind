@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, useNavigate, useParams } from 'react-router-dom'
+import { Link, NavLink, useParams } from 'react-router-dom'
 import { CaretDown, ClipboardText, DeviceMobile, MagnifyingGlass } from '@phosphor-icons/react'
 import { useOturum } from '@/kimlik/oturum'
-import { ROL_ADI } from '@/kimlik/roller'
 import { MODLAR, modGorunur } from '@/modlar/modlar'
 import { useZaman } from '@/durum/zamanDurumu'
 import { useCanliAkisDurumu } from '@/canli/canliAkis'
@@ -10,10 +9,10 @@ import { useKonsol } from '@/durum/konsolDurumu'
 import { saat } from '@/lib/bicim'
 import { sn } from '@/lib/sinif'
 import { Marka } from './Marka'
+import { ProfilMenusu } from '@/kimlik/ProfilMenusu'
 
 export function UstCubuk() {
-  const { oturum, cikisYap } = useOturum()
-  const git = useNavigate()
+  const { oturum } = useOturum()
   const canli = useZaman((d) => d.canli)
   const bitis = useZaman((d) => (d.canli ? d.simdi : d.bitis))
   const canliyaDon = useZaman((d) => d.canliyaDon)
@@ -124,16 +123,8 @@ export function UstCubuk() {
         </button>
       )}
 
-      <button
-        type="button"
-        onClick={() => {
-          void cikisYap().then(() => git('/giris', { replace: true }))
-        }}
-        title={oturum ? `${oturum.adSoyad} · ${ROL_ADI[oturum.rol]} — çıkış yap` : 'Çıkış yap'}
-        className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent-deep text-micro text-ink"
-      >
-        {bashar(oturum?.adSoyad)}
-      </button>
+      {/* Profil menüsü (J-183): hesap ayarları ve çıkış. */}
+      <ProfilMenusu />
     </header>
   )
 }
@@ -204,11 +195,3 @@ function AnalizMenusu() {
   )
 }
 
-function bashar(ad?: string): string {
-  if (!ad) return '—'
-  return ad
-    .split(' ')
-    .slice(0, 2)
-    .map((p) => p.charAt(0).toLocaleUpperCase('tr'))
-    .join('')
-}

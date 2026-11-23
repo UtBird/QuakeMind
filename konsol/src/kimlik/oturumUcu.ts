@@ -19,6 +19,7 @@ type SunucuKullanici = {
   sehir?: string | null
   ekipId?: string | null
   sifreDegismeli?: boolean
+  ortakHesap?: boolean
 }
 
 type OturumYaniti = { erisimJetonu: string; kullanici: SunucuKullanici }
@@ -41,6 +42,7 @@ function oturumaCevir(y: OturumYaniti): Oturum {
     rol: y.kullanici.rol,
     ekipId: y.kullanici.ekipId ?? null,
     sifreDegismeli: !!y.kullanici.sifreDegismeli,
+    ortakHesap: !!y.kullanici.ortakHesap,
     kaynak: 'jwt',
   }
 }

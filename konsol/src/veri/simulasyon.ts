@@ -125,6 +125,21 @@ export type SimGorev = {
   durum: string
 }
 
+/** Bir kolun tek görevdeki sonucu (ilk tur: ekip i → afetzede i). */
+export type SimGorevKolu = {
+  gorevId: string
+  ulasti: boolean
+  sureDk?: number
+  mesafeM?: number
+  /** Kapalı sokağa girip öğrenme sayısı. */
+  cikmaz?: number
+  uDonusu?: number
+  cizgi?: LatLonCizgi | null
+}
+
+/** Kolların ekrandaki adı ve sırası: bugünkü durum → QuakeMind. */
+export const KOL_SIRASI = ['Kapanmayı bilmeyen ekip', 'Telsizle paylaşan filo', 'QuakeMind'] as const
+
 export type SimKanal<T> = {
   kayitlar: T[]
   not?: string
@@ -204,6 +219,8 @@ export type SimSonuc = {
     oncesiKontrol?: { kosuldu: boolean; hasarliPikselOrani: number }
   }
   kapanma?: {
+    /** "on_road_pixel": yalnız yolun üstündeki hasar kapatır (r_h = 0, J-70). */
+    kural?: string
     yaricapM: number
     kapaliKenarSayisi: number
     cezaliKenarSayisi: number
@@ -233,8 +250,20 @@ export type SimSonuc = {
   referansAjanlar?: Record<
     string,
     /** ortalamaSureDk: kolun araçla ulaştığı görev yoksa null. */
-    { ortalamaSureDk: number | null; uDonusuSayisi?: number; ulasanGorev?: number }
+    {
+      ortalamaSureDk: number | null
+      uDonusuSayisi?: number
+      ulasanGorev?: number
+      gorevSayisi?: number
+      ortakGorev?: number
+      ortalamaMesafeM?: number | null
+      /** Ortak görevlerde kapalı sokağa girip dönme sayısı. */
+      toplamKesif?: number
+    }
   >
+  referansNotu?: string
+  /** Görev başına her kolun sonucu (J-185); anahtar kolun adı. */
+  gorevKollari?: Record<string, SimGorevKolu[]>
   /** Dönüş maliyeti (sağdan trafik) uygulandı mı — panel varsayımı yazar. */
   donusMaliyetli?: boolean
   /** Kolların FİİLEN sürdüğü yollar (ilk tur). Planlanan varyantlar bunu
