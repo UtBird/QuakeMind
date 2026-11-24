@@ -42,6 +42,8 @@ def postgis_offline(monkeypatch):
     """Forces every test onto the offline-fallback path -- deterministic,
     with no dependency on a real PostGIS instance being reachable."""
     monkeypatch.setattr(postgis_engine, "check_connection", lambda: False)
+    # safe_route and nearest_debris require QUAKEMIND_ESKI_UCLAR=1 since J-163.
+    monkeypatch.setenv("QUAKEMIND_ESKI_UCLAR", "1")
 
 
 @pytest.fixture(autouse=True)
