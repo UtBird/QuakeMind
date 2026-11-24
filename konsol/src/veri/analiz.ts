@@ -334,6 +334,11 @@ export type AnalizSonucu = {
   /** Görüntünün BOŞ olmayan piksel oranı (0–1). Düşükse model çoğunlukla boşluk
       taramıştır; "0 kapalı yol" o zaman "hasar yok" demek değildir (J-160). */
   validPixelRatio?: number
+  /** Yol katmanı (OSM yolları) alınamadı: kesişim ve yol sayıları geçersiz. */
+  roadLayerMissing?: boolean
+  /** Yol ağı (graf) kurulamadı (J-38): openRoads/blockedRoads 0 ama GEÇERSİZ. */
+  roadNetworkMissing?: boolean
+  roadNetworkStatus?: 'tamam' | 'zaman_asimi' | 'hata' | 'yok'
   openRoads?: number
   blockedRoads?: number
   openRoadPct?: number

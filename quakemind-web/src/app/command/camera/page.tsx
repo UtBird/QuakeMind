@@ -19,6 +19,8 @@ export default function CameraDetectionPage() {
 
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<CameraAnalysisResponse | null>(null);
+  // J-168: API'ye ulasilamazsa sonuc UYDURULMAZ; hata yazilir.
+  const [analizHatasi, setAnalizHatasi] = useState<string | null>(null);
 
   useEffect(() => {
     if (inputMode === "camera") {
@@ -99,6 +101,7 @@ export default function CameraDetectionPage() {
 
   const handleRunAnalysis = async () => {
     setAnalyzing(true);
+    setAnalizHatasi(null);
     let imagePayload: string | undefined = undefined;
 
     if (inputMode === "upload" && uploadedImageB64) {
@@ -112,25 +115,12 @@ export default function CameraDetectionPage() {
       const res = await analyzeCameraFrame(selectedModel, imagePayload, coords?.lat, coords?.lon);
       setResult(res);
     } catch (e) {
-      console.warn("Backend API offline fallback:", e);
-      setResult({
-        status: selectedModel === "bina" ? "CRITICAL_EVACUATE" : "SAFE_SURFACE",
-        modelType: selectedModel,
-        activeModels: selectedModel === "hybrid" ? ["catlak.pt", "bina.pt"] : [`${selectedModel}.pt`],
-        detections: [
-          {
-            label: selectedModel === "bina" ? "Bina Ağır Yapısal Hasar (2_VeryHeavyDamage)" : "Duvar/Kolon Çatlağı (crack)",
-            confidence: 96.2,
-            model: `${selectedModel}.pt`,
-            box: [110, 75, 330, 270],
-            severity: selectedModel === "bina" ? "CRITICAL" : "SAFE",
-          },
-        ],
-        advice: selectedModel === "bina"
-          ? "⚠️ BİNA AĞIR HASARLI TESPİT EDİLDİ! BÖLGEYE GİRİŞ TEHLİKELİDİR."
-          : "🟢 YAPISAL BÜTÜNLÜK KORUNUYOR. Yüzeysel kaplama çatlağı.",
-        timestamp: new Date().toISOString(),
-      });
+      // J-168: Eskiden burada sabit bir sonuc basiliyordu ("BINA AGIR HASARLI",
+      // guven %96,2) -- model hic kosmadan gercek olcum gibi gorunuyordu
+      // (CLAUDE.md kural 1). Artik sonuc yok, hata yazilir.
+      console.warn("Kamera analizi yapilamadi:", e);
+      setResult(null);
+      setAnalizHatasi("Sunucuya ulaşılamadı; analiz YAPILMADI. Ekrandaki önceki sonuç silindi. Bağlantıyı kontrol edip yeniden deneyin.");
     } finally {
       setAnalyzing(false);
     }
@@ -139,6 +129,7 @@ export default function CameraDetectionPage() {
   const resetCapture = () => {
     setCapturedPhotoB64(null);
     setResult(null);
+    setAnalizHatasi(null);
     if (inputMode === "camera") {
       startCamera();
     }
@@ -401,6 +392,11 @@ export default function CameraDetectionPage() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                ) : analizHatasi ? (
+                  <div role="alert" className="p-4 rounded-2xl border border-slate-700 bg-slate-950 text-slate-200 text-sm space-y-2">
+                    <p className="font-bold">Analiz yapılamadı</p>
+                    <p>{analizHatasi}</p>
                   </div>
                 ) : (
                   <div className="p-8 text-center text-slate-500 space-y-3 font-mono text-xs my-auto">

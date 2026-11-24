@@ -1066,6 +1066,9 @@ export function HasarSag() {
     is.durum === 'bitti' ? ASAMALAR.length : ASAMALAR.filter((a) => is.ilerleme >= a.bas).length - 1
   const sinir = sonuc?.bounds
   const kapali = sonuc?.blockedRoads ?? 0
+  // J-38: yol katmanı ya da yol ağı yoksa sayılar 0 gelir ama GEÇERSİZDİR;
+  // "0 kapalı yol" diye gösterilirse "kapanma yok" diye okunuyordu.
+  const yolYok = !!(sonuc?.roadLayerMissing || sonuc?.roadNetworkMissing)
 
   return (
     <>
@@ -1133,11 +1136,21 @@ export function HasarSag() {
           <div className="grid grid-cols-3 gap-1.5">
             <Sayac
               etiket="Kapalı yol"
-              deger={sayi(kapali)}
-              alt={sonuc.blockedRoadPct != null ? `%${(sonuc.blockedRoadPct * 100).toFixed(1).replace('.', ',')}` : undefined}
-              vurgu={kapali > 0}
+              deger={yolYok ? '—' : sayi(kapali)}
+              alt={
+                yolYok
+                  ? 'hesaplanamadı'
+                  : sonuc.blockedRoadPct != null
+                    ? `%${(sonuc.blockedRoadPct * 100).toFixed(1).replace('.', ',')}`
+                    : undefined
+              }
+              vurgu={!yolYok && kapali > 0}
             />
-            <Sayac etiket="Açık yol" deger={sayi(sonuc.openRoads ?? 0)} alt="segment" />
+            <Sayac
+              etiket="Açık yol"
+              deger={yolYok ? '—' : sayi(sonuc.openRoads ?? 0)}
+              alt={yolYok ? 'hesaplanamadı' : 'segment'}
+            />
             <Sayac
               etiket="Hasar"
               deger={sonuc.damageRate != null ? `%${(sonuc.damageRate * 100).toFixed(1).replace('.', ',')}` : '—'}
@@ -1149,11 +1162,11 @@ export function HasarSag() {
             <p role="note" className="mt-2.5 text-small text-ink-2">
               Görüntü incelenen kutunun ~%{Math.round(100 * (sonuc.validPixelRatio ?? 0))} kadarını dolduruyor;
               kalan kısım boş (drone görüntülerinin kenarları düzensizdir). Sayılar yalnız görüntülü kısmı anlatır
-              {kapali === 0 ? '; "0 kapalı yol" boş kısımda hasar olmadığı anlamına gelmez.' : '.'}
+              {kapali === 0 && !yolYok ? '; "0 kapalı yol" boş kısımda hasar olmadığı anlamına gelmez.' : '.'}
             </p>
           )}
 
-          {sonuc.recommendedAction && zamanlama !== 'pre' && !(goruntuAz && kapali === 0) && (
+          {sonuc.recommendedAction && zamanlama !== 'pre' && (yolYok || !(goruntuAz && kapali === 0)) && (
             <p className="mt-2.5 text-body text-ink">{sonuc.recommendedAction}</p>
           )}
 

@@ -51,6 +51,52 @@ _progress_queue = None
 _model_onbellegi: dict = {}
 
 
+
+YOL_AGI_SURE_SINIRI_SN = 45
+
+
+def oneri_metni(
+    yol_katmani_yok: bool,
+    yol_agi_durumu: str,
+    blocked_road_pct: float,
+    blocked_count: int,
+    damage_rate: float,
+    yerel_yol_var: bool,
+) -> str:
+    """Analiz sonucunun tek cumlelik onerisi.
+
+    Olculeni soyler, yargi uretmez: esikler (0,5 / 0,2 / 0,3) tasarim karari,
+    olculmus degil. Yol katmani ya da yol agi yoksa "kapanma yok" denmez (J-38):
+    eskiden yol agi zaman asimina ugradiginda sayilar 0 kaliyor ve sonuc
+    "bolge erisilebilir" ya da "yolu kapatan hasar bulunmadi" diyordu.
+    """
+    oran = f"{blocked_road_pct * 100:.1f}".replace(".", ",")
+    kapali_metni = f"{blocked_count} sokak kapalı (kapalı yol pikseli oranı %{oran})"
+    if yol_katmani_yok:
+        return ("Yol katmanı alınamadı; kapalı yol hesaplanamadı. Bu sonuç bölgenin "
+                "erişilebilir olduğunu göstermez. "
+                + ("Neden: yerel yol dosyası bu alanı kapsamıyor, dış yol servisi (Overpass) yanıt vermedi."
+                   if yerel_yol_var else
+                   "Neden: sunucuda yerel yol dosyası kurulu değil, dış yol servisi (Overpass) yanıt vermedi."))
+    if yol_agi_durumu != "tamam":
+        neden = {
+            "zaman_asimi": f"yol ağı {YOL_AGI_SURE_SINIRI_SN} sn içinde kurulamadı",
+            "hata": "yol ağı kurulurken hata oluştu",
+        }.get(yol_agi_durumu, "yol ağı kurulamadı")
+        return (f"Kapalı ve açık yol sayıları hesaplanamadı: {neden}. Hasar haritası geçerli, "
+                f"ama bu sonuç bölgenin erişilebilir olduğunu göstermez (hasarın yol üstüne "
+                f"düşen pikseli %{oran}). Daha küçük bir alanla yeniden deneyin.")
+    if blocked_road_pct > 0.5:
+        return f"Kritik: {kapali_metni}. Alternatif rotalar planlanmalı."
+    if blocked_road_pct > 0.2:
+        return f"Dikkat: {kapali_metni}. Ekipler için alternatif güzergâh önerilir."
+    if damage_rate > 0.3:
+        return "Yüksek hasar oranı. Bölgeye dikkatli erişim sağlanmalı."
+    if blocked_count > 0 or blocked_road_pct > 0:
+        return f"{kapali_metni}. Kapalı sokaklar haritada işaretli; rota bunlardan kaçınarak planlanmalı."
+    return ("Bu görüntüde yolu kapatan hasar bulunmadı. Model hasarı eksik bulabilir; "
+            "sahadan doğrulanmadan bölge açık sayılmamalı.")
+
 def _is_parcacigi_sinirla() -> int:
     """Cikarim isci surecini bir kac cekirdekle sinirlar (J-15).
 
@@ -697,6 +743,9 @@ def run_analysis_job(req: dict) -> dict:
     road_graph = None
     closed_edge_keys = None
     closure_prob = None
+    # J-38: yol agi (graf) hesaplanamazsa sayilar 0 kaliyordu ve sonuc
+    # "kapanma yok" diye okunuyordu. Durum sonuca yazilir.
+    yol_agi_durumu = "yok"
     try:
         # analyze_road_network_graph makes its own osmnx/Overpass fetch,
         # separate from (and slower than) the raster road mask above --
@@ -716,10 +765,11 @@ def run_analysis_job(req: dict) -> dict:
                 analyze_road_network_graph,
                 bounds, w, h, closure_mask, network_type, blockage_radius_m,
             )
-            G, safe_G, safe_edges, blocked_edges = future.result(timeout=45)
+            G, safe_G, safe_edges, blocked_edges = future.result(timeout=YOL_AGI_SURE_SINIRI_SN)
         finally:
             logistics_executor.shutdown(wait=False, cancel_futures=True)
         if G is not None:
+            yol_agi_durumu = "tamam"
             safe_count = len(safe_edges) if safe_edges else 0
             blocked_count = len(blocked_edges) if blocked_edges else 0
             safe_segments = serialize_segments(safe_edges)
@@ -743,8 +793,10 @@ def run_analysis_job(req: dict) -> dict:
             except Exception:
                 log_lines.append("Kapanma olasiligi hesaplanamadi -- yumusak maliyetli rota bu analizde yok")
     except FutureTimeoutError:
+        yol_agi_durumu = "zaman_asimi"
         log_lines.append("Lojistik analiz opsiyonel - OSMnx zaman asimina ugradi")
     except Exception:
+        yol_agi_durumu = "hata"
         log_lines.append("Lojistik analiz opsiyonel - OSMnx mevcut degil veya hata olustu")
     logistics_ms = (time.perf_counter() - t3) * 1000.0
     total_ms = (time.perf_counter() - started_at) * 1000.0
@@ -752,30 +804,16 @@ def run_analysis_job(req: dict) -> dict:
         f"Sureler (sn): uydu={satellite_fetch_ms / 1000:.1f}, yol={overpass_ms / 1000:.1f}, AI={inference_ms / 1000:.1f}, lojistik={logistics_ms / 1000:.1f}, toplam={total_ms / 1000:.1f}"
     )
 
-    # Oneri olcululeni soyler, yargi uretmez: esikler (0,5 / 0,2 / 0,3) tasarim
-    # karari, olculmus degil. Eskiden yol katmani hic alinamadiginda ve 10
-    # kapali sokak bulundugunda da "Bolge genel olarak erisilebilir" yaziyordu.
-    oran = f"{blocked_road_pct * 100:.1f}".replace(".", ",")
-    kapali_metni = f"{blocked_count} sokak kapalı (kapalı yol pikseli oranı %{oran})"
-    if yol_katmani_yok:
-        from apps.road_damage.utils import yerel_yol as _yy
+    from apps.road_damage.utils import yerel_yol as _yy
 
-        recommended = ("Yol katmanı alınamadı; kapalı yol hesaplanamadı. Bu sonuç bölgenin "
-                       "erişilebilir olduğunu göstermez. "
-                       + ("Neden: yerel yol dosyası bu alanı kapsamıyor, dış yol servisi (Overpass) yanıt vermedi."
-                          if _yy.veri_var() else
-                          "Neden: sunucuda yerel yol dosyası kurulu değil, dış yol servisi (Overpass) yanıt vermedi."))
-    elif blocked_road_pct > 0.5:
-        recommended = f"Kritik: {kapali_metni}. Alternatif rotalar planlanmalı."
-    elif blocked_road_pct > 0.2:
-        recommended = f"Dikkat: {kapali_metni}. Ekipler için alternatif güzergâh önerilir."
-    elif damage_rate > 0.3:
-        recommended = "Yüksek hasar oranı. Bölgeye dikkatli erişim sağlanmalı."
-    elif blocked_count > 0 or blocked_road_pct > 0:
-        recommended = f"{kapali_metni}. Kapalı sokaklar haritada işaretli; rota bunlardan kaçınarak planlanmalı."
-    else:
-        recommended = ("Bu görüntüde yolu kapatan hasar bulunmadı. Model hasarı eksik bulabilir; "
-                       "sahadan doğrulanmadan bölge açık sayılmamalı.")
+    recommended = oneri_metni(
+        yol_katmani_yok=yol_katmani_yok,
+        yol_agi_durumu=yol_agi_durumu,
+        blocked_road_pct=blocked_road_pct,
+        blocked_count=blocked_count,
+        damage_rate=damage_rate,
+        yerel_yol_var=_yy.veri_var(),
+    )
 
     _report(analysis_id, 97, "Sonuç görselleri hazırlanıyor…")
     try:
@@ -827,6 +865,11 @@ def run_analysis_job(req: dict) -> dict:
         "istenenAlaniKm2": round(istenen_alan_km2, 3) if istenen_alan_km2 is not None else None,
         # True ise yol katmani cekilemedi: kesisim ve kapali yol sayilari gecersiz.
         "roadLayerMissing": yol_katmani_yok,
+        # J-38: yol agi (graf) cozulemediyse openRoads/blockedRoads 0 kalir ama
+        # GECERSIZDIR; "kapanma yok" diye okunmamali. Durum: tamam / zaman_asimi /
+        # hata / yok.
+        "roadNetworkMissing": yol_agi_durumu != "tamam",
+        "roadNetworkStatus": yol_agi_durumu,
         "validPixelRatio": round(gecerli_piksel / total_pixels, 4) if total_pixels else 0.0,
         "openRoads": safe_count,
         "blockedRoads": blocked_count,
