@@ -4374,3 +4374,53 @@ Veritabanının kopyasında koşar (`--api http://127.0.0.1:8001`), canlı veriy
 - Aynı ortamda `araclar_osm_indir.py` ve künyelerdeki üç model Hugging Face'ten anahtarsız indi, parmak izleri tuttu.
 
 ---
+
+## J-38 🟠 Yol ağı zaman aşımına uğrayınca sonuç "0 kapalı yol, bölge erişilebilir" diyor
+**Durum:** KAPALI (24 Kasım 2026) · **Bulundu:** 21 Eylül 2026 · **İlgili:** J-21, kural 1
+
+**Ölçüm.** Antakya, Wayback 57965, r = 0,75 km: OSM grafı 45 sn sınırını aştı
+(`lojistik=49,1 sn`), işçi "Lojistik analiz opsiyonel - OSMnx zaman asimina ugradi"
+satırını yazıp `openRoads = 0`, `blockedRoads = 0` döndü; `/route` oturumu hiç açılmadı.
+Konsol (`konsol/src/modlar/hasar.tsx`, Sonuç bölümü) bunu "Kapalı yol 0 segment · Açık yol
+0 segment" diye gösteriyor; o koşunun öneri metni de **"Bolge genel olarak erisilebilir
+durumda."** oldu (öneri, graftan değil yol rasterından hesaplanan `blockedRoadPct =
+0,0019`'a bakıyor). Yani yol ağı **hiç çözümlenmemişken** sonuç "kapanma yok, bölge
+erişilebilir" diye okunuyor.
+
+**Sıklık.** 21 Eylül'deki dört uçtan uca koşunun üçünde yol ağı zaman aşımına uğradı
+(49,0–49,1 sn); yalnız OAM r = 0,35 km koşusunda graf 4,9 sn'de geldi. Yani bu
+koşulların çoğunda canlı analiz kapanma hiç çıkarmıyor.
+
+**Yapılacak.** İşçi sonuca `roadNetwork: "ok" | "timeout" | "error"` yazsın; konsol
+zaman aşımında sayıları göstermesin, "yol ağı alınamadı, kapanma çıkarılamadı" desin;
+öneri metni bu durumda erişilebilirlik iddia etmesin. Grafı yerel PBF önbelleğinden
+okuma yolu var (`load_local_graph_from_cache`) ama yalnız önceden ısıtılmış kutular için.
+
+**Kapatıldı (24 Kasım 2026).**
+- Worker yol ağının durumunu izler ve sonuca yazar: `roadNetworkMissing`, `roadNetworkStatus` (`tamam` / `zaman_asimi` / `hata` / `yok`). `openRoads` ve `blockedRoads` geriye uyum için 0 kalır ama bu alanlar onları geçersiz sayar.
+- Öneri metni `oneri_metni()` fonksiyonuna taşındı. Yol ağı yoksa "kapalı ve açık yol sayıları hesaplanamadı: yol ağı 45 sn içinde kurulamadı … bu sonuç bölgenin erişilebilir olduğunu göstermez" der. Eskiden duruma göre "0 sokak kapalı" ya da "yolu kapatan hasar bulunmadı" diyordu.
+- Konsol (`modlar/hasar.tsx`): yol katmanı ya da yol ağı yoksa "Kapalı yol" ve "Açık yol" sayaçları "0" yerine "—" ve "hesaplanamadı" gösterir. Öneri metni her durumda görünür.
+- Canlıda yol dosyası artık kurulduğu için (J-187) yol ağının Overpass'a bağlı kalması ve zaman aşımı seyrekleşir.
+- Doğrulama: `tests/test_oneri_metni.py` 4 test (zaman aşımı, hata/yok, yol katmanı yok, olağan durumlar değişmedi). `pytest -q` 177/177; `tsc` ve `kontrol:token` temiz. Zaman aşımı tarayıcıda yeniden üretilmedi (45 sn'lik graf sınırını aşan büyük alan gerekir); konsol tarafı tip denetimiyle ve kodla sınandı.
+
+---
+
+## J-168 🔴 Eski web kamera sayfası API'ye ulaşamayınca uydurma sonuç gösteriyor
+**Durum:** KAPALI (24 Kasım 2026) · **Görüldü** · **İlgili:** J-165, CLAUDE.md §1, §7
+
+**Bulgu (17 Kasım, J-166 kontrolünde).**
+- `quakemind-web/src/app/command/camera/page.tsx:114-133`: istek hata verirse (`catch`) ekrana
+  sabit bir sonuç basılıyor.
+  - "Bina" seçiliyse "BİNA AĞIR HASARLI TESPİT EDİLDİ! BÖLGEYE GİRİŞ TEHLİKELİDİR", güven %96,2.
+  - Öteki modellerde "YAPISAL BÜTÜNLÜK KORUNUYOR".
+- Model hiç koşmadan, gerçek bir ölçüm gibi görünüyor. Kural §1'e doğrudan aykırı.
+
+**Neden açık.** Eski web'e yalnız kritik düzeltme yapılır (CLAUDE.md §7); karar kullanıcının.
+Önerilen düzeltme: `catch` içinde sonuç yerine "Sunucuya ulaşılamadı, analiz yapılmadı" yazmak.
+
+**Kapatıldı (24 Kasım 2026).**
+- `quakemind-web/src/app/command/camera/page.tsx`: istek başarısız olunca artık sonuç uydurulmuyor. Önceki sonuç siliniyor ve "Analiz yapılamadı — Sunucuya ulaşılamadı; analiz YAPILMADI" yazılıyor.
+- Not: eski web'in girişi J-53'ten beri varsayılan kapalı eski uçları kullanıyor; bayrak (`QUAKEMIND_ESKI_UCLAR`) açılmadan eski web'e giriş yapılamıyor. Hata yine de düzeltildi; bayrak açılırsa ya da eski web başka bir API'ye bağlanırsa yanlış sonuç çıkmasın.
+- Doğrulama: API kapalıyken (yerel, deneme oturumuyla) kamera sayfasında analiz başlatıldı. Sayfa "Analiz yapılamadı" dedi, "%96,2" ve sabit sonuç görünmedi. `tsc --noEmit` hatasız (değişiklikten önce de 0).
+
+---

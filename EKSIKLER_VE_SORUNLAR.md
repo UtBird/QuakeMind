@@ -22,14 +22,14 @@ dizine bir satır ekleyin. Hiçbir madde silinmez; kimlikler değişmez.
 
 `AÇIK` · `DEVAM EDİYOR` · `KAPALI` · `KARAR BEKLİYOR` (kullanıcı kararı gerekiyor)
 
-## Özet (18 Kasım 2026)
+## Özet (güncellendi 24 Kasım 2026)
 
-179 maddenin **97'si kapandı** ve `EKSIKLER_ARSIV.md`'ye taşındı (dizini bu dosyanın sonunda).
-Burada kalan **83 madde** şöyle dağılıyor:
+189 maddenin **108'i kapandı** ve `EKSIKLER_ARSIV.md`'ye taşındı (dizini bu dosyanın sonunda).
+Burada kalan **81 madde** şöyle dağılıyor:
 
 | Neye ait | Madde | Ne zaman |
 |---|---|---|
-| Ürün — teslimden önce bakılmalı | 6 | Bu hafta (aşağıdaki liste) |
+| Ürün — teslimden önce bakılmalı | 4 | Bu hafta (aşağıdaki liste) |
 | Ürün — iyileştirme | 9 | Teslimden sonra olabilir |
 | Makale ve model sonuçları | 63 | Makale aşamasında (`MAKALE_DUZELTME_LISTESI.md` ile birlikte) |
 | Kapsam dışı (C grubu) | 5 | Makalede "yapılmadı" diye yazılır |
@@ -39,11 +39,9 @@ Burada kalan **83 madde** şöyle dağılıyor:
 | Kimlik | Ne | Kimde |
 |---|---|---|
 | D-08 🔴 | Roboflow API anahtarı makale dalında açık metin; anahtar yenilenmeli | Kullanıcı (anahtar sahibi) |
-| J-168 🔴 | Eski web kamera sayfası API'ye ulaşamayınca uydurma sonuç gösteriyor | Karar: eski web kapanacak mı |
-| J-38 🟠 | Yol ağı zaman aşımında sonuç "0 kapalı yol, bölge erişilebilir" diyor | Geliştirme |
-| J-153 🟠 | Deprem kataloğu kendiliğinden tazelenmiyor; canlıda risk modeli yeniden eğitilmeli | Canlıya çıkış (Deha) |
-| J-58 🟠 | Yol kapanmasının geometrisi atılıyor, derece sabit 3 | Geliştirme |
-| J-39 🟡 | Büyük alan çizilince görüntü sessizce 8 × 8 karoya kırpılıyor | Geliştirme |
+| J-153 🟠 | Deprem kataloğu kendiliğinden tazelenmiyor. Risk modeli artık her dağıtımda imajda yeniden eğitiliyor; kalan: katalog tazeleme | Geliştirme |
+| J-58 🟠 | Kapanmanın geometrisi artık saklanıyor ve harita/rota kullanıyor; kalan: derece sabit 3 (ekranda gösterilmiyor) | Geliştirme |
+| J-39 🟡 | Büyük alan kırpılınca sonuç notu bunu yazıyor; kalan: yakınlaştırma çizilen kutudan seçilmiyor | Geliştirme |
 
 **Ürün — iyileştirme (teslimden sonra olabilir):**
 - J-10: soğuk başlangıç.
@@ -1028,29 +1026,6 @@ nokta olarak kalır, yeni kayıtlar çizgi olur.
 **Yapılacak.** İşçi istenen kutuyu ve fiilen analiz edilen sınırları sonuca yazsın; konsol
 fark varsa söylesin. Yakınlaştırma çizilen kutunun boyundan seçilsin; bütçeyi aşan alanda
 kırpmak yerine süre ya da çözünürlük uyarısı verilsin (J-20 kararıyla birlikte).
-
----
-
-## J-38 🟠 Yol ağı zaman aşımına uğrayınca sonuç "0 kapalı yol, bölge erişilebilir" diyor
-**Durum:** AÇIK · **Bulundu:** 21 Eylül 2026 · **İlgili:** J-21, kural 1
-
-**Ölçüm.** Antakya, Wayback 57965, r = 0,75 km: OSM grafı 45 sn sınırını aştı
-(`lojistik=49,1 sn`), işçi "Lojistik analiz opsiyonel - OSMnx zaman asimina ugradi"
-satırını yazıp `openRoads = 0`, `blockedRoads = 0` döndü; `/route` oturumu hiç açılmadı.
-Konsol (`konsol/src/modlar/hasar.tsx`, Sonuç bölümü) bunu "Kapalı yol 0 segment · Açık yol
-0 segment" diye gösteriyor; o koşunun öneri metni de **"Bolge genel olarak erisilebilir
-durumda."** oldu (öneri, graftan değil yol rasterından hesaplanan `blockedRoadPct =
-0,0019`'a bakıyor). Yani yol ağı **hiç çözümlenmemişken** sonuç "kapanma yok, bölge
-erişilebilir" diye okunuyor.
-
-**Sıklık.** 21 Eylül'deki dört uçtan uca koşunun üçünde yol ağı zaman aşımına uğradı
-(49,0–49,1 sn); yalnız OAM r = 0,35 km koşusunda graf 4,9 sn'de geldi. Yani bu
-koşulların çoğunda canlı analiz kapanma hiç çıkarmıyor.
-
-**Yapılacak.** İşçi sonuca `roadNetwork: "ok" | "timeout" | "error"` yazsın; konsol
-zaman aşımında sayıları göstermesin, "yol ağı alınamadı, kapanma çıkarılamadı" desin;
-öneri metni bu durumda erişilebilirlik iddia etmesin. Grafı yerel PBF önbelleğinden
-okuma yolu var (`load_local_graph_from_cache`) ama yalnız önceden ısıtılmış kutular için.
 
 ---
 
@@ -2056,19 +2031,6 @@ Temel ölçüm de yeniden koşuldu (`benchmark/reports/sqlite_yuk_2026-11-13_son
 - Ölçüm betiğinin ilk sürümünde "gerçekleşen hız" konsol bekleme süresini de paydaya katıyordu
   (47,5 ve 39,9 gibi düşük değerler). Düzeltildi; bütün koşularda 10 sn'de 501 yazma = 50/sn.
 
-## J-168 🔴 Eski web kamera sayfası API'ye ulaşamayınca uydurma sonuç gösteriyor
-**Durum:** AÇIK · **Görüldü** · **İlgili:** J-165, CLAUDE.md §1, §7
-
-**Bulgu (17 Kasım, J-166 kontrolünde).**
-- `quakemind-web/src/app/command/camera/page.tsx:114-133`: istek hata verirse (`catch`) ekrana
-  sabit bir sonuç basılıyor.
-  - "Bina" seçiliyse "BİNA AĞIR HASARLI TESPİT EDİLDİ! BÖLGEYE GİRİŞ TEHLİKELİDİR", güven %96,2.
-  - Öteki modellerde "YAPISAL BÜTÜNLÜK KORUNUYOR".
-- Model hiç koşmadan, gerçek bir ölçüm gibi görünüyor. Kural §1'e doğrudan aykırı.
-
-**Neden açık.** Eski web'e yalnız kritik düzeltme yapılır (CLAUDE.md §7); karar kullanıcının.
-Önerilen düzeltme: `catch` içinde sonuç yerine "Sunucuya ulaşılamadı, analiz yapılmadı" yazmak.
-
 ## J-189 🟠 Makale "mekânsal sorgular PostGIS ile yürütülmektedir" diyor — çalışan sistem SQLite kullanıyor
 **Durum:** AÇIK · **Bulundu:** 18 Kasım 2026 (makalenin gönderime hazırlığı denetlenirken; başka bir oturumda "J-175" numarasıyla not edilmişti, numara ısı haritası maddesiyle çakıştığı için 24 Kasım'da J-189 oldu) · **İlgili:** J-136, CLAUDE.md §1, §8, §10
 
@@ -2193,6 +2155,8 @@ kimlikle. Başka belgelerdeki "EKSIKLER J-xxx" atıfları için kimliği burada 
 | J-186 | 🔴 Tatbikatı kapatmanın görünür yolu yoktu; yeniden başlatmada tatbikat noktaları gerçek veriye karışıyordu | 24 Kasım 2026 |
 | J-187 | 🟠 Üç uydu modeli ve yerel OSM kesiti hiçbir yerden indirilemiyordu | 24 Kasım 2026 |
 | J-188 | 🟠 81 il risk sıralaması canlıda boştu (il merkezleri depoda yoktu); dağıtım kontrol testi eski uçlarda düşüyordu | 24 Kasım 2026 |
+| J-38 | 🟠 Yol ağı zaman aşımına uğrayınca sonuç "0 kapalı yol, bölge erişilebilir" diyordu | 24 Kasım 2026 |
+| J-168 | 🔴 Eski web kamera sayfası API'ye ulaşamayınca uydurma sonuç gösteriyordu | 24 Kasım 2026 |
 
 ---
 
@@ -2434,3 +2398,4 @@ kimlikle. Başka belgelerdeki "EKSIKLER J-xxx" atıfları için kimliği burada 
 | 24 Kasım 2026 | **J-187** kapatıldı: üç model `Furkei/quakemind-uydu-modelleri`, OSM kesiti `Furkei/quakemind-osm-yollar` (ODbL) depolarında; künyeler ve `araclar_osm_indir.py` sabit sürümle indirir, `deploy.sh` kurar. Anahtarsız indirme ve parmak izleri doğrulandı. J-184'teki elle kopyalama artık gerekmiyor. Madde arşivde. |
 | 24 Kasım 2026 | **J-188** kapatıldı: `il_merkezleri.json` depoya (`apps/earthquake_risk/data/`); `deploy/test_road_api.py` eski uçlarda bayrağı test içinde açar. Sunucu paket sürümleriyle temiz kopyada 163 geçti, 0 hata. Madde arşivde. |
 | 24 Kasım 2026 | **J-189** açık madde eklendi: makale §4.1 "mekânsal sorgular PostGIS ile" diyor, sistem SQLite (18 Kasım'da başka oturumda "J-175" diye not edilmişti, numara çakıştığı için J-189). Makaleye dokunulmadı. |
+| 24 Kasım 2026 | **J-38** kapatıldı: yol ağı kurulamazsa sonuç ve konsol "hesaplanamadı" der, "0 kapalı yol" / "kapanma yok" demez (`roadNetworkMissing`, `oneri_metni`). **J-168** kapatıldı: eski web kamera sayfası API'ye ulaşamayınca uydurma sonuç yerine "Analiz yapılamadı" gösterir. `pytest -q` 177/177. Maddeler arşivde. |
