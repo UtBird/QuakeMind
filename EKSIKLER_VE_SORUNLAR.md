@@ -25,13 +25,13 @@ dizine bir satır ekleyin. Hiçbir madde silinmez; kimlikler değişmez.
 ## Özet (18 Kasım 2026)
 
 179 maddenin **97'si kapandı** ve `EKSIKLER_ARSIV.md`'ye taşındı (dizini bu dosyanın sonunda).
-Burada kalan **82 madde** şöyle dağılıyor:
+Burada kalan **83 madde** şöyle dağılıyor:
 
 | Neye ait | Madde | Ne zaman |
 |---|---|---|
 | Ürün — teslimden önce bakılmalı | 6 | Bu hafta (aşağıdaki liste) |
 | Ürün — iyileştirme | 9 | Teslimden sonra olabilir |
-| Makale ve model sonuçları | 62 | Makale aşamasında (`MAKALE_DUZELTME_LISTESI.md` ile birlikte) |
+| Makale ve model sonuçları | 63 | Makale aşamasında (`MAKALE_DUZELTME_LISTESI.md` ile birlikte) |
 | Kapsam dışı (C grubu) | 5 | Makalede "yapılmadı" diye yazılır |
 
 **Ürün — teslimden önce bakılmalı.**
@@ -2069,6 +2069,17 @@ Temel ölçüm de yeniden koşuldu (`benchmark/reports/sqlite_yuk_2026-11-13_son
 **Neden açık.** Eski web'e yalnız kritik düzeltme yapılır (CLAUDE.md §7); karar kullanıcının.
 Önerilen düzeltme: `catch` içinde sonuç yerine "Sunucuya ulaşılamadı, analiz yapılmadı" yazmak.
 
+## J-189 🟠 Makale "mekânsal sorgular PostGIS ile yürütülmektedir" diyor — çalışan sistem SQLite kullanıyor
+**Durum:** AÇIK · **Bulundu:** 18 Kasım 2026 (makalenin gönderime hazırlığı denetlenirken; başka bir oturumda "J-175" numarasıyla not edilmişti, numara ısı haritası maddesiyle çakıştığı için 24 Kasım'da J-189 oldu) · **İlgili:** J-136, CLAUDE.md §1, §8, §10
+
+**Bulgu.** Makalenin §4.1 ortam paragrafı: *"Risk skorlaması CatBoost [48] ile, yol ağı çizgesi OSMnx [43] ve NetworkX [62] ile, mekânsal sorgular PostGIS [63] ile yürütülmektedir."* Kaynakçada [63] PostGIS kaydı var. Oysa CLAUDE.md §10 (13 Kasım 2026): çalışan sistem SQLite kullanır (`backend/veri/quakemind.sqlite3`, `depo/sqlite_surucu.py`); PostGIS sürücüsü (`depo/postgis_surucu.py`) yazılmadı ve "belgede, sunumda ve makalede 'sistem PostGIS kullanıyor' denmez; PostGIS hedef mimaridir". Makalede "SQLite" hiç geçmiyor.
+
+**Neden ciddi.** Bu bir sistem tarifi; depo herkese açık olursa hakem ya da okuyucu kodu açıp PostGIS kodu bulamaz. CLAUDE.md §1 (her iddianın kaynağı var) ve §8 (ölçmeden iddia yok) ihlali.
+
+**Önerilen düzeltme.** (a) Cümle *"mekânsal sorgular SQLite üzerinde (WAL kipinde, kapsayıcı zaman indeksleriyle) yürütülmektedir"* olsun, [63] SQLite belgesiyle değiştirilsin; (b) PostGIS hedef mimari olarak ayrı bir cümlede anılsın (Bölüm 5.3, gelecek çalışma). (a)+(b) birlikte önerilir.
+
+**Not.** Makaleye dokunulmadı; makale hocanın okumasında, düzeltme sırası ekip kararı.
+
 # KAPANAN MADDELER DİZİNİ
 
 Kapanan maddelerin tam metni `EKSIKLER_ARSIV.md`'de, aynı bölüm başlıkları altında ve aynı
@@ -2422,3 +2433,4 @@ kimlikle. Başka belgelerdeki "EKSIKLER J-xxx" atıfları için kimliği burada 
 | 24 Kasım 2026 | **J-186** kapatıldı: TATBİKAT şeridinde (her modda) onaylı "Tatbikatı bitir"; sunucu koşuyu tanımasa da noktaları siler; açılışta sahipsiz tatbikat noktaları silinir (kopya veritabanında 296 nokta bulundu); kimlik biçimi denetlenir. `pytest -q` 171/171. Madde arşivde. |
 | 24 Kasım 2026 | **J-187** kapatıldı: üç model `Furkei/quakemind-uydu-modelleri`, OSM kesiti `Furkei/quakemind-osm-yollar` (ODbL) depolarında; künyeler ve `araclar_osm_indir.py` sabit sürümle indirir, `deploy.sh` kurar. Anahtarsız indirme ve parmak izleri doğrulandı. J-184'teki elle kopyalama artık gerekmiyor. Madde arşivde. |
 | 24 Kasım 2026 | **J-188** kapatıldı: `il_merkezleri.json` depoya (`apps/earthquake_risk/data/`); `deploy/test_road_api.py` eski uçlarda bayrağı test içinde açar. Sunucu paket sürümleriyle temiz kopyada 163 geçti, 0 hata. Madde arşivde. |
+| 24 Kasım 2026 | **J-189** açık madde eklendi: makale §4.1 "mekânsal sorgular PostGIS ile" diyor, sistem SQLite (18 Kasım'da başka oturumda "J-175" diye not edilmişti, numara çakıştığı için J-189). Makaleye dokunulmadı. |

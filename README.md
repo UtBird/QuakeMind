@@ -1,432 +1,379 @@
-# 🛸 QuakeMind — Afet İkaz, Karar Destek & Yapay Zeka Platformu
+# QuakeMind — Afet Karar Destek Sistemi
 
-QuakeMind; deprem ve afet anlarında **internetli veya internetsiz (WiFi Hotspot / P2P Mesh)** ortamlarda çalışabilen, uydu görüntülerinden yol hasarını tespit eden, sosyal medya/saha ihbarlarından adres ve aciliyet çıkaran, deprem risk skorlarını hesaplayan ve SOS sinyallerini arama-kurtarma ekiplerine ileten bütünleşik bir afet yönetim ekosistemidir.
+QuakeMind, deprem sonrası ilk saatlerde koordinasyon merkezinin tek ekrandan karar
+vermesine yardım eden bir karar destek sistemidir. Uydu/drone görüntüsünden hasar ve yol
+kapanması, afetzede fotoğrafından çatlak ve yapı hasarı, Türkçe ihbar metninden kategori,
+adres ve aciliyet çıkarır; bunları SOS çağrıları ve ekip konumlarıyla aynı haritada
+birleştirir ve ekiplerin geçebileceği güzergâhı hesaplar.
 
-Proje üç ana bileşenden oluşur:
+Bütün modeller tek bir çıktı biçimine iner:
 
-| Bileşen | Klasör | Teknoloji | Açıklama |
+```
+(konum, hasar/aciliyet skoru, güven, zaman damgası, kaynak tipi)
+```
+
+Arayüz modellere değil bu sözleşmeye bağlıdır; yeni bir model eklemek bu biçime uymak
+demektir.
+
+> Proje TÜBİTAK 2209-A kapsamında geliştirilmektedir. Kurallar `CLAUDE.md`'de, mimari
+> `MIMARI.md`'de, tasarım sistemi `ARAYUZ_KARARLARI.md`'de, açık sorunlar
+> `EKSIKLER_VE_SORUNLAR.md`'de kimlikli (J-…) olarak tutulur.
+
+---
+
+## İçindekiler
+
+1. [Bileşenler](#bileşenler)
+2. [Mimari](#mimari)
+3. [Roller ve ekranlar](#roller-ve-ekranlar)
+4. [Kurulum](#kurulum)
+5. [Çalıştırma](#çalıştırma)
+6. [Modeller](#modeller)
+7. [Testler ve denetimler](#testler-ve-denetimler)
+8. [Ortam değişkenleri](#ortam-değişkenleri)
+9. [Repo yapısı](#repo-yapısı)
+10. [Bilinen sınırlar](#bilinen-sınırlar)
+11. [Belgeler](#belgeler)
+12. [Lisans](#lisans)
+
+---
+
+## Bileşenler
+
+| Bileşen | Klasör | Teknoloji | Durum |
 |---|---|---|---|
-| **Web Platformu** | `quakemind-web/` | Next.js 14/15 (App Router, TypeScript) | Vatandaş ve komuta merkezi için çift portallı modern arayüz |
-| **AI Backend** | `backend/` | FastAPI (Python) | NLP, risk skorlama, uydu analizi ve kamera tespiti servisleri |
-| **Mobil Uygulama** | `mobile/` | Kotlin + Jetpack Compose | Room/WorkManager kullanan Android istemcisi |
+| **API** | `backend/` | FastAPI, Python 3.10 (sunucu imajı 3.12), SQLite (WAL) | Çalışıyor; canlıda https://quakemind-api.dehaozcan.online |
+| **Konsol** | `konsol/` | Vite + React 19 + TypeScript, MapLibre + deck.gl, Tailwind v4 | Çalışıyor; yeni arayüz |
+| Tanıtım sitesi | `tanitim/` | Astro | İskelet |
+| Eski web | `quakemind-web/` | Next.js | Olduğu gibi duruyor; yalnız kritik düzeltme. Onaydan sonra konsol devralır |
+| Mobil uygulama | `mobile/` | Kotlin + Jetpack Compose, Room, WorkManager | Android istemcisi; ayrıntı `mobile/README.md` ve `mobile/docs/` |
+| Streamlit modülleri | `backend/main.py`, `apps/` | Streamlit | Modellerin tek tek denendiği eski geliştirme arayüzü |
+| Canlı kurulum | `deploy/` | Docker, Nginx | Sunucu kurulumu ve dağıtım adımları (`deploy/README.md`) |
 
-Ayrıca `backend/main.py` ve `apps/` altında, backend modüllerinin tek tek Streamlit arayüzleriyle de çalıştırılabildiği bağımsız bir sürüm bulunur (geliştirme/deneme amaçlı).
-
----
-
-## 📚 İçindekiler
-
-1. [Mimari Genel Bakış](#-mimari-genel-bakış)
-2. [Özellikler](#-özellikler)
-3. [Repo Yapısı](#-repo-yapısı)
-4. [Kurulum](#-kurulum)
-5. [Çalıştırma](#-çalıştırma)
-6. [Kullanım Kılavuzu](#-kullanım-kılavuzu)
-7. [API Referansı](#-api-referansı)
-8. [Hotspot / İnternetsiz Kullanım](#-hotspot--internetsiz-kullanım)
-9. [Model Kaynakları](#-model-kaynakları)
-10. [Sorun Giderme](#-sorun-giderme)
-11. [Yol Haritası (Phase 2)](#-yol-haritası-phase-2)
-12. [Lisans](#-lisans)
+Raspberry Pi ve internetsiz (hotspot) çalışma **ertelendi**; ayrı bir iş olarak ele
+alınacak. Bugünkü sistem web + API, yanında Android istemcisi.
 
 ---
 
-## 🏗 Mimari Genel Bakış
+## Mimari
 
 ```
-                          ┌──────────────────────────────┐
-                          │   FastAPI AI Backend (:8000)  │
-                          │  - BERTurk NLP                │
-                          │  - CatBoost Risk Motoru        │
-                          │  - Segformer Uydu Analizi      │
-                          │  - YOLO Kamera Tespiti          │
-                          └──────────────┬───────────────┘
-                                         │ REST / JSON
-                 ┌───────────────────────┼───────────────────────┐
-                 │                                                │
-     ┌───────────▼────────────┐                     ┌────────────▼────────────┐
-     │  Next.js Web Platformu │                     │  Kotlin Android Uygulama │
-     │  (http://localhost:3000)│                     │  (WiFi Hotspot üzerinden)│
-     │  - /survivor portalı   │                     │  - Risk / Uydu / NLP     │
-     │  - /command portalı    │                     │  - Kamera (yerel)        │
-     └─────────────────────────┘                     └──────────────────────────┘
+ Konsol (Vite + React, :3200)                   API (FastAPI, :8000)
+ ─────────────────────────────                  ─────────────────────────────────────
+ tek kalıcı harita (MapLibre + deck.gl)  ─REST→ uclar/  (uç modülleri, Depends ile yetki)
+ tek canlı akış  GET /api/live (SSE)    ←SSE──  canli_yayin.py  (yalnız değişince mesaj)
+ TanStack Query (tazeleme yalnız SSE ile)              │
+                                                       ▼
+                                                depo/sqlite_surucu.py  ── veri/quakemind.sqlite3
+                                                       ▲
+                                  işçi süreçler (uydu bölütleme, metin, kamera)
+                                  ProcessPoolExecutor — modeller API'de değil işçide
 ```
 
-- **Online modda:** Web platformu ve backend aynı makinede veya ağda çalışır, tarayıcı üzerinden erişilir.
-- **Offline/afet modunda:** Backend'in çalıştığı bilgisayar bir **WiFi Hotspot** açar, telefonlar internete ihtiyaç duymadan bu hotspot'a bağlanıp yerel ağ üzerinden backend'e erişir.
+Temel kurallar (ayrıntı `CLAUDE.md` ve `MIMARI.md`):
+
+- **Pahalı iş istek yolunda çalışmaz.** Model çıkarımı işçi süreçte koşar; uzun işler
+  HTTP 202 + iş kimliği döner, ilerleme canlı akıştan gelir. Model eğitimi ayrı bir
+  komuttur (ör. `araclar_risk_egit.py`); API yalnız eğitilmiş modeli yükler.
+- **Yoklama yok.** Konsol `setInterval` ile uç sorgulamaz; tek SSE akışı vardır.
+  Bugün yayın süreç içidir ve tek uvicorn worker'ı varsayar.
+- **Depo deseni.** Uçlar SQL görmez, yalnız depo yöntemlerini çağırır. ORM yok,
+  parametreli SQL. Tek yazma bağlantısı + iş parçacığı başına okuma bağlantısı.
+- **Veritabanı bugün SQLite'tır.** PostGIS hedef mimaridir; sürücüsü
+  (`depo/postgis_surucu.py`) henüz yazılmadı. Eski `utils/postgis_manager.py` yalnız eski
+  yol hasarı uçlarında, PostgreSQL olmadığı için yedek kipte çalışır.
+- **Kimlik.** Rol asla istemciden gelmez. Kısa ömürlü (15 dk) HS256 erişim jetonu +
+  httpOnly çerezde yenileme jetonu; jeton URL'de taşınmaz. Konsoldaki rol kapısı yalnız
+  görünümdür, yetkiyi sunucu denetler.
+- **Veri dürüstlüğü.** Her katman kaynağını yazar; senaryo/tatbikat verisi "senaryo"
+  etiketiyle gösterilir, gerçek ölçümle aynı görünmez. Veri yoksa uydurulmaz, eksik
+  olduğu yazılır.
 
 ---
 
-## ✨ Özellikler
+## Roller ve ekranlar
 
-### 🔴 Vatandaş & Afetzede Portalı (`/survivor`)
-- Tek tıkla GPS destekli **SOS sinyali gönderme**
-- En yakın güvenli sığınağı ve açık/kapalı yolları gösteren harita (`SafeEvacuationMap`)
-- Canlı kamera ile duvar çatlağı / bina hasarı tarama (`SurvivorCameraScanner`, 60 FPS)
-- Acil malzeme talebi arayüzü
+Giriş ekranının üç kapısı vardır: **Afetzede · Saha ekibi · Koordinasyon**. Hesabın rolü
+kapıya uymazsa sunucu girişi reddeder. Hesap açma yalnız Afetzede kapısındadır; ekip
+hesaplarını koordinatör, koordinatör ve yönetici hesaplarını yönetici konsoldaki
+**Kullanıcılar** ekranından açar. Boş bir sunucuda ilk yönetici
+`araclar_kullanici.py ilk-yonetici` ile açılır (`deploy/README.md`).
 
-### 🔵 Arama-Kurtarma & Komuta Portalı (`/command`)
-- **War Room Dashboard:** Gelen SOS sinyallerinin canlı takibi ve ekip atama
-- **Uydu Yol Hasarı (`/command/road-damage`):** Segformer tabanlı segmentasyon ile hasar oranı, açık/kapalı yol tespiti
-- **Deprem Risk Paneli (`/command/risk`):** CatBoost ile şehir bazlı risk skoru, fay hattı ve son deprem verileri
-- **Afet NLP (`/command/nlp`):** BERTurk ile sosyal medya/saha metinlerinden kategori, aciliyet (P1–P5) ve konum çıkarımı
-- **Kamera Tespiti (`/command/camera`):** `catlak.pt` ve `bina.pt` YOLO modelleriyle canlı kamera veya fotoğraf yükleyerek çatlak/bina hasarı tespiti (dual mode: canlı kamera + foto yükleme)
-- **SOS Yönetimi (`/command/sos`):** Gelen acil çağrıların listelenmesi ve sevk edilmesi
+Her ekranın sağ üstündeki profil simgesi **Hesap ayarları**na (`/hesap`: rol, şifre
+değiştirme) ve **Çıkış yap**a götürür.
 
-### 🌟 Diğer
-- **Onboarding (`/onboarding`):** 3 adımlı karşılama akışı
-- **Auth (`/login`, `/register`):** Rol bazlı giriş/kayıt arayüzleri
-- **Tema:** Koyu (dark) glassmorphic arayüz, Tailwind CSS + Framer Motion animasyonları, Recharts grafikleri, React-Leaflet harita katmanları
+| Rol | Ekran | Ne yapar |
+|---|---|---|
+| `afetzede` | Afetzede ekranı (`src/afetzede/`) | SOS gönderir; fotoğraf, yazılı ihbar ya da ihtiyaç talebi bildirir; bildirimlerinin durumunu, gelen ekibi ve duyuruları canlı görür |
+| `saha` | Ekip ekranı (`src/ekip/`) + konsol | Atanan görevi ve güzergâhı görür, görev adımlarını (yolda → olay yerinde → tamamlandı) bildirir; konsolu acil bildirim, kullanıcılar ve tatbikat modları olmadan görür |
+| `koordinator` | Konsol | Aşağıdaki modlar; ekip hesaplarını yönetir |
+| `yonetici` | Konsol | Koordinatörün yaptıkları + koordinatör/yönetici hesapları |
 
----
+Konsolda sayfa yok, **mod** var: harita yerinde kalır, yalnız paneller ve katmanlar
+değişir (`konsol/src/modlar/modlar.ts`).
 
-## 📁 Repo Yapısı
-
-```text
-QuakeMind/
-├── start.sh                       # Backend + frontend'i tek komutla başlatan script
-├── HANDOFF.md                     # Proje bağlam/devir dokümanı
-├── KULLANIM_KILAVUZU.md           # Detaylı kullanım kılavuzu (hotspot, mobil vb.)
-├── PROJE_YOL_HARITASI.md          # Phase 2 yol haritası
-│
-├── quakemind-web/                 # Next.js web platformu
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── page.tsx           # Ana giriş / yönlendirme sayfası
-│   │   │   ├── onboarding/        # Karşılama akışı
-│   │   │   ├── login/             # Giriş ekranı
-│   │   │   ├── survivor/          # Vatandaş portalı + /camera
-│   │   │   └── command/           # Komuta portalı
-│   │   │       ├── risk/          # Deprem risk paneli
-│   │   │       ├── road-damage/   # Uydu yol hasarı analizi
-│   │   │       ├── nlp/           # Afet metin analizi
-│   │   │       ├── camera/        # YOLO kamera tespiti
-│   │   │       └── sos/           # SOS sevk yönetimi
-│   │   ├── components/            # map/, camera/, layout/ altında paylaşılan bileşenler
-│   │   ├── context/                # React context'leri
-│   │   ├── lib/                    # api.ts vb. yardımcı fonksiyonlar
-│   │   └── types/                  # TypeScript tip tanımları
-│   ├── package.json
-│   └── tailwind.config.js
-│
-├── backend/               # FastAPI AI backend
-│   ├── fastapi_app.py             # Ana API sunucusu (tüm endpoint'ler burada)
-│   ├── main.py                    # Bağımsız Streamlit giriş noktası
-│   ├── requirements.txt
-│   └── apps/
-│       ├── disaster_nlp/          # BERTurk NLP pipeline
-│       ├── earthquake_risk/       # CatBoost risk motoru + fay/deprem verisi
-│       ├── road_damage/           # Segformer uydu segmentasyonu
-│       └── camera_detection/      # YOLO (catlak.pt, bina.pt) kamera tespiti
-│
-└── mobile/                      # Kotlin/Jetpack Compose Android uygulaması
-    ├── app/                        # Android Activity, Compose ekranları ve ViewModel'ler
-    ├── core/network/               # FastAPI istemcisi ve servis sözleşmeleri
-    ├── core/data/                  # Repository'ler ve veri kaynakları
-    ├── core/database/              # Room yerel veri deposu
-    ├── sync/                       # WorkManager eşitleme
-    ├── gradlew.bat                  # Windows Gradle wrapper
-    └── settings.gradle.kts
-```
-
----
-
-## ⚙️ Kurulum
-
-### Ön Gereksinimler
-
-| Gereksinim | Detay |
+| Mod | Amaç |
 |---|---|
-| **İşletim sistemi** | Ubuntu 24.04 (veya Windows 10+) |
-| **Python** | 3.12+ |
-| **Node.js** | 20+ (önerilen: `nvm` ile 24.18.0) |
-| **RAM** | Minimum 8 GB (16 GB önerilir) |
-| **Disk** | ~5 GB (modeller + bağımlılıklar) |
-| **GPU** | Opsiyonel (CUDA destekli — uydu/kamera modülünü hızlandırır) |
-| **Android** | Android Studio, JDK 17+, Android SDK 37 (mobil geliştirme) |
+| Genel durum | Bütün kaynaklardan gelen hasar bilgisi ve ihbarlar tek haritada |
+| SOS kuyruğu | Ekip bekleyen çağrılar, ekip gönderme (araç ağında ETA) |
+| Ekipler | Hangi ekip nerede, neye gidiyor; ekip tanımları |
+| İhtiyaç talepleri | Su, gıda, barınma gibi talepler; nerede ne eksik |
+| Acil bildirim | Afetzede ekranlarına duyuru yayınlama / geri çekme |
+| Kullanıcılar | Hesap açma, rol/ekip atama, askıya alma, işlem kaydı |
+| Hasar analizi | Uydu/drone görüntüsünden yol kapanması çıkaran analiz |
+| Kamera tespiti | İhbar fotoğraflarında çatlak ve yapı hasarı |
+| Metin analizi | Türkçe ihbardan kategori, adres ve aciliyet |
+| Deprem riski | 81 il için sismik geçmiş, fay uzaklığı ve son hareketliliğe dayalı risk |
+| Simülasyon (tatbikat) | Gerçek görüntüde model koşturup rotaları tatbikat olarak dener |
+| Yol ve rota | Kapalı yollar ve ekiplerin geçebileceği güzergâh |
 
-### 1. Backend Kurulumu
+---
+
+## Kurulum
+
+### Gereksinimler
+
+| Gereksinim | Not |
+|---|---|
+| Python | 3.10 (depo kökündeki `venv/` bu sürümle kurulu) |
+| Node.js | 20+ |
+| RAM | 8 GB en az, 16 GB önerilir (uydu modeli işçide bellekte durur) |
+| GPU | Gerekmez; çıkarım CPU'da koşar (en iyi model ile tatbikat ~78 sn) |
+
+### API
+
+Sanal ortam depo kökündedir:
 
 ```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+python -m venv venv
+venv/Scripts/python.exe -m pip install -r backend/requirements.txt   # Linux/macOS: venv/bin/python
 ```
 
-> GPU (CUDA) ile PyTorch kurmak için:
-> `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121`
-
-Segformer (uydu) ve BERTurk (NLP) modelleri ilk kullanımda Hugging Face'den otomatik indirilir, elle bir işlem gerekmez (bkz. [Model Kaynakları](#-model-kaynakları)).
-
-### 2. Web Platformu Kurulumu
+Bir kez yapılacaklar:
 
 ```bash
-cd quakemind-web
-npm install
+# Risk modelini eğit (API modeli eğitmez; dosya yoksa risk uçları hata verir)
+venv/Scripts/python.exe backend/araclar_risk_egit.py
+
+# Yerel OSM yol ve tesis kesitini indir (hasar analizinin yol maskesi, tatbikatın yol ağı)
+venv/Scripts/python.exe backend/araclar_osm_indir.py
+
+# Demo hesaplarını aç (veritabanı depoya girmez, herkes kendi makinesinde kurar)
+venv/Scripts/python.exe backend/araclar_demo_hesaplari.py
 ```
 
-### 3. Mobil Uygulama Kurulumu (opsiyonel)
+Yol dosyası (`roads.gpkg`) yoksa analiz yolları Overpass'a sorar; o da yanıt vermezse
+sonuç "yol katmanı alınamadı" olur. Uydu modellerinin ağırlıkları ilk kullanımda
+künyedeki Hugging Face kaynağından iner (bkz. [Modeller](#modeller)).
 
-Android Studio ile `mobile/` klasörünü açın. Windows'ta debug APK oluşturmak için:
+### Konsol
+
+```bash
+npm --prefix konsol install
+```
+
+### Mobil uygulama (isteğe bağlı)
+
+Android Studio ile `mobile/` klasörünü açın. Windows'ta debug APK:
 
 ```powershell
 cd mobile
 .\gradlew.bat :app:assembleDebug
 ```
 
-Emülatörde varsayılan debug backend adresi `http://10.0.2.2:8000/`'dir. Fiziksel cihazda bilgisayarın LAN/hotspot IP'sini debug derlemesine verin:
-
-```powershell
-.\gradlew.bat -PquakemindApiBaseUrl=http://192.168.137.1:8000/ :app:assembleDebug
-```
-
-Buradaki IP örnektir; bilgisayarın gerçek IP adresini kullanın. Android istemci ağ ayarları ve bağlantı sözleşmeleri `mobile/docs/` altındadır. Release derlemesi için gerçek HTTPS backend URL'si ayrıca yapılandırılmalıdır.
+Emülatörde varsayılan backend adresi `http://10.0.2.2:8000/`'dir. Fiziksel cihazda
+bilgisayarın LAN/hotspot IP'sini verin:
+`.\gradlew.bat -PquakemindApiBaseUrl=http://<ip>:8000/ :app:assembleDebug`.
+Bağlantı sözleşmeleri `mobile/docs/` altındadır.
 
 ---
 
-## ▶️ Çalıştırma
+## Çalıştırma
 
-### Yöntem A — Tek Komutla Başlatma (önerilen)
-
-Repo kökünde bulunan `start.sh`, backend ve frontend'i birlikte başlatır, loglarını `.logs/` klasörüne yazar ve `Ctrl+C` ile ikisini birden düzgünce kapatır:
+İki süreç:
 
 ```bash
-./start.sh
+venv/Scripts/python.exe -m uvicorn fastapi_app:app --host 127.0.0.1 --port 8000 --app-dir backend
 ```
-
-Başarılı başlangıçta göreceğiniz çıktı:
-
-```
-Backend : http://127.0.0.1:8000   (log: .logs/backend.log)
-Frontend: http://localhost:3000   (log: .logs/web.log)
-Durdurmak icin: Ctrl+C
-```
-
-### Yöntem B — Ayrı Ayrı Başlatma
-
-**Backend (FastAPI):**
-```bash
-cd backend
-source venv/bin/activate
-python3 fastapi_app.py
-```
-- API: `http://127.0.0.1:8000`
-- Swagger/OpenAPI dokümantasyonu: `http://127.0.0.1:8000/docs`
-
-**Web Platformu (Next.js):**
-```bash
-cd quakemind-web
-npm run dev
-```
-- Arayüz: `http://localhost:3000`
-
-**Mobil Uygulama (Kotlin / Android):**
-```powershell
-cd mobile
-.\gradlew.bat :app:installDebug
-```
-Debug APK üretmek için `:app:assembleDebug`, release APK üretmek için `:app:assembleRelease` kullanın. APK konumu: `mobile/app/build/outputs/apk/debug/app-debug.apk`. Release dağıtımı için ayrıca geçerli imzalama yapılandırması gerekir.
-
-### Yöntem C — Bağımsız Streamlit Modülleri
-
-Backend'in her AI modülü ayrıca kendi Streamlit arayüzüyle bağımsız çalıştırılabilir:
 
 ```bash
-cd backend
-streamlit run main.py          # Birleşik arayüz (tüm modüller sidebar'dan seçilir)
-
-# veya tek tek:
-streamlit run apps/disaster_nlp/app.py
-streamlit run apps/road_damage/app.py
-python3 apps/earthquake_risk/main.py
+npm --prefix konsol run dev
 ```
 
----
+- Konsol: **http://localhost:3200** — `/api/*` istekleri 8000'e vekillenir. Başka bir
+  API adresi için `QM_API=http://127.0.0.1:8001`.
+- API belgeleri (Swagger): http://127.0.0.1:8000/docs
+- API'nin açılması ~20 sn sürer; uydu modeli ilk analize kadar belleğe girmez.
 
-## 🖱 Kullanım Kılavuzu
+Demo hesapları (yerelde `araclar_demo_hesaplari.py` açar; şifresi depoda açık olduğu
+için yalnız yerel geliştirme içindir). Canlıda aynı dört hesap, sunucudaki
+`QUAKEMIND_ORNEK_HESAP_SIFRESI` ile ve depoda yazmayan bir şifreyle kurulur; şifreleri
+uygulamadan değiştirilemez (`deploy/README.md`):
 
-### Web Platformu Akışı
-
-1. `http://localhost:3000` adresine gidin, karşılama (`/onboarding`) akışını tamamlayın.
-2. Rolünüze göre portal seçin:
-   - **Vatandaş/Afetzede (`/survivor`):** SOS gönder, güvenli tahliye rotasını gör, kamera ile çevrenizi tarayın.
-   - **Arama-Kurtarma/Komuta (`/command`):** War Room dashboard üzerinden gelen SOS'ları izleyin, uydu/NLP/risk/kamera modüllerini kullanın.
-
-### Deprem Risk Modülü (`/command/risk`)
-1. Şehir seçin (81 il mevcut) veya manuel koordinat girin.
-2. "Deprem Riskini Hesapla" butonuna basın.
-3. Sonuçlar: risk skoru/seviyesi (Düşük/Orta/Yüksek/Çok Yüksek), fay hatları + deprem odaklarını gösteren harita, yakın faylar ve son deprem kayıtları.
-
-### Uydu Yol Hasarı Modülü (`/command/road-damage`)
-1. Şehir seçin (ör. Antakya, Kahramanmaraş, Gaziantep, Malatya, Adıyaman).
-2. Uydu kaynağı seçin: **Google Maps** (güncel), **OpenAerialMap** (afet sonrası özel görüntüler), **Esri Wayback** (tarihsel görüntüler).
-3. Hasar hassasiyeti (1-10), tespit eşiği (0.05-0.95) ve post-processing seviyesini ayarlayın.
-4. "Analizi Başlat" — süre ~1-2 dakika (uydu indirme + AI inference).
-5. Sonuçlar: hasar oranı (%), açık/kapalı yol sayısı, analiz günlüğü, önerilen aksiyon.
-
-> Bu modül uydu görüntüsü indirmek için **internet gerektirir**.
-
-### Afet NLP Modülü (`/command/nlp`)
-1. Örnek metin seçin veya serbest Türkçe metin girin (sosyal medya paylaşımı, saha raporu vb.).
-2. "Analizi Çalıştır" butonuna basın.
-3. Sonuçlar: kategori (Enkaz Bildirimi / Acil Yardım / Yol Kapanma / Lojistik / Alakasız), güven skoru, P1-P5 aciliyet seviyesi, NER ile çıkarılan konum + geocoding koordinatları.
-
-### Kamera Tespiti Modülü (`/command/camera`, `/survivor/camera`)
-1. Model seçin: `catlak.pt` (duvar çatlağı) veya `bina.pt` (bina hasarı).
-2. Mod seçin: **canlı kamera** veya **fotoğraf yükleme**.
-3. Tespit sonuçları görüntü üzerinde işaretlenerek listelenir.
-
-> Canlı kamera modu tarayıcı/cihaz kamerasını kullanır; fotoğraf yükleme modu backend'deki `/api/camera/analyze` endpoint'ine istek atar.
-
-### SOS Akışı
-1. Vatandaş portalından GPS ile SOS gönderilir → backend'e `POST /api/sos/alert`.
-2. Komuta portalı (`/command/sos`) `GET /api/sos/alerts` ile gelen sinyalleri listeler ve ekip atar.
-
-Daha ayrıntılı hotspot/mobil kullanım adımları için bkz. **`KULLANIM_KILAVUZU.md`**.
-
----
-
-## 🔌 API Referansı
-
-Backend `http://127.0.0.1:8000` üzerinde çalışır, tüm endpoint'ler için otomatik Swagger dokümantasyonu `/docs` altında mevcuttur.
-
-| Endpoint | Metod | Açıklama |
+| Rol | E-posta | Kapı |
 |---|---|---|
-| `/` | GET | Sağlık kontrolü |
-| `/api/status` | GET | Modül durumu (nlp, risk, road_damage vb.) |
-| `/api/nlp/analyze` | POST | Afet metni analizi (kategori, aciliyet, konum) |
-| `/api/risk/predict` | POST | Şehir/koordinat bazlı deprem risk tahmini |
-| `/api/risk/fault_lines` | GET | Fay hattı verisi |
-| `/api/risk/all_quakes` | GET | Tüm deprem kayıtları |
-| `/api/risk/refresh_live_data` | POST | Canlı deprem verisini güncelle |
-| `/api/road_damage/wayback_versions` | GET | Esri Wayback görüntü sürümleri |
-| `/api/road_damage/oam_search` | GET | OpenAerialMap görüntü arama |
-| `/api/road_damage/analyze` | POST | Uydu görüntüsünden yol hasarı analizi |
-| `/api/road_damage/route` | POST | Açık yollara göre rota hesaplama |
-| `/api/road_damage/assembly` | GET | Analiz sonrası birleştirilmiş görüntü/rapor |
-| `/api/sos/alert` | POST | Yeni SOS sinyali gönderme |
-| `/api/sos/alerts` | GET | Gönderilmiş SOS sinyallerini listeleme |
-| `/api/camera/analyze` | POST | Fotoğraf/kare üzerinde YOLO tespiti (çatlak/bina) |
+| Yönetici | `yonetici-demo@quakemind.local` | Koordinasyon |
+| Koordinatör | `demo@quakemind.local` | Koordinasyon |
+| Saha ekibi | `saha-demo@quakemind.local` | Saha ekibi |
+| Afetzede | `afetzede-demo@quakemind.local` | Afetzede |
 
-### Örnek İstekler
+Şifreler ve tatbikat sunum sırası: **`DEMO_CALISTIRMA.md`**.
 
-**NLP Analizi:**
-```bash
-curl -X POST http://127.0.0.1:8000/api/nlp/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Hatay Antakya Cebrail mahallesi yıkıldı enkaz altında kalanlar var"}'
-```
-
-**Risk Tahmini:**
-```bash
-curl -X POST http://127.0.0.1:8000/api/risk/predict \
-  -H "Content-Type: application/json" \
-  -d '{"city": "Istanbul", "refreshData": false}'
-```
-
-**Uydu Yol Hasarı:**
-```bash
-curl -X POST http://127.0.0.1:8000/api/road_damage/analyze \
-  -H "Content-Type: application/json" \
-  -d '{
-    "city": "Antakya (Hatay)",
-    "latitude": 36.20,
-    "longitude": 36.16,
-    "source": "google",
-    "damageBooster": 3.5,
-    "threshold": 0.40,
-    "useImagenetNorm": true,
-    "postProcessLevel": 2
-  }'
-```
+> Kökteki `start.sh` eski düzeni (Next.js web) başlatır; konsol için yukarıdaki iki
+> komutu kullanın.
 
 ---
 
-## 📡 Hotspot / İnternetsiz Kullanım
+## Modeller
 
-QuakeMind'in en kritik özelliği, **internet olmadan** da çalışabilmesidir:
+Ağır model dosyaları depoya girmez; Hugging Face'ten indirilir ya da yerel yoldan yüklenir.
 
-```
-+---------------------------+          WiFi Hotspot           +------------------+
-|      BİLGİSAYAR (PC)      |  <---------------------------> |   TELEFON (App)  |
-|  FastAPI Sunucu (:8000)   |        (internet gerekmez)      |  QuakeMind App   |
-+---------------------------+                                 +------------------+
-```
+| Model | Görev | Kaynak |
+|---|---|---|
+| SegFormer MiT-B4 (etkin) | Uydu/drone görüntüsünde hasar bölütleme | `Utbird/dispath_optimized_mitb4_focal_dice30` |
+| SegFormer B0 / B2 · U-Net MiT-B4 | Kıyas modelleri; tatbikattaki Hızlı / Dengeli / En iyi | `Furkei/quakemind-uydu-modelleri` |
+| BERTurk sınıflandırıcı (`2kveri`) | İhbar metninin kategorisi ve aciliyeti | `Utbird/EqTwitterTr` (eksikse indirilir) |
+| Adres dizini (kural tabanlı) | Metinden mahalle/sokak çözümü | `metin_analizi/adres.py`, yerel; ağa çıkmaz |
+| YOLO `catlak.pt`, `bina.pt` | Fotoğrafta çatlak ve yapı hasarı | Depoda (`apps/camera_detection/models/`) |
+| CatBoost risk modeli | 81 il deprem risk skoru | `araclar_risk_egit.py` üretir (`risk_catboost.cbm`) |
+| Harita altlığı | Konsol zemin karoları | `Utbird/quakemind-altlik` (HF veri kümesi) |
+| OSM yol ve tesis kesiti | Yol maskesi, tatbikat yol ağı, ekip üsleri | `Furkei/quakemind-osm-yollar` (HF veri kümesi, ODbL) |
+| İl merkezleri | 81 il risk sıralaması | Depoda (`apps/earthquake_risk/data/il_merkezleri.json`, OSM) |
 
-1. **Hotspot açma:**
-   - Linux: `nmcli device wifi hotspot ifname <arayüz> ssid QuakeMindNet password quakemind123` → IP genelde `10.42.0.1`
-   - Windows: Ayarlar > Ağ ve İnternet > Mobil Etkin Nokta → IP genelde `192.168.137.1`
-2. Telefonu bu ağa bağlayın (internet gerekmez, sadece yerel ağ üzerinden iletişim).
-3. Fiziksel telefon için repo kökünde `./start.sh --telefon` çalıştırın veya `QUAKEMIND_HOST=0.0.0.0` ayarıyla `fastapi_app.py` dosyasını başlatın.
-4. Android istemcisinin backend adresini bilgisayarın gerçek LAN/hotspot IP'sine (`10.42.0.1:8000` veya `192.168.137.1:8000` yaygın örneklerdir) ayarlayın.
-5. Aynı hotspot'a birden fazla telefon bağlanabilir; hepsi aynı backend'e erişir.
+Uydu modellerinin künyeleri `backend/modeller/uydu/*.json`'dadır: mimari, ölçümler,
+ağırlığın SHA-256'sı ve Hugging Face kaynağı (sabit sürüm). Ağırlık
+`apps/road_damage/models/` altına iner; parmak izi tutmazsa yüklenmez. Etkin model
+`QM_UYDU_MODELI` ile seçilir. Yeni model teslim süreci: `backend/modeller/README.md`.
 
-> Yalnızca uydu görüntüsü indirme ve canlı deprem verisi güncelleme gibi işlemler internet gerektirir; NLP, risk hesaplama ve kamera tespiti tamamen yerel ağda çalışır.
-
-Detaylı adımlar (hotspot kurulumu, firewall ayarları, çoklu telefon senaryosu) için **`KULLANIM_KILAVUZU.md`** dosyasına bakın.
-
----
-
-## 🧠 Model Kaynakları
-
-Bazı büyük model dosyaları repo dışında (Hugging Face) barındırılır ve eksikse otomatik indirilir:
-
-| Model | Kullanım | Kaynak | Otomatik indirme |
-|---|---|---|---|
-| BERTurk sınıflandırma | Afet NLP | `Utbird/EqTwitterTr` | ✅ |
-| NER modeli | Konum çıkarımı | `yhaslan/turkish-earthquake-tweets-ner` | ✅ |
-| Segformer (MiT-B4) | Uydu yol hasarı | `Utbird/dispath_optimized_mitb4_focal_dice30` | ✅ |
-| YOLO `catlak.pt` | Duvar çatlağı tespiti | Repo içinde (`apps/camera_detection/models/`) | — |
-| YOLO `bina.pt` | Bina hasarı tespiti | Repo içinde (`apps/camera_detection/models/`) | — |
-| CatBoost risk modeli | Deprem risk skorlama | Repo içinde (`apps/earthquake_risk/models/`) | — |
-
-Deprem risk modülü için tarihsel veri `backend/apps/earthquake_risk/data/query.csv` içinde hazır bulunur; güncel veri "Veriyi Güncelle" ile çekilebilir (internet gerektirir).
+Model doğruluğuyla ilgili sınırlar (duyarlılık, kalibrasyon) `DEMO_CALISTIRMA.md` §7 ve
+`EKSIKLER_VE_SORUNLAR.md`'de yazılıdır; ölçülmemiş bir başarım iddiası yapılmaz.
 
 ---
 
-## 🛠 Sorun Giderme
+## Testler ve denetimler
 
-| Sorun | Çözüm |
+```bash
+cd backend && ../venv/Scripts/python.exe -m pytest -q     # API testleri (~2 dk)
+```
+
+```bash
+cd konsol && npx tsc -b --noEmit         # tip denetimi
+npm --prefix konsol run kontrol:token    # keyfi değer denetimi (text-[13px], bg-[#…] yasak)
+```
+
+Dağıtım hazırlığı aynı testleri sunucu imajının içinde de koşturur (`deploy/deploy.sh`).
+
+---
+
+## Ortam değişkenleri
+
+| Değişken | Ne işe yarar |
 |---|---|
-| Sunucuya bağlanamıyorum | Terminalde `Uvicorn running on http://0.0.0.0:8000` çıktısını kontrol edin |
-| Telefon/tarayıcı backend'e erişemiyor | Aynı ağda olduğunuzdan ve IP/port'un doğru girildiğinden emin olun |
-| Firewall engelliyor | `sudo ufw allow 8000` (Linux) veya Windows Firewall'da 8000 portunu açın |
-| Port meşgul | `lsof -i :8000` ile kontrol edip gerekirse süreci sonlandırın |
-| `nlp`/`risk` modülü `false` dönüyor | `curl http://127.0.0.1:8000/api/status` ile kontrol edin; eksik bağımlılık için `pip install -r requirements.txt` |
-| Uydu analizi çok yavaş/başarısız | GPU + CUDA destekli PyTorch kurun; internet bağlantısını kontrol edin; daha küçük bir alan seçin |
-| Web arayüzü açılmıyor | `cd quakemind-web && rm -rf node_modules .next && npm install && npm run dev` |
-| Mobil uygulama derlenmiyor | `cd mobile && .\gradlew.bat :app:assembleDebug --stacktrace` (Windows); Android SDK/JDK sürümünü doğrulayın |
+| `QUAKEMIND_JWT_ANAHTARI` | Jeton imza anahtarı. Tanımlı değilse her açılışta yenisi üretilir (oturumlar düşer) |
+| `QUAKEMIND_SQLITE` | Veritabanı dosyası yolu (deneme için kopya DB) |
+| `QUAKEMIND_CORS` | Geliştirme adreslerine eklenecek izinli kaynaklar, virgülle (yıldız kullanılmaz) |
+| `QUAKEMIND_CEREZ_GUVENLI` | `1` ise yenileme çerezi `Secure` bayrağıyla yazılır (HTTPS altında) |
+| `QUAKEMIND_ESKI_UCLAR` | Eski web'in kullandığı uçları açar; varsayılan kapalı |
+| `QM_UYDU_MODELI` | Etkin uydu modeli künyesinin adı |
+| `QUAKEMIND_LOCAL_OSM_PBF` | Yerel OSM PBF dosyası yolu (`araclar_yerel_osm_kur.py`) |
+| `QUAKEMIND_OSM_DIZINI` | `roads.gpkg`'nin aranacağı dizin; yoksa `veri/osm`, sonra `apps/road_damage/data/osm` |
+| `QUAKEMIND_ORNEK_HESAP_SIFRESI` | Tanımlıysa API açılışta dört ortak örnek hesabı bu şifreyle kurar (en az 10 karakter) |
+| `QM_API` | Konsolun vekillediği API adresi (geliştirme) |
 
 ---
 
-## 🚀 Yol Haritası (Phase 2)
+## Repo yapısı
 
-Detaylar için `PROJE_YOL_HARITASI.md` ve `HANDOFF.md` dosyalarına bakın. Öne çıkanlar:
-
-- **MLOps Admin Paneli (`/command/admin`):** Model versiyonlama, eğitim hiperparametreleri ve başarım metrikleri (mIoU, Dice, F1, Precision/Recall) grafikleri; sunucuyu yeniden başlatmadan model sürümü değiştirme.
-- **Çift Modlu Ekip Mesajlaşma (`/command/chat`):** Online/offline (P2P Mesh, store-and-forward) taktik sohbet.
-- **Kullanıcı Kayıt & Kimlik Doğrulama:** `POST /api/auth/register`, `/api/auth/login`, `/api/auth/me`.
-- **Firebase Entegrasyonu:** SMS OTP ile telefon doğrulama, FCM push bildirimleri.
-- **PostGIS & pgRouting:** PostgreSQL 16 + PostGIS 3 ile çevrimdışı rota hesaplama (`pgr_dijkstra`).
-- **Backend Performans Optimizasyonları:** `lru_cache` önbellekleme, async paralel inference.
+```text
+QuakeMind_Proje_Repo/
+├── CLAUDE.md, MIMARI.md, ARAYUZ_KARARLARI.md   # kurallar, mimari, tasarım sistemi
+├── PROJE_DOSYASI.md                            # akademik tanıtım (kanıt etiketli)
+├── EKSIKLER_VE_SORUNLAR.md                     # açık sorunlar (J-…)
+├── DEMO_CALISTIRMA.md                          # demo ve tatbikat sunumu
+│
+├── backend/
+│   ├── fastapi_app.py        # uygulama girişi (uçları uclar/'dan bağlar)
+│   ├── cekirdek.py           # işçi havuzu, iş kaydı, paylaşılan durum
+│   ├── uclar/                # uç modülleri: oturum, sos, ihbar, gorev, ekip, kamera,
+│   │                         #   metin, risk, rota, simulasyon, katmanlar, canli, …
+│   ├── depo/sqlite_surucu.py # depo deseni; tablolar ve indeksler
+│   ├── kimlik.py             # jeton, şifre, rol bağımlılıkları
+│   ├── canli_yayin.py        # SSE yayını
+│   ├── metin_analizi/        # metin işçisi: sınıflandırma + adres + çıkarım
+│   ├── risk_hizmeti.py       # iş parçacığı güvenli risk hesabı
+│   ├── apps/                 # modeller: road_damage, disaster_nlp, camera_detection,
+│   │                         #   earthquake_risk
+│   ├── modeller/uydu/        # uydu modeli künyeleri
+│   ├── ornek_hesaplar.py     # ortak örnek hesaplar
+│   ├── araclar_*.py          # tek seferlik komutlar (eğitim, ölçüm, veri hazırlama,
+│   │                         #   ilk yönetici, OSM kesitini indirme)
+│   ├── tests/, testler/      # pytest
+│   └── veri/                 # SQLite, altlık, yol ağı, OSM kesiti (depoya girmez)
+│
+├── konsol/                   # yeni arayüz (Vite + React)
+│   └── src/
+│       ├── kimlik/           # giriş, rol kapısı, oturum, profil menüsü, hesap ayarları
+│       ├── kabuk/            # üst çubuk, paneller, zaman şeridi, Ctrl+K
+│       ├── harita/           # tek MapLibre örneği + deck.gl katmanları
+│       ├── modlar/           # konsol modları
+│       ├── afetzede/         # afetzede ekranı
+│       ├── ekip/             # saha ekibi ekranı
+│       ├── canli/            # tek SSE istemcisi
+│       ├── veri/             # TanStack Query sorguları
+│       └── stil/token.css    # tasarım token'ları (tek kaynak)
+│
+├── mobile/                   # Android istemcisi (Kotlin + Jetpack Compose)
+├── deploy/                   # canlı sunucu kurulumu (Docker, Nginx, dağıtım betiği)
+├── tanitim/                  # tanıtım sitesi (Astro)
+├── prototip/                 # komuta konsolu prototipi
+├── makale/                   # makale çalışma dosyaları
+└── quakemind-web/            # eski web (Next.js)
+```
 
 ---
 
-## 📄 İlgili Dokümanlar
+## Bilinen sınırlar
 
-- `HANDOFF.md` — Proje bağlam ve devir dokümanı
-- `KULLANIM_KILAVUZU.md` — Hotspot/mobil odaklı ayrıntılı kullanım kılavuzu
-- `PROJE_YOL_HARITASI.md` — Phase 2 mimari planlama
-- `backend/README.md` — Bağımsız Streamlit modülleri için İngilizce teknik doküman
-- `backend/OPTIMIZASYON_ANALIZI.md` — Backend performans analizi notları
+- **Tek süreç varsayımı.** İş kuyruğu ve SSE yayını süreç içidir; sunucu yeniden
+  başlarsa koşan işler kaybolur, birden çok worker desteklenmez. Hedef: Postgres tablosu
+  + `FOR UPDATE SKIP LOCKED` ve `LISTEN/NOTIFY`.
+- **PostGIS yok.** Mekânsal sorgular SQLite'ta `(lon, lat)` b-tree indeksiyle kutu
+  sorgusudur.
+- **Uydu modeli bina hasarı bulur**; yol kapanması bundan türetilir (yol hasarı etiketi
+  yok). Duyarlılığı düşüktür.
+- **Tatbikatın afetzede konumları üretilmiş veridir** ve arayüzde "senaryo" etiketiyle
+  gösterilir. Tatbikat noktaları koşu bitince ya da API yeniden açılınca silinir; gerçek
+  veriye karışmaz.
+- **Süre tahmini** yol türüne göre ortalama hız varsayımıdır; anlık trafik yoktur.
+
+Güncel ve ayrıntılı liste: `EKSIKLER_VE_SORUNLAR.md`.
 
 ---
 
-## ⚖️ Lisans
+## Belgeler
 
-Bu proje **tescillidir ve tüm hakları saklıdır** (All Rights Reserved). Açık kaynak bir lisans **değildir**.
+| Belge | İçerik |
+|---|---|
+| `CLAUDE.md` | Geliştirme kuralları (veri dürüstlüğü, sözleşme, kuyruk, yoklama yasağı, kimlik) |
+| `MIMARI.md` | Katmanlar, veri sözleşmesi, ölçek eşikleri, ölçüm bütçeleri |
+| `ARAYUZ_KARARLARI.md` | Renk ve tip token'ları, bileşenler, panel kuralı |
+| `PROJE_DOSYASI.md` | Sistem ve veri mimarisinin akademik tanıtımı |
+| `EKSIKLER_VE_SORUNLAR.md` | Açık sorunların kimlikli (J-…) takibi |
+| `DEMO_CALISTIRMA.md` | Demo hesapları, tatbikat sunumu, ölçülen süreler |
+| `konsol/README.md` | Konsolun yapısı ve kuralları |
+| `backend/modeller/README.md` | Uydu modeli künyesi ve teslim süreci |
+| `deploy/README.md` | Canlı sunucu: dağıtım, ilk hesaplar, analiz dosyaları |
+| `mobile/README.md` | Android istemcisi |
 
-Telif hakkı sahibinin önceden yazılı izni olmaksızın bu depodaki kodun, belgelerin, model dosyalarının veya herhangi bir materyalin kopyalanması, dağıtılması, değiştirilmesi veya herhangi bir amaçla (ticari veya değil) kullanılması **yasaktır**.
+---
+
+## Lisans
+
+Bu proje **tescillidir ve tüm hakları saklıdır** (All Rights Reserved). Açık kaynak bir
+lisans **değildir**.
+
+Telif hakkı sahibinin önceden yazılı izni olmaksızın bu depodaki kodun, belgelerin, model
+dosyalarının veya herhangi bir materyalin kopyalanması, dağıtılması, değiştirilmesi veya
+herhangi bir amaçla (ticari veya değil) kullanılması **yasaktır**.
 
 Ayrıntılar için bkz. [`LICENSE`](./LICENSE).

@@ -1,8 +1,9 @@
 # QuakeMind Konsol
 
-Yeni komuta konsolu. Vite + React + TypeScript + Tailwind v4, tek kalıcı harita
-(MapLibre + deck.gl), tek SSE akışı. Mevcut `quakemind-web/` (Next.js) olduğu gibi durur;
-onay verilene kadar ikisi yan yanadır (CLAUDE.md kural 7).
+QuakeMind'ın arayüzü: koordinasyon konsolu, afetzede ekranı ve saha ekibi ekranı tek
+uygulamada. Vite + React 19 + TypeScript + Tailwind v4; tek kalıcı harita (MapLibre +
+deck.gl), tek SSE akışı. Eski `quakemind-web/` (Next.js) olduğu gibi durur; onay verilene
+kadar ikisi yan yanadır (CLAUDE.md kural 7).
 
 Kaynak belgeler: `../CLAUDE.md` · `../MIMARI.md` · `../ARAYUZ_KARARLARI.md`
 Referans prototip: `../prototip/komuta-konsolu/`
@@ -11,61 +12,96 @@ Referans prototip: `../prototip/komuta-konsolu/`
 
 ```bash
 npm --prefix konsol install
-npm --prefix konsol run dev      # http://127.0.0.1:3200
+npm --prefix konsol run dev      # http://localhost:3200
 ```
 
-Geliştirmede `/api/*` istekleri `http://127.0.0.1:8000` adresine (FastAPI) vekillenir.
-Başka bir adres için: `QM_API=http://127.0.0.1:8001 npm --prefix konsol run dev`.
+API (FastAPI) ayrıca çalışmalı; nasıl başlatılacağı kök `README.md`'de. Geliştirmede
+`/api/*` istekleri `http://127.0.0.1:8000` adresine vekillenir. Başka bir adres için:
+`QM_API=http://127.0.0.1:8001 npm --prefix konsol run dev`.
 
 > Aynı anda iki backend çalışıyorsa (biri `0.0.0.0:8000`, diğeri `127.0.0.1:8000`)
 > istekler ikisi arasında bölünür: bir uçta açılan iş öbür uçta "bilinmeyen kimlik"
 > olur. Böyle bir durumda backend'i ayrı bir porta alıp `QM_API` ile göster.
 
+Giriş için demo hesapları `../DEMO_CALISTIRMA.md` §2'de.
+
 ```bash
 npm --prefix konsol run build          # dist/ — statik dosyalar, Node sunucusu gerekmez
-npm --prefix konsol run kontrol:token  # keyfi değer denetimi (CI bunu koşacak)
+npx --prefix konsol tsc -b --noEmit     # tip denetimi (`kontrol` betiği src'ye .js döküyor)
+npm --prefix konsol run kontrol:token  # yalnız keyfi değer denetimi
 ```
 
-## Bu iskelette ne var
+## Ekranlar ve roller
+
+Rota bazlı kod bölme vardır: afetzede ve ekip ekranları harita motorunu indirmez.
+
+| Yol | Ekran | Rol |
+|---|---|---|
+| `/giris` | Üç kapılı giriş: Afetzede · Saha ekibi · Koordinasyon | herkes |
+| `/sifre-degistir` | Tek seferlik şifreyle açılan hesabın ilk girişi | herkes |
+| `/konsol/:mod` | Koordinasyon konsolu | `saha`, `koordinator`, `yonetici` (acil bildirim, kullanıcılar ve tatbikat yalnız `koordinator`/`yonetici`) |
+| `/afetzede` | SOS, fotoğraf/metin/ihtiyaç ihbarı, bildirimlerim, gelen ekip, duyurular | `afetzede` (koordinasyon da açabilir) |
+| `/ekip` | Atanan görev, güzergâh, görev adımları | `saha` (koordinasyon da açabilir) |
+
+Rol kapısı (`src/kimlik/RolKapisi.tsx`) yalnız görünümdür; yetkiyi sunucu denetler
+(kural 5). Bir modun hangi rollere görüneceği `src/modlar/modlar.ts`'teki `roller`
+alanındadır.
+
+Konsol modları: genel durum · SOS kuyruğu · ekipler · ihtiyaç talepleri · acil bildirim ·
+kullanıcılar · hasar analizi · kamera tespiti · metin analizi · deprem riski · simülasyon
+(tatbikat) · yol ve rota. Sayfa yok, mod var: mod değişince harita yerinde kalır, yalnız
+paneller ve açık katmanlar değişir. Yeni mod eklemek `MODLAR` listesine bir satır
+eklemektir.
+
+## Yapı
 
 | Parça | Yer | Not |
 |---|---|---|
-| Tasarım token'ları | `src/stil/token.css` | **Tek kaynak.** Renk, yazı ölçeği (6 değer), köşe, boşluk. Tailwind'in hazır renk/yazı ölçekleri `initial` ile kapatıldı |
-| Giriş + rol yönlendirmesi | `src/kimlik/` | Oturum **sahte**; rol istemciden gelmez, "sunucu" döndürür (kural 5) |
+| Tasarım token'ları | `src/stil/token.css` | **Tek kaynak.** Renk, yazı ölçeği, köşe, boşluk. Tailwind'in hazır renk/yazı ölçekleri `initial` ile kapatıldı |
+| Oturum | `src/kimlik/oturum.tsx`, `oturumUcu.ts` | Gerçek `/api/oturum/*` uçları. Erişim jetonu yalnız bellekte; sekme yenilenince httpOnly çerezdeki yenileme jetonuyla geri alınır. 401'de sessizce yenilenir. Rol sunucudan gelir |
 | Kalıcı harita kabuğu | `src/harita/HaritaKabugu.tsx` | Tek MapLibre örneği + deck.gl `MapboxOverlay`; mod değişince yeniden kurulmaz |
-| Modlar | `src/modlar/modlar.ts` | Sayfa yok: genel durum · SOS kuyruğu · hasar analizi · kamera tespiti · metin analizi · deprem riski · yol ve rota |
-| Kabuk | `src/kabuk/` | Üst çubuk, sol katman paneli, sağ durum paneli, alt zaman şeridi, Ctrl+K paleti |
+| Altlık | `src/harita/altlikGorunumu.ts`, `src/veri/altlik.ts` | Kendi altlığımız (OSM'den üretilen bölge paketleri, `/api/altlik/`); yalnız görünen bölgelerin paketleri iner |
+| Katmanlar | `src/harita/katmanlar.ts`, `simKatmanlari.ts` | Olaylar, ekipler, kapanmalar, rotalar, faylar, depremler, toplanma ve sağlık yerleri; tatbikat katmanları ayrı |
+| Isı | `src/harita/isiDokusu.ts` | Sunucu her kanalın ızgarasını ayrı üretir; ağırlıklı karışım tarayıcıda yapılır, ağırlık değişince istek gitmez |
+| Kabuk | `src/kabuk/` | Üst çubuk, sol/sağ panel, zaman şeridi (olay yoğunluğu histogramı), Ctrl+K paleti, TATBİKAT şeridi |
 | Panel kuralı | `src/kabuk/Panel.tsx` | `Amac` → `HazirSecenekler` → `InceAyar` → `SuAn` → `Teknik` (ARAYUZ §9) |
 | Zaman aralığı | `src/durum/zamanDurumu.ts` | Varsayılan canlı; şerit geri çekilince geçmiş; oynat yalnız geçmişte |
-| Tek canlı akış | `src/canli/canliAkis.ts` | `/api/live`, üstel geri çekilme; **yoklama yok** |
-| Sunucu verisi | `src/veri/` | TanStack Query; tazeleme yalnız SSE mesajıyla (`staleTime: Infinity`) |
-| Afetzede ekranı | `src/afetzede/` | Ayrı ve hafif; harita motorunu indirmez |
+| Tek canlı akış | `src/canli/` | `GET /api/live`, üstel geri çekilme; **yoklama yok** |
+| Sunucu verisi | `src/veri/` | TanStack Query; `staleTime: Infinity`, odak/yeniden bağlanma tazelemesi kapalı. Tazeleme yalnız SSE mesajıyla |
+| İstemci durumu | `src/durum/` | Zustand: konsol, seçim, zaman, rota, işler, simülasyon |
 
-## Bu iskelette ne yok (bilerek)
+## Canlı akış
 
-Uçlar bağlanmadığı için **hiçbir veri üretilmez** (kural 1). Paneller sayı yerine `—` ve
-"uç bağlı değil" yazar; örnek/uydurma kayıt konmaz.
+Sunucu yalnız değişiklik olduğunda mesaj gönderir (`src/canli/mesajlar.ts`):
 
-Bağlanacak uçlar:
-
-| Uç | Ne döndürecek |
+| Mesaj | Ne zaman |
 |---|---|
-| `GET /api/live` | **Bağlandı** — SSE: `yeni-sos`, `is-durumu`, `yeni-analiz`, `isi-surumu`, `ekip-konumu` |
-| `POST /api/road_damage/analyze` | **Bağlandı** — HTTP 202 + iş kimliği; ilerleme canlı akıştan gelir |
-| `GET /api/road_damage/wayback_versions` | **Bağlandı** — tarihli uydu arşivi; varsayılan seçim 6 Şubat 2023'ten sonraki ilk görüntü |
-| `GET /api/hasar-noktalari?baslangic&bitis` | Ortak sözleşme: konum, skor, güven, zaman, kaynak tipi |
-| `GET /api/sos?baslangic&bitis` | Çağrı kuyruğu |
-| `GET /api/ekipler` | Saha ekipleri |
-| `GET /api/ozet?baslangic&bitis` | KPI sayıları (sunucuda hazır) |
-| ısı ızgarası (ikili) | Kanal başına ızgara; karışım tarayıcıda, GPU'da |
-| harita karoları | Kendi altlığımız (OSM + Copernicus); şimdilik zemin boş |
+| `yeni-sos` | Yeni SOS ya da durum değişikliği |
+| `ihbar` | Yeni afetzede ihbarı ya da durum değişikliği |
+| `gorev` | Sevk görevi açıldı ya da adımı değişti |
+| `ekip-konumu` | Ekibin konumu değişti |
+| `is-durumu` | Hasar analizi / tatbikat ilerlemesi (`iptal` yalnız tatbikat bitince) |
+| `simulasyon-katman` | Tatbikatın bir katmanı hazır (hasar → kapanma → rota → görev) |
+| `yeni-analiz`, `isi-surumu` | Yeni hasar noktaları yazıldı, ısı ızgarası yenilendi |
+| `bildirim` | Acil durum duyurusu yayınlandı ya da geri çekildi |
+| `hesap`, `islem-kaydi` | Hesap değişti, işlem kaydına satır eklendi (yalnız konsol rolleri) |
 
-Hasar analizi modunda görüntü kaynağı **Esri Wayback** varsayılanıdır ve tarih listesi
-uçtan gelir; çalışma alanımız 6 Şubat 2023 olduğu için varsayılan tarih depremden sonraki
-ilk kayıttır. Seçilen tarih sonucun künyesine yazılır.
+Afetzedeye yalnız **kendi** çağrısının ve ihbarının durumu gider; başkasının kaydı ve ekip
+koordinatları gitmez.
 
-Ayrıca sıradaki işler: gerçek JWT akışı (`src/kimlik/sahteSunucu.ts` silinecek), ısı
-`BitmapLayer`'ı, zaman şeridi histogramı, komut paletine çağrı/mahalle araması.
+## Bağlı uçlar (başlıcaları)
+
+| Alan | Uçlar |
+|---|---|
+| Oturum ve hesaplar | `/api/oturum/giris`, `kayit`, `yenile`, `cikis`, `sifre`, `kullanicilar`, `hesap-kayitlari` |
+| Olaylar | `/api/sos`, `/api/ihbarlar`, `/api/hasar-noktalari`, `/api/ozet`, `/api/olay-yogunlugu` |
+| Sevk | `/api/gorevler`, `/api/gorevler/aday-ekipler`, `/api/ekipler`, `/api/ekibim`, `/api/guzergah` |
+| Analiz | `/api/road_damage/analyze` (HTTP 202 + iş kimliği), `/api/camera/analyze`, `/api/nlp/analyze`, `/api/risk/predict`, `/api/risk/siralama` |
+| Tatbikat | `/api/simulasyon/alanlar`, `modeller`, `kos`, `kosu/{id}`, `bitir` |
+| Harita | `/api/katman/{kapanmalar,depremler,faylar,toplanma,saglik}`, `/api/altlik/`, `/api/goruntu/karo` |
+| Duyuru ve kayıt | `/api/bildirimler`, `/api/bildirimler/aktif`, `/api/islem-kayitlari` |
+
+Tam liste ve şemalar için API'nin `/docs` sayfası.
 
 ## Kurallar (kısa)
 
@@ -75,4 +111,7 @@ Ayrıca sıradaki işler: gerçek JWT akışı (`src/kimlik/sahteSunucu.ts` sili
 - Kırmızı/turuncu/sarı yalnız hasar ve aciliyet için.
 - Her panel kendini anlatır: amaç cümlesi → hazır seçenekler → ince ayar → "şu an ne
   görüyorum" → teknik not.
-- Veri yoksa uydurulmaz; eksik olduğu yazılır.
+- Her katman kaynağını yazar; senaryo/tatbikat verisi "senaryo" etiketiyle gösterilir.
+  Veri yoksa uydurulmaz, eksik olduğu yazılır.
+- Kod biçimlendirici ayarı yok; `npx prettier` dosyaları başka biçime çevirip diff'i
+  bozar, çalıştırma.
