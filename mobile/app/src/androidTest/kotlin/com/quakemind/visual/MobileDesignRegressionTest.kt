@@ -3,6 +3,7 @@ package com.quakemind.visual
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -22,9 +23,12 @@ import com.quakemind.feature.auth.AuthScreen
 import com.quakemind.feature.checklist.ChecklistScreen
 import com.quakemind.feature.home.HomeScreen
 import com.quakemind.feature.home.HomeUiState
+import com.quakemind.feature.mesh.P2pMeshScreen
 import com.quakemind.feature.profile.ProfileScreen
 import com.quakemind.feature.profile.ProfileUiState
 import com.quakemind.feature.report.ReportScreen
+import com.quakemind.navigation.components.QuakeBottomBar
+import com.quakemind.navigation.components.defaultBottomDestinations
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -228,6 +232,54 @@ class MobileDesignRegressionTest {
         compose.onNodeWithText("Metni Yapay Zekâ ile Ayrıştır").performScrollTo().performClick()
         compose.runOnIdle { assertTrue(analyzed == "İçme suyuna ihtiyaç var.") }
         capture("nlp-dark-input")
+    }
+
+    @Test fun p2pMeshDesignPreviewSwitchesPowerProfile() {
+        compose.setContent {
+            QuakeMindTheme(darkTheme = true) {
+                P2pMeshScreen()
+            }
+        }
+        compose.onNodeWithText("Yakın Ağ (P2P)").assertIsDisplayed()
+        compose.onNodeWithText("Tasarım").assertIsDisplayed()
+        compose.onNodeWithTag("p2p_mesh_lazy_column").performScrollToNode(hasText("Ultra Düşük"))
+        compose.onNodeWithText("Ultra Düşük").performClick()
+        compose.onNodeWithText("30 sn aralık").assertIsDisplayed()
+        capture("p2p-mesh-dark-phone")
+    }
+
+    @Test fun homeShellWithRedesignedBottomBarLightAndDark() {
+        val dark = mutableStateOf(false)
+        compose.setContent {
+            QuakeMindTheme(darkTheme = dark.value) {
+                androidx.compose.material3.Scaffold(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    bottomBar = {
+                        QuakeBottomBar(
+                            items = defaultBottomDestinations(),
+                            destination = null,
+                            onNavigate = {},
+                            hasUnreadAlerts = true,
+                        )
+                    },
+                ) { padding ->
+                    HomeScreen(
+                        state = home.copy(online = true, pendingCount = 0),
+                        onMap = {}, onReport = {}, onSos = {}, onSafety = {}, onAlerts = {},
+                        onRouting = {}, onDamage = {}, onNlp = {}, onRisk = {}, onChecklist = {},
+                        onOperations = {}, onProfile = {}, onIncident = {},
+                        modifier = Modifier.padding(bottom = padding.calculateBottomPadding()),
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("bottom_nav_home").assertIsDisplayed()
+        compose.onNodeWithTag("bottom_nav_sos").assertIsDisplayed()
+        compose.onNodeWithTag("bottom_nav_mesh").assertIsDisplayed()
+        capture("home-shell-light")
+        dark.value = true
+        compose.waitForIdle()
+        capture("home-shell-dark")
     }
 
     private fun capture(name: String) {

@@ -25,6 +25,7 @@ fun HomeRoute(
     onOperations: () -> Unit,
     onProfile: () -> Unit,
     onIncident: (String) -> Unit,
+    onMesh: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -55,5 +56,6 @@ fun HomeRoute(
         onProfile = onProfile,
         onIncident = onIncident,
         onRequestLocation = requestLocation,
+        onMesh = onMesh,
     )
 }

@@ -2,16 +2,14 @@ package com.quakemind.navigation
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.slideInHorizontally
-import androidx.navigation.NavDestination
-import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -29,6 +27,7 @@ import com.quakemind.feature.emergency.safety.SafetyRoute
 import com.quakemind.feature.emergency.sos.SosRoute
 import com.quakemind.feature.home.HomeRoute
 import com.quakemind.feature.map.MapRoute
+import com.quakemind.feature.mesh.P2pMeshRoute
 import com.quakemind.feature.operations.OperationsRoute
 import com.quakemind.feature.preparedness.checklist.ChecklistRoute
 import com.quakemind.feature.preparedness.risk.RiskRoute
@@ -53,14 +52,14 @@ fun AppNavHost(
         modifier = modifier,
         enterTransition = {
             if (initialState.destination.isMainDestination() && targetState.destination.isMainDestination()) EnterTransition.None
-            else fadeIn(tween(100))
+            else fadeIn(tween(120))
         },
         exitTransition = {
             if (initialState.destination.isMainDestination() && targetState.destination.isMainDestination()) ExitTransition.None
-            else fadeOut(tween(80))
+            else fadeOut(tween(90))
         },
-        popEnterTransition = { fadeIn(tween(100)) },
-        popExitTransition = { fadeOut(tween(80)) },
+        popEnterTransition = { fadeIn(tween(120)) },
+        popExitTransition = { fadeOut(tween(90)) },
     ) {
         composable<SplashRoute> {
             SplashRoute(
@@ -110,6 +109,13 @@ fun AppNavHost(
                 onOperations = { navController.navigate(OperationsRoute) },
                 onProfile = { navController.navigate(ProfileRoute) },
                 onIncident = { navController.navigate(IncidentDetailRoute(it)) },
+                onMesh = {
+                    navController.navigate(P2pMeshRoute) {
+                        popUpTo(HomeRoute) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
             )
         }
 
@@ -135,6 +141,10 @@ fun AppNavHost(
 
         composable<SosRoute> {
             SosRoute(onBack = { navController.popBackStack() })
+        }
+
+        composable<P2pMeshRoute> {
+            P2pMeshRoute()
         }
 
         composable<ProfileRoute> {
@@ -203,5 +213,5 @@ fun AppNavHost(
 }
 
 private fun NavDestination.isMainDestination(): Boolean =
-    hasRoute<HomeRoute>() || hasRoute<MapRoute>() || hasRoute<AlertsRoute>() ||
-        hasRoute<ChecklistRoute>() || hasRoute<SosRoute>()
+    hasRoute<HomeRoute>() || hasRoute<MapRoute>() || hasRoute<SosRoute>() ||
+        hasRoute<P2pMeshRoute>() || hasRoute<AlertsRoute>()

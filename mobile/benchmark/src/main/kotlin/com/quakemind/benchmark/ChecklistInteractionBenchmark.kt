@@ -28,7 +28,8 @@ class ChecklistInteractionBenchmark {
         setupBlock = {
             pressHome()
             navigateToHome()
-            clickBottomTab("Çanta")
+            scrollFeed("home_lazy_column")
+            clickBottomTab("Afet çantası")
             device.wait(Until.hasObject(By.text("Afet ve Acil Durum Çantası")), SHORT_TIMEOUT)
         },
     ) {

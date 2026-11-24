@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object AlertsRoute
 @Serializable data object ProfileRoute
 @Serializable data object SosRoute
+@Serializable data object P2pMeshRoute
 @Serializable data object NlpRoute
 @Serializable data object DamageRoute
 @Serializable data object RoutingRoute

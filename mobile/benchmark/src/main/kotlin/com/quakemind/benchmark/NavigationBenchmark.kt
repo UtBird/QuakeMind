@@ -30,11 +30,11 @@ class NavigationBenchmark {
     ) {
         // Transition: Home -> Map
         clickBottomTab("Harita")
-        // Transition: Map -> Alerts
+        // Transition: Map -> P2P Mesh
+        clickBottomTab("Yakın Ağ")
+        // Transition: P2P Mesh -> Alerts
         clickBottomTab("Uyarılar")
-        // Transition: Alerts -> Checklist
-        clickBottomTab("Çanta")
-        // Transition: Checklist -> Home
+        // Transition: Alerts -> Home
         clickBottomTab("Ana Sayfa")
     }
 }

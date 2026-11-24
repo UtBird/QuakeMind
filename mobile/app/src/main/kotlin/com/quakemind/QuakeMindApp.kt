@@ -11,6 +11,7 @@ typealias ReportRoute = com.quakemind.navigation.ReportRoute
 typealias AlertsRoute = com.quakemind.navigation.AlertsRoute
 typealias ProfileRoute = com.quakemind.navigation.ProfileRoute
 typealias SosRoute = com.quakemind.navigation.SosRoute
+typealias P2pMeshRoute = com.quakemind.navigation.P2pMeshRoute
 typealias NlpRoute = com.quakemind.navigation.NlpRoute
 typealias DamageRoute = com.quakemind.navigation.DamageRoute
 typealias RoutingRoute = com.quakemind.navigation.RoutingRoute
