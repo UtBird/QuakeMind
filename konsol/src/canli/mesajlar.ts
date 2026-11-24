@@ -39,6 +39,8 @@ export type CanliMesaj =
     }
   | { tip: 'yeni-analiz'; kaynak: string; isId?: string; bolge?: string; sayi?: number }
   | { tip: 'isi-surumu'; surum: string; bolge?: string }
+  /** Bir yol kapanmasının durumu değişti (kapalı / açıldı / yanlış alarm). */
+  | { tip: 'kapanma' }
   /** Konsola ekibin kimliği ve konumu gider. Afetzedeye yalnız KENDİ olayına
       giden ekip için, koordinatsız (J-54): istemci kendi çağrısını yeniden ister. */
   | {
@@ -94,6 +96,7 @@ export const MESAJ_TIPLERI: CanliMesaj['tip'][] = [
   'simulasyon-katman',
   'hesap',
   'islem-kaydi',
+  'kapanma',
 ]
 
 /** Mesaj → tazelenecek sorgu anahtarları. Yalnız değişen şey tazelenir: yeni
@@ -114,6 +117,10 @@ export function tazelenecekler(m: CanliMesaj): string[][] {
       return [['hasar'], ['ozet'], ['isi', 'uydu'], ['katman', 'kapanmalar']]
     case 'isi-surumu':
       return [['isi']]
+    case 'kapanma':
+      // Harita katmanı, yönetim listesi ve afetzede çevresi; rota bir sonraki istekte
+      // sunucuda kendiliğinden güncel (imza durum zamanını da içerir).
+      return [['katman', 'kapanmalar'], ['afetzede', 'cevre']]
     case 'ekip-konumu':
       // Afetzedeye gelen mesajda ekip kimliği yok: kendi çağrısı ya da ihbarı tazelenir.
       return m.ekipId

@@ -24,13 +24,13 @@ dizine bir satır ekleyin. Hiçbir madde silinmez; kimlikler değişmez.
 
 ## Özet (güncellendi 24 Kasım 2026)
 
-189 maddenin **108'i kapandı** ve `EKSIKLER_ARSIV.md`'ye taşındı (dizini bu dosyanın sonunda).
-Burada kalan **81 madde** şöyle dağılıyor:
+192 maddenin **110'u kapandı** ve `EKSIKLER_ARSIV.md`'ye taşındı (dizini bu dosyanın sonunda).
+Burada kalan **82 madde** şöyle dağılıyor:
 
 | Neye ait | Madde | Ne zaman |
 |---|---|---|
 | Ürün — teslimden önce bakılmalı | 4 | Bu hafta (aşağıdaki liste) |
-| Ürün — iyileştirme | 9 | Teslimden sonra olabilir |
+| Ürün — iyileştirme | 10 | Teslimden sonra olabilir |
 | Makale ve model sonuçları | 63 | Makale aşamasında (`MAKALE_DUZELTME_LISTESI.md` ile birlikte) |
 | Kapsam dışı (C grubu) | 5 | Makalede "yapılmadı" diye yazılır |
 
@@ -52,6 +52,7 @@ Burada kalan **81 madde** şöyle dağılıyor:
 - J-147: mobilde harita lejantı ve renk (Deha).
 - J-151: 81 il altlığı (Utku).
 - J-155, J-158: büyük ölçüde kapandı, kalanları maddelerinde yazılı.
+- J-192: deprem kataloğunda yer adlarında "?" (kaynak veride).
 
 **Makale ve model sonuçları (62):** A grubundan 21, B 12, D 8 (D-08 hariç), G 3, E 4 ve şu J maddeleri:
 - Model ve kapanma: J-20, J-21, J-22, J-25, J-26, J-34, J-36, J-65, J-69, J-70.
@@ -2042,6 +2043,13 @@ Temel ölçüm de yeniden koşuldu (`benchmark/reports/sqlite_yuk_2026-11-13_son
 
 **Not.** Makaleye dokunulmadı; makale hocanın okumasında, düzeltme sırası ekip kararı.
 
+## J-192 🟡 Deprem kataloğunda Türkçe harfler "?" olarak kayıtlı (yer adları bozuk görünüyor)
+**Durum:** AÇIK · **Bulundu:** 24 Kasım 2026 (J-191 sırasında, risk ekranındaki deprem listesinde) · **İlgili:** J-191, kural 1
+
+**Bulgu.** `apps/earthquake_risk/data/query.csv`'de 6 265 satırın yer adında Türkçe harfler soru işaretine dönmüş: aynı yer bir satırda "Doğubayazıt", 2006 tarihli USGS satırlarında "Do?ubayaz?t". Bozulma kaynak dosyada; ekran olduğu gibi gösteriyor (risk listesi, deprem katmanı ipucu).
+
+**Yapılacak.** Uydurma düzeltme yapılmaz. Seçenekler: (a) aynı USGS kimliğini (`id` sütunu) USGS'ten yeniden çekip yer adını oradan almak, (b) yer adı yerine koordinattan en yakın il/ilçe adını (yerel OSM kopyası) yazmak ve kaynağını belirtmek.
+
 # KAPANAN MADDELER DİZİNİ
 
 Kapanan maddelerin tam metni `EKSIKLER_ARSIV.md`'de, aynı bölüm başlıkları altında ve aynı
@@ -2157,6 +2165,8 @@ kimlikle. Başka belgelerdeki "EKSIKLER J-xxx" atıfları için kimliği burada 
 | J-188 | 🟠 81 il risk sıralaması canlıda boştu (il merkezleri depoda yoktu); dağıtım kontrol testi eski uçlarda düşüyordu | 24 Kasım 2026 |
 | J-38 | 🟠 Yol ağı zaman aşımına uğrayınca sonuç "0 kapalı yol, bölge erişilebilir" diyordu | 24 Kasım 2026 |
 | J-168 | 🔴 Eski web kamera sayfası API'ye ulaşamayınca uydurma sonuç gösteriyordu | 24 Kasım 2026 |
+| J-190 | 🟠 Yol ve rota: yarım çokgen rota ekranına taşınıyordu, araç kapalı yoldan geçiyordu, kapanmanın durumu değiştirilemiyordu | 24 Kasım 2026 |
+| J-191 | 🟠 Deprem riski ekranı okunmuyordu; harita noktaları uzakta görünmüyor ya da üst üste biniyordu; logo ana ekrana götürmüyordu | 24 Kasım 2026 |
 
 ---
 
@@ -2399,3 +2409,5 @@ kimlikle. Başka belgelerdeki "EKSIKLER J-xxx" atıfları için kimliği burada 
 | 24 Kasım 2026 | **J-188** kapatıldı: `il_merkezleri.json` depoya (`apps/earthquake_risk/data/`); `deploy/test_road_api.py` eski uçlarda bayrağı test içinde açar. Sunucu paket sürümleriyle temiz kopyada 163 geçti, 0 hata. Madde arşivde. |
 | 24 Kasım 2026 | **J-189** açık madde eklendi: makale §4.1 "mekânsal sorgular PostGIS ile" diyor, sistem SQLite (18 Kasım'da başka oturumda "J-175" diye not edilmişti, numara çakıştığı için J-189). Makaleye dokunulmadı. |
 | 24 Kasım 2026 | **J-38** kapatıldı: yol ağı kurulamazsa sonuç ve konsol "hesaplanamadı" der, "0 kapalı yol" / "kapanma yok" demez (`roadNetworkMissing`, `oneri_metni`). **J-168** kapatıldı: eski web kamera sayfası API'ye ulaşamayınca uydurma sonuç yerine "Analiz yapılamadı" gösterir. `pytest -q` 177/177. Maddeler arşivde. |
+| 24 Kasım 2026 | **J-190** kapatıldı: Yol ve rota baştan; iki nokta (A/B) ve sıralı çok duraklı rota; hasar ekranının yarım çokgeni artık taşınmıyor; araç kapalı yoldan yalnız başka yol yoksa geçer ve söyler; kapanma eşleşmesi en yakın kenar + en az 3 nokta; kapanma durumu (kapalı / açıldı / yanlış alarm) konsoldan değişir, işlem kaydına ve canlı akışa gider. 186 test geçti. Madde arşivde. |
+| 24 Kasım 2026 | **J-191** kapatıldı: deprem riski ekranı baştan (il seçilince yalnız skora giren depremler ve hesap alanı; olasılıklar soru cümlesiyle; deprem listesi haritayla bağlı); harita noktaları uzakta sayılı kümeler (toplanma, sağlık, ekip, ihbar, SOS); logo genel duruma götürür. **J-192** açık madde: katalogda yer adlarında "?" (kaynak veride). |

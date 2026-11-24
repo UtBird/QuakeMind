@@ -13,7 +13,24 @@ import { belirsizlikMetni, duzeyAciklamasi, ihbarBelirsizligi, type BelirsizlikC
 import { useCozumleme } from '@/durum/cozumlemeDurumu'
 import { haritadanNokta, useRota } from '@/durum/rotaDurumu'
 import { useRiskSiralamasi, useSeciliRiskIli } from '@/modlar/risk'
-import { useDepremler, useFaylar, useKapanmalar, useSaglik, useToplanmaAlanlari } from '@/veri/katman'
+import {
+  alanKutusu,
+  depremKimligi,
+  depremYili,
+  useRisk,
+  useRiskSecimi,
+  useUlkeAnaSoklari,
+  type RiskDeprem,
+} from '@/veri/risk'
+import type { RiskDepremi } from '@/harita/katmanlar'
+import {
+  useDepremler,
+  useFaylar,
+  useKapanmaListesi,
+  useKapanmalar,
+  useSaglik,
+  useToplanmaAlanlari,
+} from '@/veri/katman'
 import { useSimAlanlar, useSimMaske, useSimSonuc } from '@/veri/simulasyon'
 import { useSimulasyon } from '@/durum/simulasyonDurumu'
 import { isiDokusuKur } from '@/harita/isiDokusu'
@@ -24,7 +41,6 @@ import { gunMetni } from '@/lib/bicim'
 import { Chip } from './parcalar'
 import {
   ALTLIK_EN_AZ_ZOOM,
-  TOPLANMA_EN_AZ_ZOOM,
   kisaAd,
   kutuMerkezi,
   useAltlikGirdisi,
@@ -84,7 +100,9 @@ export function KonsolKabugu() {
       <div className="relative flex min-h-0 flex-1 flex-col overflow-auto genis:block genis:overflow-hidden">
         <HaritaKabugu>
           <KatmanKopru />
-          <AlanSecici />
+          {/* Alan çizimi yalnız hasar analizinde: her modda açık kaldığında yarım
+              çokgen başka modda tıklamaları yakalıyor, noktalar sayfalar arası taşınıyordu. */}
+          {tanim.id === 'hasar' && <AlanSecici />}
 
           {/* Dar ekranda (<= 980 px) harita üstte, paneller altında dikey sıralanır.
               Tam sayfa modda (Kullanıcılar) paneller hiç çizilmez. */}
@@ -260,6 +278,21 @@ function KatmanKopru() {
   // kalır. Zaman penceresine bağlı değiller; toplanma görünen bölgeye bağlı.
   const { gorunen: gorunenBolgeler } = useGorunenAltlik()
   const kapanmalar = useKapanmalar(katmanlar.hasarliYollar)
+  // Kapanma yönetimi (Yol ve rota → Kapalı yollar): açılan ve yanlış alarm
+  // olanlar da çizilir, seçilen süzgece göre.
+  const rotaSoru = useRota((d) => d.soru)
+  const kapanmaSuzgeci = useRota((d) => d.kapanmaSuzgeci)
+  const seciliKapanma = useRota((d) => d.seciliKapanma)
+  const kapanmaYonetimi = tanim.id === 'yol' && rotaSoru === 'kapali'
+  const kapanmaListesi = useKapanmaListesi(kapanmaYonetimi)
+  const kapanmaKayitlari = useMemo(() => {
+    if (!kapanmaYonetimi) return kapanmalar.data?.kayitlar
+    const hepsi = kapanmaListesi.data?.kayitlar ?? []
+    // Seçili kapanma süzgeçten bağımsız çizilir: durumu değişince haritadan kaybolmasın.
+    return kapanmaSuzgeci === 'hepsi'
+      ? hepsi
+      : hepsi.filter((k) => k.durum === kapanmaSuzgeci || k.id === seciliKapanma)
+  }, [kapanmaYonetimi, kapanmalar.data, kapanmaListesi.data, kapanmaSuzgeci, seciliKapanma])
   const depremler = useDepremler(katmanlar.depremler)
   const faylar = useFaylar(katmanlar.faylar)
   const toplanma = useToplanmaAlanlari(katmanlar.toplanma, gorunenBolgeler)
@@ -376,27 +409,53 @@ function KatmanKopru() {
     return Math.round(o * 20) / 20
   }, [gorunum?.zoom])
   // Haritada bir ihbara ya da ekibe tıklayınca oraya yakınlaşılır; SOS seçilir.
+  // Tıklama yöneticisi bir kez kurulur; mod ref'ten okunur.
+  const modRef = useRef(tanim.id)
+  modRef.current = tanim.id
   useEffect(() => {
     if (!hazir) return
     tiklamaYaz((bilgi) => {
-      // Yol ve rota modunda nokta seçimi açıksa tıklama noktayı seçer (J-171).
-      if (bilgi.coordinate && haritadanNokta(bilgi.coordinate[0], bilgi.coordinate[1])) return
-      const nesne = bilgi.object as { id?: string; lon?: number; lat?: number } | undefined
       const katman = bilgi.layer?.id
+      // Kümeye tıklayınca açıldığı yakınlığa uçulur (J-191).
+      if (katman?.startsWith('kume-')) {
+        const k = bilgi.object as { lon: number; lat: number; genisleme: number } | undefined
+        if (k) ucus(k.lon, k.lat, Math.max(k.genisleme, (haritaAl()?.getZoom() ?? 0) + 1))
+        return
+      }
+      // Yol ve rota modu: kapanma yönetiminde kapanmaya tıklamak onu seçer;
+      // rota sorularında tıklama noktayı seçer. Başka modda nokta seçilmez.
+      if (modRef.current === 'yol') {
+        const r = useRota.getState()
+        if (r.soru === 'kapali' && (katman === 'yol-kapanmalari-cizgi' || katman === 'yol-kapanmalari')) {
+          const k = bilgi.object as { id?: string } | undefined
+          if (k?.id) r.kapanmaSec(k.id)
+          return
+        }
+        if (bilgi.coordinate && haritadanNokta(bilgi.coordinate[0], bilgi.coordinate[1])) return
+      }
+      const nesne = bilgi.object as { id?: string; lon?: number; lat?: number } | undefined
       if (!nesne || nesne.lon == null || nesne.lat == null) return
       if (katman === 'sos' && nesne.id) kayitSec({ tip: 'sos', id: nesne.id })
       if (katman === 'ihbarlar' && nesne.id) kayitSec({ tip: 'ihbar', id: nesne.id })
-      if (katman === 'risk-illeri') {
+      if (katman === 'risk-illeri' || katman === 'risk-secili-il') {
+        // İl seçilince harita ilin 200 km'lik hesap alanına sığar (J-191).
         const il = bilgi.object as { il: string; lat: number; lon: number }
         useCozumleme.getState().riskBolgeSec(`il:${il.il}`)
-        ucus(il.lon, il.lat, 6.4)
+        useRiskSecimi.getState().depremSec(null)
+        kutuyaUc(alanKutusu(il.lon, il.lat, 210))
+        return
+      }
+      if (katman === 'risk-ana-sok' || katman === 'risk-son-yil') {
+        const d = bilgi.object as { id: string }
+        const r = useRiskSecimi.getState()
+        r.depremSec(r.deprem === d.id ? null : d.id)
         return
       }
       if (katman === 'sos' || katman === 'ihbarlar' || katman === 'hasar-noktalari' || katman === 'ekipler') {
         ucus(nesne.lon, nesne.lat, Math.max(15.5, haritaAl()?.getZoom() ?? 0))
       }
     })
-  }, [hazir, tiklamaYaz, kayitSec, ucus, haritaAl])
+  }, [hazir, tiklamaYaz, kayitSec, ucus, kutuyaUc, haritaAl])
 
   // Isı: her kanalın ızgarası ayrı gelir, karışım istemcide (MIMARI §5).
   const agirliklar = useKonsol((d) => d.agirliklar)
@@ -458,9 +517,20 @@ function KatmanKopru() {
   const rotaSonuc = useRota((d) => d.sonuc)
   const rotaKiyas = useRota((d) => d.kiyas)
   const rotaAdaylar = useRota((d) => d.adaylar)
+  const rotaDuraklar = useRota((d) => d.duraklar)
   const guzergah = useMemo(() => {
-    if (tanim.id !== 'yol') return null
+    if (tanim.id !== 'yol' || rotaSoru === 'kapali') return null
     const seciliRota = rotaSonuc?.rota ?? null
+    if (rotaSoru === 'duraklar') {
+      return {
+        ana: seciliRota,
+        kiyas: null,
+        adaylar: [],
+        bas: null,
+        hedef: null,
+        duraklar: rotaDuraklar.map((n) => [n.lon, n.lat] as [number, number]),
+      }
+    }
     return {
       ana: seciliRota,
       kiyas: rotaKiyas && rotaKiyas.mesafeM !== rotaSonuc?.mesafeM ? rotaKiyas.rota : null,
@@ -472,19 +542,40 @@ function KatmanKopru() {
           ? (rotaSonuc.rota[rotaSonuc.rota.length - 1] ?? null)
           : null,
     }
-  }, [tanim.id, rotaBas, rotaHedef, rotaSonuc, rotaKiyas, rotaAdaylar])
+  }, [tanim.id, rotaSoru, rotaBas, rotaHedef, rotaSonuc, rotaKiyas, rotaAdaylar, rotaDuraklar])
 
   // Deprem riski (J-173): yalnız risk modunda.
   const riskSiralamasi = useRiskSiralamasi(tanim.id === 'risk')
   const riskIli = useSeciliRiskIli(riskSiralamasi.data?.iller)
+  // J-191: il seçilmemişken ülkenin M≥6 ana şokları; seçilince yalnız o ilin
+  // hesabına giren depremler (panelle aynı sorgu).
+  const riskDetay = useRisk(tanim.id === 'risk' ? riskIli : null)
+  const ulkeAnaSoklari = useUlkeAnaSoklari(tanim.id === 'risk' && !riskIli)
+  const seciliDeprem = useRiskSecimi((d) => d.deprem)
   const riskGirdisi = useMemo(() => {
     if (tanim.id !== 'risk' || !riskSiralamasi.data) return null
+    const donustur = (d: RiskDeprem): RiskDepremi => ({
+      id: depremKimligi(d),
+      lon: d.longitude,
+      lat: d.latitude,
+      m: d.magnitude,
+      yil: depremYili(d),
+      zaman: d.time,
+      yer: d.place,
+      km: d.distanceKm,
+    })
+    const detay = riskIli ? riskDetay.data : undefined
     return {
       iller: riskSiralamasi.data.iller,
       secili: riskIli?.il ?? null,
-      halkalar: riskIli ? { lon: riskIli.lon, lat: riskIli.lat, kisaKm: 150, uzunKm: 200 } : null,
+      alan: riskIli ? { lon: riskIli.lon, lat: riskIli.lat, km: detay?.dayanak?.yaricapKm.uzun ?? 200 } : null,
+      anaSoklar: riskIli
+        ? (detay?.anaSoklar ?? []).map(donustur)
+        : (ulkeAnaSoklari.data?.depremler ?? []).map(donustur),
+      sonYil: (detay?.sonYilDepremler ?? []).map(donustur),
+      seciliDeprem,
     }
-  }, [tanim.id, riskSiralamasi.data, riskIli])
+  }, [tanim.id, riskSiralamasi.data, riskIli, riskDetay.data, ulkeAnaSoklari.data, seciliDeprem])
 
   const deckKatmanlari = useMemo(
     () =>
@@ -505,15 +596,19 @@ function KatmanKopru() {
         belirsizlik,
         guzergah,
         risk: riskGirdisi,
-        secim: { kutu: secimKutusu, cokgen: secimCokgeni, taslak: secimTaslagi },
+        // Seçim şekli yalnız hasar analizinde çizilir; başka modda harita üstünde kalmasın.
+        secim:
+          tanim.id === 'hasar'
+            ? { kutu: secimKutusu, cokgen: secimCokgeni, taslak: secimTaslagi }
+            : { kutu: null, cokgen: null, taslak: null },
         goruntu: analizKarosu,
         analiz: segmentler.data ?? null,
         isi: isiDokusu,
-        toplanmaGorunur: (gorunum?.zoom ?? 0) >= TOPLANMA_EN_AZ_ZOOM,
         zoom: gorunum?.zoom,
         saglik: saglik.data?.kayitlar,
         simulasyon: simGirdi,
-        kapanmalar: kapanmalar.data?.kayitlar,
+        kapanmalar: kapanmaKayitlari,
+        seciliKapanma: kapanmaYonetimi ? seciliKapanma : null,
         depremler: depremler.data?.kayitlar,
         faylar: faylar.data?.kayitlar,
         toplanma: toplanma.data?.kayitlar,
@@ -541,7 +636,9 @@ function KatmanKopru() {
       analizKarosu,
       isiDokusu,
       gorunum?.zoom,
-      kapanmalar.data,
+      kapanmaKayitlari,
+      kapanmaYonetimi,
+      seciliKapanma,
       depremler.data,
       faylar.data,
       toplanma.data,

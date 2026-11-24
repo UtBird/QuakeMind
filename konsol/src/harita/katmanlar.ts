@@ -27,7 +27,15 @@ import type { Yol } from '@/veri/analiz'
 import type { AltlikVerisi, Etiket } from '@/veri/altlik'
 import { IHBAR_DURUMU, IHBAR_TURU, ihbarKonumu, type Ihbar, type IhbarTuru } from '@/veri/ihbar'
 import type { BelirsizlikCemberi } from '@/veri/metin'
-import { DEPREM_EN_AZ, type Deprem, type Fay, type Kapanma, type SaglikYeri, type ToplanmaAlani } from '@/veri/katman'
+import {
+  DEPREM_EN_AZ,
+  KAPANMA_DURUM_ADI,
+  type Deprem,
+  type Fay,
+  type Kapanma,
+  type SaglikYeri,
+  type ToplanmaAlani,
+} from '@/veri/katman'
 import { VARYANT_ADI, type SimGorev, type SimKenar } from '@/veri/simulasyon'
 import { goruntuKatmani } from './goruntuKatmani'
 import {
@@ -39,7 +47,8 @@ import {
 } from './simKatmanlari'
 import { mesafe, sureMetni, tarihSaat, tarihSaatYilli } from '@/lib/bicim'
 import { tokenPx, tokenRenk } from './tokenRenk'
-import { ikon, simgeAdresi, type SimgeTuru } from './simgeler'
+import { ikon, kumeIkonu, simgeAdresi, type SimgeTuru } from './simgeler'
+import { kumele, kumeSayisi, type Kume } from './kumeleme'
 import { paylarMetni, type IsiDokusu } from './isiDokusu'
 
 /* Yakınlaştırma eşikleri (J-172): harita her ölçekte yalnız o ölçekte işe
@@ -47,7 +56,46 @@ import { paylarMetni, type IsiDokusu } from './isiDokusu'
    noktaları, ekip adları ve sağlık tesisleri şehir ölçeğinde. */
 export const HASAR_NOKTASI_EN_AZ_ZOOM = 13
 export const EKIP_ADI_EN_AZ_ZOOM = 12
-export const SAGLIK_EN_AZ_ZOOM = 12
+/* Kümeleme (J-191): bu yakınlığın üstünde her tür tek tek çizilir. Ekip adları
+   EKIP_ADI_EN_AZ_ZOOM'da yazıldığı için ekipler ondan önce açılır. */
+const KUME_EN_COK_ZOOM = { toplanma: 14, saglik: 13, ekipler: 11, ihbarlar: 13, sos: 13 } as const
+const SOS_ONCELIK = { kritik: 3, yuksek: 2, orta: 1 } as const
+
+/** Küme simgesi + sayısı. Simge tıklanır (KonsolKabugu: genişleme yakınlığına uçar). */
+function kumeKatmanlari(id: string, kumeler: Kume[], simge: (k: Kume) => SimgeTuru, yazi: (k: Kume) => [number, number, number]): Layer[] {
+  if (!kumeler.length) return []
+  const boy = (k: Kume) => 30 + Math.min(18, Math.log2(k.sayi) * 3.4)
+  return [
+    new IconLayer<Kume>({
+      ...SIMGE_ORTAK,
+      id: `kume-${id}`,
+      data: kumeler,
+      getPosition: (k) => [k.lon, k.lat],
+      getIcon: (k) => kumeIkonu(simge(k)),
+      getSize: boy,
+    }),
+    new TextLayer<Kume>({
+      id: `kume-${id}-sayi`,
+      data: kumeler,
+      getPosition: (k) => [k.lon, k.lat],
+      getText: (k) => kumeSayisi(k.sayi),
+      getSize: tokenPx('--text-small'),
+      getColor: (k) => [...yazi(k), 255],
+      fontFamily: 'IBM Plex Sans, sans-serif',
+      fontWeight: 700,
+      characterSet: '0123456789, B',
+      getTextAnchor: 'middle',
+      getAlignmentBaseline: 'center',
+    }),
+  ]
+}
+
+function baskinTur(k: Kume): string {
+  let en = ''
+  let n = -1
+  for (const [t, v] of Object.entries(k.ozet.turler)) if (v > n) [en, n] = [t, v]
+  return en
+}
 
 /** IconLayer ortak ayarları: simge piksel boyutunda, renk simgenin kendisinde. */
 const SIMGE_ORTAK = {
@@ -241,7 +289,13 @@ export type KatmanGirdisi = {
   risk?: {
     iller: { il: string; lat: number; lon: number; skor: number; seviye: string; fayKm: number }[]
     secili: string | null
-    halkalar: { lon: number; lat: number; kisaKm: number; uzunKm: number } | null
+    /** Seçili ilin merkezi ve hesap alanı (uzun vadeli, km). */
+    alan: { lon: number; lat: number; km: number } | null
+    /** İl seçiliyse o ilin 200 km'sindeki, değilse ülkenin M≥6 ana şokları. */
+    anaSoklar: RiskDepremi[]
+    /** Seçili ilin son bir yılı (150 km). */
+    sonYil: RiskDepremi[]
+    seciliDeprem: string | null
   } | null
   /** Uzak yakınlaştırmada yazılan bölge adları (altlık kataloğundan). */
   bolgeAdlari?: Etiket[]
@@ -267,6 +321,8 @@ export type KatmanGirdisi = {
     adaylar: [number, number][][]
     bas: [number, number] | null
     hedef: [number, number] | null
+    /** Çok duraklı rota: sırayla numaralanır. */
+    duraklar?: [number, number][]
   } | null
   /** Soldan seçilen görüntü kaynağının karosu (Hasar analizi modu). */
   goruntu?: { url: string; kunye: string; ortuculuk?: number } | null
@@ -276,6 +332,8 @@ export type KatmanGirdisi = {
   simulasyon?: SimHaritaGirdisi
   /** Başvuru katmanları (J-56); her biri kendi ucundan gelir. */
   kapanmalar?: Kapanma[]
+  /** Kapanma yönetiminde seçili kapanma (vurgulanır). */
+  seciliKapanma?: string | null
   depremler?: Deprem[]
   faylar?: Fay[]
   toplanma?: ToplanmaAlani[]
@@ -291,6 +349,23 @@ export type KatmanGirdisi = {
 
 type KonumBelirsizligi = BelirsizlikCemberi
 type RiskIli = NonNullable<KatmanGirdisi['risk']>['iller'][number]
+/** Risk ekranının depremi (J-191); `id` panel listesiyle aynı. */
+export type RiskDepremi = { id: string; lon: number; lat: number; m: number; yil: string; zaman: string; yer: string; km?: number }
+
+/** Merkezden km yarıçaplı çember (büyük daire; harita izdüşümünde doğru çizilir). */
+function cember(lon: number, lat: number, km: number, n = 128): [number, number][] {
+  const r = km / 6371
+  const f1 = (lat * Math.PI) / 180
+  const l1 = (lon * Math.PI) / 180
+  const sonuc: [number, number][] = []
+  for (let i = 0; i <= n; i++) {
+    const a = (2 * Math.PI * i) / n
+    const f2 = Math.asin(Math.sin(f1) * Math.cos(r) + Math.cos(f1) * Math.sin(r) * Math.cos(a))
+    const l2 = l1 + Math.atan2(Math.sin(a) * Math.sin(r) * Math.cos(f1), Math.cos(r) - Math.sin(f1) * Math.sin(f2))
+    sonuc.push([(l2 * 180) / Math.PI, (f2 * 180) / Math.PI])
+  }
+  return sonuc
+}
 
 function kutuHalkasi(k: Kutu): Nokta[] {
   return [
@@ -392,19 +467,45 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
     const cizgili = g.kapanmalar.filter((d) => (d.cizgi?.length ?? 0) >= 2)
     const noktali = g.kapanmalar.filter((d) => (d.cizgi?.length ?? 0) < 2)
     if (cizgili.length) {
+      // Durum (J-190): kapalı kırmızı ve düz; açıldı yeşil,
+      // yanlış alarm gri, ikisi de kesik. Kırmızı yalnız hasar anlamında kalır
+      // (ARAYUZ §6). Açıldı ve yanlış alarm yalnız kapanma yönetiminde gelir.
+      const renk = {
+        kapali: tokenRenk('--color-crit'),
+        acildi: tokenRenk('--color-ok'),
+        yanlis: tokenRenk('--color-ink-3'),
+      }
+      const yol = (d: Kapanma) => (d.cizgi ?? []).map(([enlem, boylam]) => [boylam, enlem] as [number, number])
+      const secili = g.seciliKapanma ? cizgili.find((d) => d.id === g.seciliKapanma) : undefined
+      if (secili) {
+        L.push(
+          new PathLayer<Kapanma>({
+            id: 'yol-kapanmalari-secili',
+            data: [secili],
+            getPath: yol,
+            getColor: [...tokenRenk('--color-accent'), 120],
+            getWidth: 12,
+            widthUnits: 'pixels',
+            capRounded: true,
+            jointRounded: true,
+          }),
+        )
+      }
       L.push(
-        new PathLayer<Kapanma>({
+        new PathLayer<Kapanma, { getDashArray?: (d: Kapanma) => [number, number] }>({
           id: 'yol-kapanmalari-cizgi',
           data: cizgili,
-          getPath: (d) =>
-            (d.cizgi ?? []).map(([enlem, boylam]) => [boylam, enlem] as [number, number]),
-          getColor: [...tokenRenk('--color-crit'), 235],
+          getPath: yol,
+          getColor: (d) => [...renk[d.durum ?? 'kapali'], 235],
           getWidth: 4,
           widthUnits: 'pixels',
           widthMinPixels: 2.5,
           capRounded: true,
           jointRounded: true,
           pickable: true,
+          getDashArray: (d) => ((d.durum ?? 'kapali') === 'kapali' ? [0, 0] : [3, 2]),
+          extensions: [KESIK],
+          updateTriggers: { getColor: [g.seciliKapanma], getDashArray: [g.seciliKapanma] },
         }),
       )
     }
@@ -457,12 +558,17 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
   // renk. Kayıt alanın şu an açık ya da kullanılabilir olduğunu söylemez (kural 1);
   // ipucu bunu yazar. Bölge ölçeğinde 3.682 nokta haritayı kapattığı için
   // yalnız şehir ölçeğinde çizilir.
-  if (g.katmanlar.toplanma && g.toplanmaGorunur && g.toplanma?.length) {
+  if (g.katmanlar.toplanma && g.toplanma?.length) {
+    const k = kumele('toplanma', g.toplanma, g.zoom ?? 0, {
+      konum: (d) => [d.lon, d.lat],
+      enCokZoom: KUME_EN_COK_ZOOM.toplanma,
+    })
     L.push(
+      ...kumeKatmanlari('toplanma', k.kumeler, () => 'toplanma', () => tokenRenk('--color-ground')),
       new IconLayer<ToplanmaAlani>({
         ...SIMGE_ORTAK,
         id: 'toplanma',
-        data: g.toplanma,
+        data: k.tekler,
         getPosition: (d) => [d.lon, d.lat],
         getIcon: () => ikon('toplanma'),
         getSize: 18,
@@ -472,12 +578,17 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
 
   // Hastane ve sağlık merkezi (J-172): OSM kaydı; şehir ölçeğinde. Hastane
   // sağlık merkezinden büyük çizilir.
-  if (g.katmanlar.saglik && (g.zoom ?? 0) >= SAGLIK_EN_AZ_ZOOM && g.saglik?.length) {
+  if (g.katmanlar.saglik && g.saglik?.length) {
+    const k = kumele('saglik', g.saglik, g.zoom ?? 0, {
+      konum: (d) => [d.lon, d.lat],
+      enCokZoom: KUME_EN_COK_ZOOM.saglik,
+    })
     L.push(
+      ...kumeKatmanlari('saglik', k.kumeler, () => 'hastane', () => tokenRenk('--color-ground')),
       new IconLayer<SaglikYeri>({
         ...SIMGE_ORTAK,
         id: 'saglik',
-        data: g.saglik,
+        data: k.tekler,
         getPosition: (d) => [d.lon, d.lat],
         getIcon: (d) => ikon(d.tur === 'hastane' ? 'hastane' : 'saglik'),
         getSize: (d) => (d.tur === 'hastane' ? 22 : 16),
@@ -485,66 +596,181 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
     )
   }
 
-  // Deprem riski (J-173): seçili ilin hesap alanı (uzun vadeli 200 km, kısa
-  // vadeli 150 km) ve 81 il merkezi risk renginde. Kırmızı-turuncu-sarı burada
-  // aciliyet/tehlike anlamında (ARAYUZ §6).
+  // Deprem riski (J-173; J-191). İl seçilmemişken: il merkezleri (skor içinde)
+  // ve ülkenin M≥6 ana şokları. İl seçilince: o ilin hesabına giren depremler
+  // ve hesap alanı ince kesik çizgi; öteki iller sönük. Eskiden ülke kataloğunun
+  // binlerce dairesi ve iki dev dolu daire birlikte çiziliyordu.
+  // Kırmızı-turuncu-sarı burada tehlike düzeyi anlamında (ARAYUZ §6).
   if (g.risk) {
-    const h = g.risk.halkalar
-    if (h) {
-      const soluk = tokenRenk('--color-ink-3')
-      L.push(
-        new ScatterplotLayer<{ p: [number, number]; r: number; uzun: boolean }>({
-          id: 'risk-halkalari',
-          data: [
-            { p: [h.lon, h.lat], r: h.uzunKm * 1000, uzun: true },
-            { p: [h.lon, h.lat], r: h.kisaKm * 1000, uzun: false },
-          ],
-          getPosition: (d) => d.p,
-          getRadius: (d) => d.r,
-          radiusUnits: 'meters',
-          filled: true,
-          getFillColor: (d) => [...soluk, d.uzun ? 14 : 0],
-          stroked: true,
-          lineWidthMinPixels: 1.5,
-          getLineColor: (d) => [...soluk, d.uzun ? 200 : 140],
-        }),
-      )
+    const r = g.risk
+    const deprem = tokenRenk('--color-deprem')
+    const zemin = tokenRenk('--color-ground')
+    const vurgu = tokenRenk('--color-accent')
+    const yazi = tokenRenk('--color-ink')
+    const etiketOrtak = {
+      fontFamily: 'IBM Plex Sans, sans-serif',
+      fontWeight: 600,
+      characterSet: 'auto' as const,
+      fontSettings: { sdf: true },
+      outlineWidth: 3,
+      outlineColor: [...zemin, 255] as [number, number, number, number],
     }
     const renk = (s: number) =>
       tokenRenk(s >= 75 ? '--color-crit' : s >= 50 ? '--color-high' : s >= 25 ? '--color-mid' : '--color-ok')
-    L.push(
+    // Ülke ölçeğinde 81 il üst üste binmesin: yuvarlak yakınlıkla büyür, skor
+    // yazısı yalnız sığınca ve çakışmayınca yazılır (yüksek skor önce).
+    const z = g.zoom ?? 6
+    const ilR = Math.max(6, Math.min(11, 4 + (z - 4) * 3))
+    const olcek = Math.max(0.7, Math.min(1, (z - 4) / 3))
+    const iller = r.secili ? r.iller.filter((d) => d.il !== r.secili) : r.iller
+    const seciliIl = r.secili ? r.iller.filter((d) => d.il === r.secili) : []
+    const ilKatmanlari = (id: string, veri: RiskIli[], soluk: boolean, buyuk: boolean): Layer[] => [
       new ScatterplotLayer<RiskIli>({
-        id: 'risk-illeri',
-        data: g.risk.iller,
+        id,
+        data: veri,
         getPosition: (d) => [d.lon, d.lat],
-        getRadius: (d) => (d.il === g.risk!.secili ? 9 : 6),
+        getRadius: buyuk ? Math.max(13, ilR + 4) : ilR,
         radiusUnits: 'pixels',
-        getFillColor: (d) => [...renk(d.skor), 235],
+        getFillColor: (d) => [...renk(d.skor), soluk ? 110 : 240],
         stroked: true,
-        lineWidthMinPixels: 1.5,
-        getLineColor: (d) => (d.il === g.risk!.secili ? [232, 236, 244, 255] : [...tokenRenk('--color-ground'), 255]),
-        updateTriggers: { getRadius: g.risk.secili, getLineColor: g.risk.secili },
+        lineWidthMinPixels: buyuk ? 2.5 : 1.5,
+        getLineColor: buyuk ? [...yazi, 255] : [...zemin, soluk ? 140 : 255],
         pickable: true,
+        updateTriggers: { getFillColor: soluk, getLineColor: soluk, getRadius: ilR },
       }),
-      new TextLayer<RiskIli>({
-        id: 'risk-il-adlari',
-        // Uzakta yalnız seçili il ve en riskli 10 il yazılır; yakında hepsi.
-        data: (g.zoom ?? 0) >= 7.5 ? g.risk.iller : g.risk.iller.filter((d, i) => i < 10 || d.il === g.risk!.secili),
+      new TextLayer<RiskIli, CollisionFilterExtensionProps<RiskIli>>({
+        id: `${id}-skor`,
+        data: buyuk || ilR >= 8 ? veri : [],
+        extensions: [CAKISMA],
+        collisionGroup: 'risk-il',
+        getCollisionPriority: (d) => d.skor,
         getPosition: (d) => [d.lon, d.lat],
-        getText: (d) => `${d.il} ${Math.round(d.skor)}`,
-        getSize: tokenPx('--text-small'),
-        getColor: [...tokenRenk('--color-ink'), 255],
-        getPixelOffset: [0, -12],
+        getText: (d) => String(Math.round(d.skor)),
+        getSize: tokenPx(buyuk ? '--text-body' : '--text-small'),
+        getColor: (d) => (d.skor >= 75 ? [...yazi, soluk ? 140 : 255] : [...zemin, soluk ? 140 : 255]),
         fontFamily: 'IBM Plex Sans, sans-serif',
-        fontWeight: 600,
-        characterSet: 'auto',
-        fontSettings: { sdf: true },
-        outlineWidth: 3,
-        outlineColor: [...tokenRenk('--color-ground'), 255],
+        fontWeight: 700,
+        characterSet: '0123456789',
         getTextAnchor: 'middle',
-        getAlignmentBaseline: 'bottom',
+        getAlignmentBaseline: 'center',
+        updateTriggers: { getColor: soluk },
       }),
-    )
+    ]
+
+    // Hesap alanı: ince kesik çizgi ve kuzey ucunda adı.
+    if (r.alan) {
+      const c = cember(r.alan.lon, r.alan.lat, r.alan.km)
+      L.push(
+        new PathLayer<{ p: [number, number][] }, { getDashArray: [number, number] }>({
+          id: 'risk-alani',
+          data: [{ p: c }],
+          getPath: (d) => d.p,
+          getColor: [...tokenRenk('--color-ink-3'), 200],
+          getWidth: 1.5,
+          widthUnits: 'pixels',
+          getDashArray: [6, 5],
+          extensions: [KESIK],
+        }),
+        new TextLayer<{ p: [number, number] }>({
+          id: 'risk-alani-adi',
+          data: [{ p: c[0] }],
+          getPosition: (d) => d.p,
+          getText: () => `${r.alan!.km} km · ilin hesap alanı`,
+          getSize: tokenPx('--text-small'),
+          getColor: [...tokenRenk('--color-ink-2'), 255],
+          getPixelOffset: [0, -8],
+          getTextAnchor: 'middle',
+          getAlignmentBaseline: 'bottom',
+          ...etiketOrtak,
+        }),
+      )
+    }
+
+    L.push(...ilKatmanlari('risk-illeri', iller, !!r.secili, false))
+
+    // Son bir yıl: küçük dolu noktalar (çap büyüklükle).
+    if (r.sonYil.length) {
+      L.push(
+        new ScatterplotLayer<RiskDepremi>({
+          id: 'risk-son-yil',
+          data: r.sonYil,
+          getPosition: (d) => [d.lon, d.lat],
+          getRadius: (d) => 2.5 + Math.max(0, d.m - 3) * 1.8,
+          radiusUnits: 'pixels',
+          getFillColor: (d) => (d.id === r.seciliDeprem ? [...vurgu, 255] : [...deprem, 170]),
+          stroked: true,
+          lineWidthMinPixels: 1,
+          getLineColor: [...zemin, 200],
+          pickable: true,
+          updateTriggers: { getFillColor: r.seciliDeprem },
+        }),
+      )
+    }
+
+    // M≥6 ana şoklar: halka, çap büyüklük (M6 ~6 px, M7,8 ~19 px).
+    if (r.anaSoklar.length) {
+      const yaricap = (d: RiskDepremi) => (6 + Math.max(0, d.m - 6) * 7.2) * olcek
+      L.push(
+        new ScatterplotLayer<RiskDepremi>({
+          id: 'risk-ana-sok',
+          data: r.anaSoklar,
+          getPosition: (d) => [d.lon, d.lat],
+          getRadius: yaricap,
+          radiusUnits: 'pixels',
+          filled: true,
+          getFillColor: (d) => (d.id === r.seciliDeprem ? [...vurgu, 60] : [...deprem, 55]),
+          stroked: true,
+          lineWidthUnits: 'pixels',
+          getLineWidth: (d) => (d.id === r.seciliDeprem ? 3 : 2),
+          getLineColor: (d) => (d.id === r.seciliDeprem ? [...vurgu, 255] : [...deprem, 235]),
+          pickable: true,
+          updateTriggers: {
+            getFillColor: r.seciliDeprem,
+            getLineColor: r.seciliDeprem,
+            getLineWidth: r.seciliDeprem,
+            getRadius: olcek,
+          },
+        }),
+      )
+      // Yıl ve büyüklük: il seçiliyse hepsi (en çok ~20), değilse yakında ya da M≥7.
+      const yazilan = r.secili
+        ? r.anaSoklar
+        : r.anaSoklar.filter((d) => d.m >= (z >= 7 ? 0 : z >= 6 ? 7 : 7.4) || d.id === r.seciliDeprem)
+      L.push(
+        new TextLayer<RiskDepremi>({
+          id: 'risk-ana-sok-adi',
+          data: yazilan,
+          getPosition: (d) => [d.lon, d.lat],
+          getText: (d) => `${d.yil} · M${d.m.toFixed(1).replace('.', ',')}`,
+          getSize: tokenPx('--text-small'),
+          getColor: (d) => (d.id === r.seciliDeprem ? [...vurgu, 255] : [...tokenRenk('--color-ink-2'), 255]),
+          getPixelOffset: (d) => [0, yaricap(d) + 4],
+          getTextAnchor: 'middle',
+          getAlignmentBaseline: 'top',
+          updateTriggers: { getColor: r.seciliDeprem, getPixelOffset: olcek },
+          ...etiketOrtak,
+        }),
+      )
+    }
+
+    // Seçili il en üstte; adı üstünde (altlık adlarıyla çakışmasın diye yalnız o).
+    if (seciliIl.length) {
+      L.push(
+        ...ilKatmanlari('risk-secili-il', seciliIl, false, true),
+        new TextLayer<RiskIli>({
+          id: 'risk-secili-il-adi',
+          data: seciliIl,
+          getPosition: (d) => [d.lon, d.lat],
+          getText: (d) => d.il,
+          getSize: tokenPx('--text-body'),
+          getColor: [...yazi, 255],
+          getPixelOffset: [0, -20],
+          getTextAnchor: 'middle',
+          getAlignmentBaseline: 'bottom',
+          ...etiketOrtak,
+        }),
+      )
+    }
   }
 
   // Hasar noktaları birleşik ısının kaynağıdır; ısıyla birlikte açılır.
@@ -574,6 +800,10 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
     const ekipler = g.ekipler.filter(konumlu)
     const giden = ekipler.filter((e) => e.gorev?.hedef)
     const vurgu = tokenRenk('--color-accent')
+    const ek = kumele('ekipler', ekipler, g.zoom ?? 0, {
+      konum: (d) => [d.lon, d.lat],
+      enCokZoom: KUME_EN_COK_ZOOM.ekipler,
+    })
     L.push(
       new PathLayer<KonumluEkip>({
         id: 'gorev-rotalari',
@@ -598,10 +828,11 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
         getDashArray: [4, 3],
         extensions: [KESIK],
       }),
+      ...kumeKatmanlari('ekipler', ek.kumeler, () => 'ekip-musait', () => tokenRenk('--color-accent-ink')),
       new IconLayer<KonumluEkip>({
         ...SIMGE_ORTAK,
         id: 'ekipler',
-        data: ekipler,
+        data: ek.tekler,
         getPosition: (d) => [d.lon, d.lat],
         getIcon: (d) => ikon(ekipSimgesi(d)),
         getSize: 24,
@@ -676,11 +907,24 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
   if (g.katmanlar.ihbarlar && g.ihbarlar?.length) {
     const turler = g.ihbarTurleri
     const veri = turler ? g.ihbarlar.filter((i) => turler.includes(i.tur)) : g.ihbarlar
+    // Seçili ihbar kümeye girmez: panelde seçilen nokta haritada hep görünür.
+    const secili = veri.filter((i) => i.id === g.seciliIhbar)
+    const k = kumele('ihbarlar', secili.length ? veri.filter((i) => i.id !== g.seciliIhbar) : veri, g.zoom ?? 0, {
+      konum: (d) => [d.lon, d.lat],
+      enCokZoom: KUME_EN_COK_ZOOM.ihbarlar,
+      altTur: (d) => d.tur,
+    })
     L.push(
+      ...kumeKatmanlari(
+        'ihbarlar',
+        k.kumeler,
+        (x) => `ihbar-${baskinTur(x) || 'metin'}` as SimgeTuru,
+        () => tokenRenk('--color-ground'),
+      ),
       new IconLayer<Ihbar>({
         ...SIMGE_ORTAK,
         id: 'ihbarlar',
-        data: veri,
+        data: secili.length ? [...k.tekler, ...secili] : k.tekler,
         getPosition: (d) => [d.lon, d.lat],
         getIcon: (d) => ikon(`ihbar-${d.tur}` as SimgeTuru, g.seciliIhbar === d.id),
         getSize: (d) => (g.seciliIhbar === d.id ? 30 : 22),
@@ -691,11 +935,23 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
     )
   }
 
+  // SOS kümesi içindeki en acil önceliğin rengini alır; seçili SOS kümeye girmez.
+  const sosSecili = g.sos.filter((c) => c.id === g.seciliSos)
+  const sosK = kumele('sos', sosSecili.length ? g.sos.filter((c) => c.id !== g.seciliSos) : g.sos, g.zoom ?? 0, {
+    konum: (d) => [d.lon, d.lat],
+    enCokZoom: KUME_EN_COK_ZOOM.sos,
+    oncelik: (d) => SOS_ONCELIK[d.oncelik] ?? 1,
+  })
+  const sosKumeTuru = (k: Kume): SimgeTuru =>
+    k.ozet.enYuksek >= 3 ? 'sos-kritik' : k.ozet.enYuksek === 2 ? 'sos-yuksek' : 'sos-orta'
   L.push(
+    ...kumeKatmanlari('sos', sosK.kumeler, sosKumeTuru, (k) =>
+      tokenRenk(sosKumeTuru(k) === 'sos-kritik' ? '--color-ink' : '--color-ground'),
+    ),
     new IconLayer<SosCagrisi>({
       ...SIMGE_ORTAK,
       id: 'sos',
-      data: g.sos,
+      data: sosSecili.length ? [...sosK.tekler, ...sosSecili] : sosK.tekler,
       getPosition: (d) => [d.lon, d.lat],
       getIcon: (d) => ikon(`sos-${d.oncelik}` as SimgeTuru, g.seciliSos === d.id),
       getSize: (d) => (g.seciliSos === d.id ? 34 : 26),
@@ -764,22 +1020,39 @@ export function katmanlariKur(g: KatmanGirdisi): Layer[] {
         }),
       )
     }
-    const uclar = [
-      ...(gz.bas ? [{ p: gz.bas, bas: true }] : []),
-      ...(gz.hedef ? [{ p: gz.hedef, bas: false }] : []),
-    ]
+    // Uçlar etiketli (J-190): iki nokta A ve B, duraklar
+    // 1, 2, 3…; hangi noktanın hangisi olduğu haritadan okunur.
+    const uclar: { p: [number, number]; bas: boolean; etiket: string }[] = gz.duraklar?.length
+      ? gz.duraklar.map((p, i) => ({ p, bas: i === 0, etiket: String(i + 1) }))
+      : [
+          ...(gz.bas ? [{ p: gz.bas, bas: true, etiket: 'A' }] : []),
+          ...(gz.hedef ? [{ p: gz.hedef, bas: false, etiket: 'B' }] : []),
+        ]
     if (uclar.length) {
       L.push(
-        new ScatterplotLayer<{ p: [number, number]; bas: boolean }>({
+        new ScatterplotLayer<(typeof uclar)[number]>({
           id: 'guzergah-uclari',
           data: uclar,
           getPosition: (d) => d.p,
-          getRadius: 8,
+          getRadius: 11,
           radiusUnits: 'pixels',
           getFillColor: (d) => (d.bas ? [...vurgu, 255] : [232, 236, 244, 255]),
           stroked: true,
           lineWidthMinPixels: 2,
           getLineColor: [...zemin, 255],
+        }),
+        new TextLayer<(typeof uclar)[number]>({
+          id: 'guzergah-uclari-etiket',
+          data: uclar,
+          getPosition: (d) => d.p,
+          getText: (d) => d.etiket,
+          getSize: tokenPx('--text-small'),
+          getColor: [...zemin, 255],
+          fontFamily: 'IBM Plex Sans, sans-serif',
+          fontWeight: 600,
+          characterSet: 'ABCDEFGHIJ0123456789',
+          getTextAnchor: 'middle',
+          getAlignmentBaseline: 'center',
         }),
       )
     }
@@ -867,6 +1140,29 @@ type KartSatiri = string | null | undefined | false | [string, string | null | u
 /** Üstüne gelince bilgi kartı (J-172): ne olduğu (tür ve simge), başlık,
     ad-değer satırları, kaynağı ve tıklayınca ne olacağı. Her nokta türü aynı
     düzende: koordinatör türü simgeden, ayrıntıyı karttan okur. */
+const KUME_ADI: Record<string, string> = {
+  toplanma: 'toplanma alanı',
+  saglik: 'hastane ve sağlık yeri',
+  ekipler: 'ekip',
+  ihbarlar: 'ihbar',
+  sos: 'SOS çağrısı',
+}
+
+function kumeIpucu(k: Kume) {
+  const turler = Object.entries(k.ozet.turler)
+  return ipucuKarti({
+    tur: 'Küme',
+    baslik: `${k.sayi} ${KUME_ADI[k.tur] ?? 'kayıt'}`,
+    satirlar: [
+      k.tur === 'sos' && ['En acil', k.ozet.enYuksek >= 3 ? 'Kritik' : k.ozet.enYuksek === 2 ? 'Yüksek' : 'Orta'],
+      k.tur === 'ihbarlar' && turler.length > 0
+        ? turler.map(([t, n]) => `${IHBAR_TURU[t as IhbarTuru]?.ad ?? t}: ${n}`).join(' · ')
+        : null,
+    ],
+    eylem: 'Tıkla: yakınlaş, küme açılsın',
+  })
+}
+
 export function ipucuKarti(k: {
   tur: string
   simge?: SimgeTuru
@@ -934,6 +1230,7 @@ export function haritaIpucu(bilgi: PickingInfo) {
   const { object, layer } = bilgi
   if (layer?.id === 'isi') return isiIpucu(bilgi)
   if (!object || !layer) return null
+  if (layer.id.startsWith('kume-')) return kumeIpucu(object as Kume)
   switch (layer.id) {
     case 'sos': {
       const c = object as SosCagrisi
@@ -1017,10 +1314,19 @@ export function haritaIpucu(bilgi: PickingInfo) {
       return ipucuKarti({
         tur: 'Yol kapanması',
         simge: 'kapanma',
-        baslik: k.kaynak === 'uydu' ? 'Uydu analizinde kapalı' : `Kapalı (${k.kaynak})`,
+        baslik:
+          (k.durum ?? 'kapali') !== 'kapali'
+            ? KAPANMA_DURUM_ADI[k.durum]
+            : k.kaynak === 'uydu'
+              ? 'Uydu analizinde kapalı'
+              : `Kapalı (${k.kaynak})`,
         satirlar: [
           ['Bulundu', tarihSaatYilli(k.zaman)],
-          'Rotalar bu yoldan kaçınır; başka yol yoksa geçer ve uyarır.',
+          ...(k.durumZaman ? [['Durum', `${KAPANMA_DURUM_ADI[k.durum]} · ${tarihSaatYilli(k.durumZaman)}`] as [string, string]] : []),
+          (k.durum ?? 'kapali') === 'kapali'
+            ? 'Araç rotası bu yoldan geçmez; başka yol yoksa geçer ve uyarır.'
+            : 'Rota bu kaydı artık hesaba katmıyor.',
+          'Durumunu değiştirmek için: Yol ve rota → Kapalı yollar.',
         ],
         kaynak: k.kaynak === 'uydu' ? 'Modelin tahmini; sahada doğrulanmadı' : null,
       })
@@ -1053,6 +1359,25 @@ export function haritaIpucu(bilgi: PickingInfo) {
         kaynak: 'AFAD listesi; alanın şu an açık ya da güvenli olduğunu göstermez',
       })
     }
+    case 'risk-ana-sok':
+    case 'risk-son-yil': {
+      const d = object as RiskDepremi
+      const ana = layer.id === 'risk-ana-sok'
+      return ipucuKarti({
+        tur: ana ? 'Geçmiş büyük deprem (ana şok)' : 'Son bir yılın depremi',
+        baslik: `M ${d.m.toFixed(1).replace('.', ',')} · ${d.yil}`,
+        satirlar: [
+          d.yer,
+          ['Tarih', d.zaman.slice(0, 10)],
+          ['İle uzaklık', d.km != null ? `${Math.round(d.km)} km` : null],
+        ],
+        kaynak: ana
+          ? 'Katalog (Kandilli, USGS); artçılar ayıklandı. Uzun vadeli olasılık bunlardan hesaplanır'
+          : 'Katalog (Kandilli, USGS); kısa vadeli tahminin girdisi',
+        eylem: 'Tıkla: sağdaki listede vurgula',
+      })
+    }
+    case 'risk-secili-il':
     case 'risk-illeri': {
       const r = object as RiskIli
       return ipucuKarti({

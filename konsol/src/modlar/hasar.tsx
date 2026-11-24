@@ -34,6 +34,7 @@ import {
   type WaybackGoruntuGecmisi,
 } from '@/veri/analiz'
 import { kutuCevresi, useSecim, type Kutu } from '@/durum/secimDurumu'
+import { useRota } from '@/durum/rotaDurumu'
 import { gunMetni, sayi, saat } from '@/lib/bicim'
 import { sn } from '@/lib/sinif'
 
@@ -1190,11 +1191,21 @@ export function HasarSag() {
               </button>
             )}
             {kapali > 0 && (
+              // J-190: eskiden "Bu ağda rota planla" Yol ve
+              // rota'ya yalnız geçiyordu, ne işe yaradığı anlaşılmıyordu. Şimdi
+              // bu analizin kapanmalarını açar; durumları oradan değişir.
               <Link
                 to="/konsol/yol"
+                onClick={() => {
+                  const r = useRota.getState()
+                  r.soruSec('kapali')
+                  r.kapanmaSuzgeciSec('hepsi')
+                  r.kapanmaSec(null)
+                  r.analizAc(is.id)
+                }}
                 className="rounded-control border border-accent px-2.5 py-1.5 text-small text-ink hover:bg-hover"
               >
-                Bu ağda rota planla
+                Kapalı yolları gözden geçir
               </Link>
             )}
           </div>

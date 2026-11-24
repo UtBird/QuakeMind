@@ -247,3 +247,51 @@ def test_guzergah_hiz_siniri(istemci, monkeypatch):
     disari = {"basLon": 29.0, "basLat": 41.0, "hedefLon": 29.1, "hedefLat": 41.05}
     kodlar = [c.post("/api/guzergah", json=disari, headers=j["koordinator"]).status_code for _ in range(3)]
     assert kodlar[-1] == 429, kodlar
+
+
+def test_arac_kapali_yoldan_baska_yol_varken_gecmez(monkeypatch):
+    """Dogrudan yol A-B-C (200 m), A-B uzerinde kisa bir kapanma; dolambac
+    A-D-E-C 2,2 km. Eski 20 kat ceza (100 m x 20 = 2 km) dolambactan ucuz
+    kaliyor ve rota kapanmadan geciyordu. Arac artik baska yol varken gecmez."""
+    _ag, _no, b = _kur(
+        {"A": (0, 0), "B": (1, 0), "C": (2, 0), "D": (0, 10), "E": (2, 10)},
+        [(["A", "B", "C"], "iki", "residential", 0), (["A", "D", "E", "C"], "iki", "residential", 0)],
+        monkeypatch=monkeypatch,
+    )
+    kapanma = ((_p(0.2, 0)), (_p(0.5, 0)), (_p(0.8, 0)))
+    monkeypatch.setattr(arac_rotasi, "_hasar_verisi", lambda _b: ((1, 1.0, 0, None, None), [kapanma], []))
+    r = _rota(b, (-0.0, 0.0), (2.0, 0.0))
+    assert r is not None
+    assert r["kapanmadanGecer"] == 0 and r["mesafeM"] > 2000
+    assert not _gecer_mi(r, (0, 0), (1, 0))
+
+
+def test_arac_baska_yol_yoksa_gecer_ve_soyler(monkeypatch):
+    """Hedef kapali sokagin ustunde: gecmek kacinilmaz; rota bulunur ve bunu soyler."""
+    _ag, _no, b = _kur(
+        {"A": (0, 0), "B": (1, 0), "C": (2, 0)},
+        [(["A", "B", "C"], "iki", "residential", 0)],
+        monkeypatch=monkeypatch,
+    )
+    kapanma = ((_p(1.2, 0)), (_p(1.5, 0)), (_p(1.8, 0)))
+    monkeypatch.setattr(arac_rotasi, "_hasar_verisi", lambda _b: ((1, 1.0, 0, None, None), [kapanma], []))
+    r = _rota(b, (0.0, 0.0), (1.6, 0.0))
+    assert r is not None and r["kapanmadanGecer"] == 1 and r["hedefKapanmada"] is True
+
+
+@pytest.mark.skipif(not GERCEK_AG, reason="gercek yol agi bu makinede yok")
+def test_guzergah_duraklar(istemci):
+    c, j = istemci
+    noktalar = [{"lon": 36.1610, "lat": 36.2020}, {"lon": 36.1650, "lat": 36.2060}, {"lon": 36.1700, "lat": 36.2100}]
+    y = c.post("/api/guzergah/duraklar", json={"noktalar": noktalar}, headers=j["koordinator"])
+    assert y.status_code == 200, y.text
+    r = y.json()
+    assert len(r["bacaklar"]) == 2 and r["mesafeM"] == sum(x["mesafeM"] for x in r["bacaklar"])
+    assert len(r["rota"]) > 3
+    # Tek durak ve 11 durak reddedilir; afetzede yetkisiz; ag disi bacak adiyla soylenir.
+    assert c.post("/api/guzergah/duraklar", json={"noktalar": noktalar[:1]}, headers=j["koordinator"]).status_code == 422
+    assert c.post("/api/guzergah/duraklar", json={"noktalar": noktalar * 4}, headers=j["koordinator"]).status_code == 422
+    assert c.post("/api/guzergah/duraklar", json={"noktalar": noktalar}, headers=j["afetzede"]).status_code == 403
+    disari = noktalar[:2] + [{"lon": 29.0, "lat": 41.0}]
+    y = c.post("/api/guzergah/duraklar", json={"noktalar": disari}, headers=j["koordinator"])
+    assert y.status_code == 422 and "2. bacak" in y.json()["detail"]

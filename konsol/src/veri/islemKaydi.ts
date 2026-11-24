@@ -25,6 +25,7 @@ export type IslemTuru =
   | 'ekip_uyeleri'
   | 'bildirim_yayinlandi'
   | 'bildirim_geri_cekildi'
+  | 'kapanma_durumu'
   | 'giris_basarili'
   | 'giris_basarisiz'
   | 'cikis'
@@ -70,6 +71,7 @@ export const ISLEM_TURU: Record<IslemTuru, { ad: string; hata?: true }> = {
   ekip_uyeleri: { ad: 'Ekip hesapları' },
   bildirim_yayinlandi: { ad: 'Bildirim yayınlandı' },
   bildirim_geri_cekildi: { ad: 'Bildirim geri çekildi', hata: true },
+  kapanma_durumu: { ad: 'Yol kapanması durumu' },
   giris_basarili: { ad: 'Giriş' },
   giris_basarisiz: { ad: 'Başarısız giriş', hata: true },
   cikis: { ad: 'Çıkış' },

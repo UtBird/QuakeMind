@@ -70,6 +70,10 @@ def _afetzede_icin(mesaj: dict, kullanici_id: str):
     ister, ekibin konumu oradan (yalniz gorev acikken) gelir."""
     if mesaj["tip"] == "bildirim":
         return mesaj
+    if mesaj["tip"] == "kapanma":
+        # Veri yok, yalniz "kapali yollar degisti" isareti: afetzede kendi
+        # cevresini (yalniz kapali olanlar) yeniden ister.
+        return {"tip": "kapanma"}
     if mesaj["tip"] == "gorev":
         if _kendi_olayi(mesaj.get("hedefTur", ""), mesaj.get("hedefId", ""), kullanici_id):
             return {

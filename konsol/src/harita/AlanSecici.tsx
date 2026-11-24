@@ -19,6 +19,9 @@ export function AlanSecici() {
   const { hazir, haritaAl } = useHarita()
   const modu = useSecim((d) => d.modu)
 
+  // Moddan çıkınca yarım kalan çizim iptal: köşeler başka moda taşınmasın.
+  useEffect(() => () => useSecim.getState().cizimiIptal(), [])
+
   useEffect(() => {
     const harita = haritaAl()
     if (!hazir || !harita) return

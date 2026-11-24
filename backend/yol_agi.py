@@ -47,9 +47,17 @@ import numpy as np
 AG_DIZINI = Path(__file__).resolve().parent / "veri" / "yol_agi"
 
 YAYA_HIZI_M_DK = 80.0  # ~4,8 km/sa; sokak rotasiyla ayni
-KAPANMA_YARICAPI_M = 25.0
-KAPANMA_CARPANI = 20.0
+KAPANMA_YARICAPI_M = 25.0  # dis servis (OSRM) rotasini denetlerken genis tutulur
+KAPANMA_CARPANI = 20.0  # yaya: kapali yoldan gecebilir ama tehlikeli (tasarim karari)
 KAPANMA_ADIM_M = 5.0  # kapanma cizgisinin ornekleme araligi
+# Kapanma -> yol kenari eslesmesi (J-190). Her ornek nokta
+# ESLESME_M icindeki EN YAKIN kenara sayilir; bir kenara en az EN_AZ_NOKTA
+# (~10 m) dusen kapanma o kenari kapatir. Eskiden cizginin 25 m cevresindeki
+# BUTUN kenarlar kapaniyordu: kavsak yanindaki tek kapanma kavsaga baglanan
+# butun sokaklari kapatiyor, "baska yol yok" diye rota kapanmadan geciyordu
+# (Elektrik, 40 rastgele rotanin 4'u).
+KAPANMA_ESLESME_M = 8.0
+KAPANMA_EN_AZ_NOKTA = 3
 HASAR_YARICAPI_M = 400.0  # risk_weight'in en genis kademesi
 OTURMA_UYARI_M = 300.0  # konum yol agina bundan uzaksa ekran uyarir
 
@@ -151,9 +159,13 @@ class Ag:
         mesafe, i = self.dugum_agaci.query(self.xy([lon], [lat])[0])
         return int(i), float(mesafe)
 
-    def carpanlar(self, imza, kapanmalar, hasarlar) -> tuple[np.ndarray, np.ndarray]:
+    def carpanlar(self, imza, kapanmalar, hasarlar,
+                  kapanma_carpani: float = KAPANMA_CARPANI) -> tuple[np.ndarray, np.ndarray]:
         """Kenar basina maliyet carpani ve kapali kenar isareti. Hasar verisi
-        degismedikce onceki hesap kullanilir (imza: sayi + son zaman)."""
+        degismedikce onceki hesap kullanilir (imza: sayi + son zaman).
+
+        `kapanma_carpani`: yaya agi 20 (gecebilir ama tehlikeli), arac agi
+        cok buyuk (yalniz baska yol yoksa gecer; bkz. arac_rotasi)."""
         from apps.road_damage.utils.network import risk_weight
 
         with self._kilit:
@@ -169,13 +181,28 @@ class Ag:
                 yakin = np.nonzero(en_az < HASAR_YARICAPI_M)[0]
                 # Arac motorunun kurali, ayni islev (kademeler tek yerde).
                 carpan[yakin] = [risk_weight(float(d)) for d in en_az[yakin]]
-            if kapanmalar:
-                noktalar = self._kapanma_noktalari(kapanmalar)
-                for _p, k, d in self._adaylar(noktalar, KAPANMA_YARICAPI_M):
-                    kapali[k[d <= KAPANMA_YARICAPI_M]] = True
-                carpan[kapali] *= KAPANMA_CARPANI
+            for cizgi in kapanmalar or ():
+                kapali[self._kapanmanin_kenarlari(cizgi)] = True
+            carpan[kapali] *= kapanma_carpani
             self._imza, self._carpan, self._kapali = imza, carpan, kapali
             return carpan, kapali
+
+    def _kapanmanin_kenarlari(self, cizgi) -> list[int]:
+        """Kapanma cizgisinin UZERINDE YATTIGI kenarlar. Her ornek nokta en
+        yakin kenara (ve ona esit uzakliktaki kenarlara: ayni sokagin iki
+        yonu) sayilir; kisa kapanmada esik nokta sayisiyla sinirlanir."""
+        noktalar = _ornekle(self.xy([p[0] for p in cizgi], [p[1] for p in cizgi]))
+        sayac: dict[int, int] = {}
+        for _p, k, d in self._adaylar(noktalar, KAPANMA_ESLESME_M):
+            if not len(k):
+                continue
+            en_az = float(d.min())
+            if en_az > KAPANMA_ESLESME_M:
+                continue
+            for kenar in k[d <= en_az + 0.5]:
+                sayac[int(kenar)] = sayac.get(int(kenar), 0) + 1
+        esik = min(KAPANMA_EN_AZ_NOKTA, len(noktalar))
+        return [kenar for kenar, n in sayac.items() if n >= esik]
 
     def _kapanma_noktalari(self, kapanmalar) -> np.ndarray:
         """Her kapanma bir nokta dizisi ((lon, lat), ...); cizgi orneklenir."""

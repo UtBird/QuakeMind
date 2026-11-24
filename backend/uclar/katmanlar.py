@@ -117,11 +117,15 @@ def kapanmalar(
     baslangic: Optional[float] = None,
     bitis: Optional[float] = None,
     sinir: int = Query(default=5000, ge=1, le=20000),
+    tumu: bool = Query(default=False, description="acildi ve yanlis durumdakiler de"),
     _kul: dict = Depends(kimlik.rol_gerektir(*SAHA_VE_USTU)),
 ):
+    """Varsayilan yalniz KAPALI durumdakiler (rota ve harita bunlara bakar).
+    `tumu=1`: kapanma yonetimi icin acildi ve yanlis alarm olanlar da."""
     k = _kutu(kutu)
     kayitlar = aktif_depo().kapanma_listele(
-        baslangic=_sn(baslangic), bitis=_sn(bitis), kutu=k, sinir=sinir
+        baslangic=_sn(baslangic), bitis=_sn(bitis), kutu=k, sinir=sinir,
+        durumlar=None if tumu else ("kapali",),
     )
     return {
         "kutu": list(k),
@@ -129,6 +133,13 @@ def kapanmalar(
         "kaynak": {
             "ad": "Uydu hasar analizi",
             "aciklama": "Kapali bulunan yol parcasi; cizgisi varsa cizgi, yoksa orta nokta.",
+            # Kirmizi neye gore cizilir (konsol bunu kullaniciya gosterir).
+            "kural": (
+                "Her OSM sokak parcasi (iki kavsak arasi) ~5 m aralikla orneklenir. Ornek nokta "
+                "modelin hasar maskesine duserse o kisim kapali sayilir; kirmizi cizgi o kisimdir. "
+                "Hasarin yolun ustune dusmesi gerekir (yandaki bina yikik olsa da yol ustunde "
+                "hasar yoksa yol acik sayilir). Modelin tahminidir; sahada dogrulanmadi."
+            ),
             "not": "Siddet derecesi hala olculmuyor; her kayda ayni deger yaziliyor (J-58).",
         },
         "kayitlar": [
@@ -142,6 +153,9 @@ def kapanmalar(
                 "zaman": _ms(x["zaman"]),
                 "kaynak": x["kaynak"],
                 "analizId": x.get("analiz_id"),
+                "durum": x.get("durum") or "kapali",
+                "durumZaman": _ms(x["durum_zaman"]) if x.get("durum_zaman") else None,
+                "durumNotu": x.get("durum_notu"),
             }
             for x in kayitlar
         ],

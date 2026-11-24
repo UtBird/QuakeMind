@@ -4424,3 +4424,54 @@ okuma yolu var (`load_local_graph_from_cache`) ama yalnız önceden ısıtılmı
 - Doğrulama: API kapalıyken (yerel, deneme oturumuyla) kamera sayfasında analiz başlatıldı. Sayfa "Analiz yapılamadı" dedi, "%96,2" ve sabit sonuç görünmedi. `tsc --noEmit` hatasız (değişiklikten önce de 0).
 
 ---
+
+---
+
+## J-190 🟠 Yol ve rota: hasar ekranının yarım çokgeni rota ekranına taşınıyordu; araç kapalı yoldan geçiyordu; kapanmanın durumu değiştirilemiyordu
+**Durum:** KAPALI (24 Kasım 2026) · **Bulundu:** 24 Kasım 2026, kullanıcı Defne/Elektrik'te analizden sonra "Bu ağda rota planla" ile Yol ve rota'ya geçince · **İlgili:** J-171, J-181, J-58
+
+**Bulgu.**
+1. Hasar ekranında çizimi bitmemiş çokgen (`AlanSecici`) bütün modlarda açıktı: Yol ve rota "iki nokta seç" derken her tıklama çokgene köşe ekliyordu, köşeler hangi sayfaya gidilse oraya taşınıyordu.
+2. "Bu ağda rota planla" yalnız Yol ve rota'ya geçiyordu; ne yaptığı anlaşılmıyordu.
+3. Rota yalnız iki noktalıydı; sıralı çok duraklı rota yoktu.
+4. Araç rotası kapalı yoldan geçiyordu. İki sebep: (a) kapanma cezası ×20 idi; Defne'de kapalı sokak dolanmaktan ucuz kalabiliyordu (bir ölçümde rota 3 kapanmadan geçti). (b) Kapanma, 25 m içindeki bütün kenarları kapatıyordu: kavşaktaki bir kapanma yan sokakları da kapatıyor, rotanın "kapanmadan geçiyor" sayısı şişiyordu (40 rastgele rotada öz bildirim 5, gerçekte 3).
+5. Kırmızı kapanmalar kalıcıydı: durumunu değiştirmenin yolu yoktu, neye göre çizildiği yazmıyordu.
+
+**Kural (kırmızı neye göre çiziliyor).** Her OSM sokak parçası (iki kavşak arası) ~5 m aralıkla örneklenir; örnek nokta modelin hasar maskesine düşerse o alt parça kapalıdır, kırmızı çizgi o alt parçadır (`network._classify_edges`, `cekirdek._kapanmalari_depoya_yaz`). Sokak bazlı değil, metre bazlıdır; hasar yolun üstüne düşmezse yol açık sayılır.
+
+**Yapılan.**
+- `AlanSecici` yalnız hasar modunda çizilir ve modda iken alır; moddan çıkınca yarım çizim iptal edilir. Haritaya tıklama yalnız Yol ve rota modunda nokta seçer.
+- Yol ve rota baştan düzenlendi (`konsol/src/modlar/yol.tsx`, `durum/rotaDurumu.ts`): **İki nokta arası** (ilk tıklama A, ikincisi B, sonra tıklama yok sayılır; "Değiştir" ile tek nokta yeniden seçilir), **Çok duraklı** (en çok 10 durak, sırayla numaralı, oklarla sıra değişir; `POST /api/guzergah/duraklar`, her bacak aynı araç motorundan), ekipten olaya, en yakın hastane / toplanma, **Kapalı yollar**. Haritada uçlar A/B ya da 1…n etiketli.
+- Kapanma eşleşmesi: kapanma çizgisinin her noktası 8 m içindeki en yakın kenara gider; kenar en az 3 nokta (kısa çizgide hepsi) alırsa kapalıdır. Dik kesen ve kavşaktaki kapanma yan sokağı kapatmaz (`yol_agi._kapanmanin_kenarlari`).
+- Araç için kapanma cezası 10⁶ (`arac_rotasi.ARAC_KAPANMA_CARPANI`): başka yol varsa kapalı yoldan geçilmez; yoksa (başlangıç ya da hedef kapalı sokakta) geçilir ve rota kartı nedenini söyler (`baslangicKapanmada`, `hedefKapanmada`). Yürüme ×20'de kaldı (yaya enkazın yanından geçebilir; tasarım kararı).
+- Kapanma durumu: `yol_kapanmalari` tablosuna `durum` (kapali / acildi / yanlis), `durum_zaman`, `durum_yapan`, `durum_notu` (kendiliğinden göç). `PATCH /api/kapanmalar/{id}` (saha, koordinatör, yönetici) aynı orta noktalı bütün kayıtları değiştirir; `POST /api/kapanmalar/analiz/{id}/durum` (koordinatör, yönetici) bir analizin hepsini. İkisi de işlem kaydına (`kapanma_durumu`) yazar ve canlı akışa `kapanma` gönderir. Rota, harita ve afetzede çevresi yalnız `kapali` olanı kullanır; kayıt silinmez, geri alınabilir.
+- Konsol: Kapalı yollar sorusunda durum süzgeci (sayılı), analizlere göre gruplu liste, toplu durum (onaylı), kural açıklaması; haritada ya da listede parçaya tıklayınca sağda kart (kaynak, tarih, kapalı kısmın uzunluğu, son değişiklik, not, üç durum düğmesi). Açılan yeşil kesik, yanlış alarm gri kesik çizilir. Tıklama payı 6 px (ince parçalar).
+- Hasar sonucundaki bağlantı "Kapalı yolları gözden geçir" oldu: o analizin kapanmalarını açar ve oraya uçar.
+
+**Doğrulama.**
+- `pytest`: 186 geçti. Yeni testler: kapanma üstünde yattığı kenarı kapatır, dik kapanma yolu kapatmaz, kavşak kapanması yan sokağı kapatmaz; araç başka yol varken kapalıdan geçmez (×20 ile düşüyordu), başka yol yoksa geçer ve söyler; çok duraklı uç; durum ucu (yetki, geçersiz durum, rota etkisi).
+- Yerel konsolda (gerçek Antakya verisi): A/B ve üçüncü tıklamanın yok sayılması; 3 duraklı rota ve sıra değiştirme (13 dk ↔ 15 dk); hasar ekranında 3 köşeli yarım çokgenle Yol ve rota'ya geçince köşe taşınmadı; kapanma listeden ve haritadan seçildi, "Yol açıldı" yazıldı (kart, sayılar, harita güncellendi), sonra yeniden "Kapalı" yapıldı. `tsc -b`, `kontrol:token` temiz.
+- Ölçülmedi: canlıda; hasar ekranındaki yeni bağlantı yerelde analiz koşturmadan denenmedi (yalnız tip denetimi).
+
+---
+
+## J-191 🟠 Deprem riski ekranı okunmuyordu; harita noktaları uzakta ya hiç görünmüyor ya üst üste biniyordu; logo ana ekrana götürmüyordu
+**Durum:** KAPALI (24 Kasım 2026) · **Bulundu:** 24 Kasım 2026, kullanıcı (ekran görüntüleriyle: Manisa seçiliyken risk haritası; örnek olarak kümeli harita) · **İlgili:** J-173, J-172, J-56
+
+**Bulgu.**
+1. Deprem riski haritası: ülke kataloğunun binlerce M≥4 dairesi (risk modunda varsayılan açık), seçili ilde 150 ve 200 km'lik iki dolu daire (Manisa'da neredeyse bütün Batı Anadolu), her il adının yanında skor yazısı altlık adlarıyla çakışıyordu. Skora hangi depremlerin girdiği haritada görünmüyordu; olasılıklar "Kısa vadeli %57" gibi sorudan kopuk yazıyordu.
+2. Toplanma alanları z11, sağlık yerleri z12 altında hiç çizilmiyordu ("yakınlaşınca görünür"); SOS, ihbar ve ekipler uzakta üst üste biniyordu.
+3. Sol üstteki QuakeMind yazısı tıklanmıyordu.
+
+**Yapılan.**
+- **Risk, sunucu** (`risk_hizmeti.py`, `uclar/risk.py`): yanıt skora giren depremleri konumlarıyla taşır: `anaSoklar` (200 km içinde, M≥6, Gardner–Knopoff ile artçısız; uzun vadeli bileşenin saydıkları, sayı `uzunVadeAnaSok` ile aynı) ve `sonYilDepremler` (150 km, son bir yıl, motorun ayıklanmış çerçevesi; kısa vadeli bileşenin girdisi, en büyük 60). Yeni uç `GET /api/risk/ana-soklar`: ülkenin M≥6 ana şokları (71 kayıt, 10 KB, giriş ister). Hesap önbellekte; Manisa ilk hesap 0,95 sn (ölçüldü, yerel).
+- **Risk, harita:** il seçilmemişken il merkezleri skor renginde (skor yuvarlağın içinde, sığınca ve çakışmayınca) ve ülkenin M≥6 ana şokları (halka, çap büyüklük; M≥7,4'ün yılı yazılı, yakınlaştıkça hepsi). İl seçilince yalnız o ilin hesabına giren depremler: ana şoklar yılı ve büyüklüğüyle, son bir yıl küçük noktalar, hesap alanı ince kesik çizgi ve adı ("200 km · ilin hesap alanı"); öteki iller sönük. Risk modunun varsayılan katmanlarından ülke kataloğu çıktı (katman düğmesinden açılabilir).
+- **Risk, panel:** sol: düzeye göre süzgeç (Çok yüksek / Yüksek / Orta / Düşük, sayılı), operasyon bölgeleri, arama, sıralı liste. Sağ, il yokken: "Türkiye'nin büyük depremleri" listesi ve haritayı okuma. İl seçiliyken: skor; olasılıklar soru cümlesiyle ("10 yılda, 200 km içinde M≥6 deprem %78; 1933–2026 arasında bu alanda 14 ana şok"); geçmişteki büyük depremler ve son bir yıl listesi (satıra tıklayınca haritada uçar ve vurgulanır; haritada halkaya tıklayınca listede vurgulanır); yakın faylar; okuma kılavuzu; yöntem. Moda girince harita Türkiye'ye, il seçilince ilin hesap alanına sığar.
+- **Kümeleme** (`harita/kumeleme.ts`, Supercluster 8.0.1, ISC): toplanma (z14'e kadar), sağlık (z13), ekipler (z11), ihbarlar (z13), SOS (z13). Küme türün şekli ve renginde, ortasında sayı; SOS kümesi içindeki en acil önceliğin rengini, ihbar kümesi baskın türün rengini alır. Seçili SOS ve ihbar kümeye girmez. Tıklayınca kümenin açıldığı yakınlığa uçulur; üzerine gelince sayı ve (SOS) en acil öncelik. Dizin veri dizisi başına bir kez kurulur, sonuç tam sayı yakınlık başına saklanır.
+- **Harita:** `kutuyaUc` alçak ya da dar pencerede dolguyu tuvalin %70'ine küçültür; eskiden maplibre "Map cannot fit" deyip hiç uçmuyordu (760 px yükseklikte görüldü).
+- **Logo:** üst çubuktaki QuakeMind genel duruma götürür.
+
+**Doğrulama.**
+- `pytest`: risk testleri 6/6 (yeni: skoru belirleyen depremlerin sayısı dayanakla tutar, hepsi yarıçap ve eşik içinde; ülke ana şokları giriş ister). `tsc -b`, `kontrol:token` temiz.
+- Yerel konsolda: genel durumda toplanma kümeleri (28 → tıklayınca 17, 7, 3…), üzerine gelince "28 toplanma alanı"; risk modunda Türkiye görünümü, Manisa seçilince hesap alanı, 14 ana şok etiketli, öteki iller sönük; listeden 1953 Gönen M7,3 seçilince harita uçtu ve vurguladı; logo genel duruma götürdü.
+- Ölçülmedi: SOS ve ihbar kümeleri (yerel veride açık SOS ya da ihbar yoktu); canlıda.

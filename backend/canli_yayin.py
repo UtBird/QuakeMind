@@ -41,6 +41,8 @@ MESAJ_TIPLERI = (
     "simulasyon-katman",
     # Islem kaydi (J-165): yalniz tur gider; konsol kayit listesini tazeler.
     "islem-kaydi",
+    # Yol kapanmasinin durumu degisti (kapali / acildi / yanlis alarm).
+    "kapanma",
 )
 
 

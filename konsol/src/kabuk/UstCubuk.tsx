@@ -33,7 +33,15 @@ export function UstCubuk() {
       {/* 1024 px'te üst çubuk 200 px taşıyor, çıkış ve Canlı rozeti ekran dışına
           düşüyordu (17 Kasım). 1280 altında yazılar simgeye iner, sekmeler sıkışır;
           yine sığmazsa yalnız sekmeler kayar, sağdaki denetimler hep görünür. */}
-      <Marka daraltilir />
+      {/* Logo ana ekrana (genel durum) götürür (J-191). */}
+      <Link
+        to="/konsol/genel"
+        aria-label="Genel duruma dön"
+        title="Genel durum"
+        className="shrink-0 rounded-control text-ink focus-visible:outline-2 focus-visible:outline-accent"
+      >
+        <Marka daraltilir />
+      </Link>
       <span className="h-5 w-px shrink-0 bg-line-2" />
 
       {/* Ana modlar sekme, analiz modları tek menüde (J-56): on sekme sığmıyor,

@@ -463,6 +463,15 @@ class SqliteDepo:
             ("onceki_hash", "TEXT"),
             ("hash", "TEXT"),
         ),
+        # Kapanmanin durumu (J-190): model "kapali" der;
+        # saha ya da koordinasyon "acildi" ya da "yanlis" (yanlis alarm)
+        # isaretleyebilir. Rota, harita ve afetzede ekrani yalniz "kapali"ya bakar.
+        "yol_kapanmalari": (
+            ("durum", "TEXT NOT NULL DEFAULT 'kapali'"),
+            ("durum_zaman", "REAL"),
+            ("durum_yapan", "TEXT"),
+            ("durum_notu", "TEXT"),
+        ),
     }
 
     def _sutunlari_tamamla(self) -> None:
@@ -968,8 +977,11 @@ class SqliteDepo:
         (eskiden her istekte 100 000'e kadar satir Python'a cekiliyordu)."""
         kosullar, parametreler = self._zaman_kutu_kosullari(None, None, kutu)
         nerede = " AND ".join(kosullar)
+        # Durum degisikligi (acildi / yanlis) imzayi degistirmeli: sayi ve son
+        # zaman tek basina yetmez, son durum zamani da girer.
         k = self._tek(
-            f"SELECT COUNT(*) AS n, MAX(zaman) AS son FROM yol_kapanmalari WHERE {nerede}",
+            f"SELECT SUM(durum = 'kapali') AS n, MAX(CASE WHEN durum = 'kapali' THEN zaman END) AS son, "
+            f"MAX(durum_zaman) AS durum_son FROM yol_kapanmalari WHERE {nerede}",
             tuple(parametreler),
         )
         h = self._tek(
@@ -977,7 +989,7 @@ class SqliteDepo:
             f" WHERE {nerede} AND {self._ROTA_HASAR_KOSULU}",
             tuple(parametreler),
         )
-        return (int(k["n"]), k["son"], int(h["n"]), h["son"])
+        return (int(k["n"] or 0), k["son"], int(h["n"]), h["son"], k["durum_son"])
 
     def rota_tehlike_noktalari(self, kutu: tuple[float, float, float, float]) -> tuple[list[dict], list[tuple]]:
         """(kapanmalar: lon, lat, ek; hasar noktalari: (lon, lat)). Suzme SQL'de,
@@ -985,7 +997,7 @@ class SqliteDepo:
         kosullar, parametreler = self._zaman_kutu_kosullari(None, None, kutu)
         nerede = " AND ".join(kosullar)
         kapanmalar = self._oku(
-            f"SELECT lon, lat, ek FROM yol_kapanmalari WHERE {nerede} ORDER BY zaman DESC",
+            f"SELECT lon, lat, ek FROM yol_kapanmalari WHERE {nerede} AND durum = 'kapali' ORDER BY zaman DESC",
             tuple(parametreler),
         )
         hasarlar = [
@@ -1784,11 +1796,51 @@ class SqliteDepo:
             "hasarliYapi": (int(uydu["n"]) - yikik) if uydu else 0,
         }
 
+    def kapanma_bul(self, kapanma_id: str) -> Optional[dict]:
+        return self._tek("SELECT * FROM yol_kapanmalari WHERE id = ?", (kapanma_id,))
+
+    def kapanma_durum_yaz(self, kapanma_id: str, durum: str, yapan: str, notu: str | None) -> int:
+        """Kapanmanin durumunu yazar. Ayni yol parcasi (ayni orta nokta) birden
+        cok analizde kaydedildiyse hepsi birlikte degisir: haritada tek cizgi
+        gorunuyor, rota da tek parca sayiyor. Donus: degisen kayit sayisi."""
+        if durum not in self.KAPANMA_DURUMLARI:
+            raise ValueError(durum)
+        k = self.kapanma_bul(kapanma_id)
+        if k is None:
+            return 0
+        n = self._tek(
+            "SELECT COUNT(*) AS n FROM yol_kapanmalari WHERE ABS(lon - ?) < 1e-6 AND ABS(lat - ?) < 1e-6",
+            (k["lon"], k["lat"]),
+        )["n"]
+        self._yaz(
+            "UPDATE yol_kapanmalari SET durum = ?, durum_zaman = ?, durum_yapan = ?, durum_notu = ? "
+            "WHERE ABS(lon - ?) < 1e-6 AND ABS(lat - ?) < 1e-6",
+            (durum, time.time(), yapan, notu, k["lon"], k["lat"]),
+        )
+        return int(n)
+
+    def kapanma_analiz_durum_yaz(self, analiz_id: str, durum: str, yapan: str, notu: str | None) -> int:
+        """Bir analizin butun kapanmalari (ornegin "bu analizin hepsi yanlis
+        alarm"). Donus: degisen kayit sayisi."""
+        if durum not in self.KAPANMA_DURUMLARI:
+            raise ValueError(durum)
+        n = self._tek("SELECT COUNT(*) AS n FROM yol_kapanmalari WHERE analiz_id = ?", (analiz_id,))["n"]
+        if n:
+            self._yaz(
+                "UPDATE yol_kapanmalari SET durum = ?, durum_zaman = ?, durum_yapan = ?, durum_notu = ? "
+                "WHERE analiz_id = ?",
+                (durum, time.time(), yapan, notu, analiz_id),
+            )
+        return int(n)
+
     def kapanma_sayisi(self, baslangic: float | None = None, bitis: float | None = None) -> int:
         kosullar, parametreler = self._zaman_kutu_kosullari(baslangic, bitis, None)
+        kosullar.append("durum = 'kapali'")
         nerede = f"WHERE {' AND '.join(kosullar)}" if kosullar else ""
         satir = self._tek(f"SELECT COUNT(*) AS n FROM yol_kapanmalari {nerede}", tuple(parametreler))
         return int(satir["n"]) if satir else 0
+
+    KAPANMA_DURUMLARI = ("kapali", "acildi", "yanlis")
 
     def kapanma_listele(
         self,
@@ -1796,8 +1848,14 @@ class SqliteDepo:
         bitis: float | None = None,
         kutu: tuple[float, float, float, float] | None = None,
         sinir: int = 20000,
+        durumlar: tuple[str, ...] | None = ("kapali",),
     ) -> list[dict]:
+        """`durumlar`: varsayilan yalniz kapali olanlar (rota, harita, sayim).
+        None: hepsi (kapanma yonetimi ekrani)."""
         kosullar, parametreler = self._zaman_kutu_kosullari(baslangic, bitis, kutu)
+        if durumlar:
+            kosullar.append(f"durum IN ({','.join('?' * len(durumlar))})")
+            parametreler.extend(durumlar)
         nerede = f"WHERE {' AND '.join(kosullar)}" if kosullar else ""
         return self._oku(
             f"SELECT * FROM yol_kapanmalari {nerede} ORDER BY zaman DESC LIMIT ?",

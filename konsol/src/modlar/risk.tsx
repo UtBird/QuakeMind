@@ -1,65 +1,46 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { WarningCircle } from '@phosphor-icons/react'
 import { Amac, Bolum, HazirSecenekler, SuAn, Teknik, VeriYok } from '@/kabuk/Panel'
-import { Micro, Rozet } from '@/kabuk/parcalar'
-import { apiGet, apiPost } from '@/veri/istemci'
+import { Chip, Micro, Rozet } from '@/kabuk/parcalar'
 import { useHarita } from '@/harita/HaritaKabugu'
 import { useCozumleme } from '@/durum/cozumlemeDurumu'
+import {
+  DUZEY_ADI,
+  RISK_TONU,
+  alanKutusu,
+  buyukluk,
+  depremKimligi,
+  depremYili,
+  useRisk,
+  useRiskSecimi,
+  useRiskSiralamasi,
+  useUlkeAnaSoklari,
+  type RiskDeprem,
+  type RiskDuzeyi,
+  type RiskSirasi,
+  type RiskYaniti,
+} from '@/veri/risk'
 import { sn } from '@/lib/sinif'
 
+export { useRiskSiralamasi }
+
 /* ---------------------------------------------------------------------------
-   Deprem riski (J-173). Panelin sorusu: hangi ilde risk daha yüksek, neden?
-   Sol: 81 il riske göre sıralı. Harita: il merkezleri risk renginde, seçili
-   ilin hesap alanı halkalarla. Sağ: skor ve üç bileşen, her biri neyi
-   ölçtüğü ve dayanağıyla; zayıf olan bileşen bunu söyler.
+   Deprem riski (J-173; baştan düzen J-191).
+
+   Sorusu: hangi ilde büyük deprem tehlikesi yüksek, NEDEN?
+   · Sol: 81 il riske göre sıralı, düzeye göre süzülür.
+   · Harita, il seçilmemişken: il merkezleri skor renginde (sayı içinde) ve
+     Türkiye'nin 1933'ten beri M≥6 ana şokları (halka, çap = büyüklük).
+   · İl seçilince: yalnız o ilin skoruna giren depremler. 200 km içindeki M≥6
+     ana şoklar (yılıyla) ve 150 km içinde son bir yılın depremleri; hesap alanı
+     ince kesik çizgi. Eskiden ülke kataloğunun binlerce dairesi ve iki dev
+     dolu daire birlikte çiziliyordu; neyin skora girdiği okunmuyordu.
+   · Sağ: olasılıklar düz cümleyle, sonra dayanakları (deprem listesi tıklanır).
    Hesap sunucuda (`risk_hizmeti.py`), model dosyadan yüklenir.
 --------------------------------------------------------------------------- */
 
-export type RiskYaniti = {
-  city: string
-  coordinates: { lat: number; lon: number }
-  riskScore: number
-  riskLevel: string
-  lastUpdate?: string
-  metrics: {
-    shortRisk: number
-    longHazard: number
-    faultScore: number
-    faultDistanceKm: number
-    nearbyQuakeCount?: number
-    maxMagnitude?: number
-  }
-  dayanak?: {
-    kisaVadeKaynagi: 'yerel' | 'ulke'
-    kisaVadeYerelDeprem: number
-    uzunVadeAnaSok: number
-    katalogBasi: string
-    katalogSonu: string
-    agirlik: { kisa: number; uzun: number; fay: number }
-    yaricapKm: { kisa: number; uzun: number; yakinDeprem: number }
-  }
-  yakinFaylar?: { tur: string; kimlik: string; km: number }[]
-  sonDepremler?: { time: string; magnitude: number; distanceKm: number; place: string; depth: number | null }[]
-}
-
-export type RiskSirasi = {
-  il: string
-  lat: number
-  lon: number
-  skor: number
-  seviye: string
-  kisa: number
-  uzun: number
-  fay: number
-  fayKm: number
-  kisaVadeKaynagi: 'yerel' | 'ulke'
-}
-
-export const RISK_TONU = (skor: number): 'crit' | 'high' | 'mid' | 'ok' =>
-  skor >= 75 ? 'crit' : skor >= 50 ? 'high' : skor >= 25 ? 'mid' : 'ok'
-
 const TON_ZEMIN = { crit: 'bg-crit', high: 'bg-high', mid: 'bg-mid', ok: 'bg-ok' } as const
+const DUZEYLER: RiskDuzeyi[] = ['crit', 'high', 'mid', 'ok']
 
 const OPERASYON = [
   { id: 'Hatay', etiket: 'Antakya (Hatay)' },
@@ -69,28 +50,11 @@ const OPERASYON = [
   { id: 'Adıyaman', etiket: 'Adıyaman' },
 ] as const
 
+/** Türkiye kutusu [batı, güney, doğu, kuzey]. */
+const TURKIYE: [number, number, number, number] = [25.6, 35.8, 44.8, 42.1]
+
 const yuzde = (x: number) => `%${Math.round(x * 100)}`
 const ondalik = (x: number, b = 1) => x.toFixed(b).replace('.', ',')
-
-export function useRiskSiralamasi(acik = true) {
-  return useQuery({
-    queryKey: ['risk', 'siralama'],
-    // Harita kabuğu her modda çağırır; yalnız risk modunda istenir (J-175).
-    enabled: acik,
-    staleTime: 10 * 60_000,
-    queryFn: () => apiGet<{ iller: RiskSirasi[] }>('/api/risk/siralama'),
-  })
-}
-
-function useRisk(il: RiskSirasi | null) {
-  return useQuery({
-    queryKey: ['risk', 'il', il?.il],
-    enabled: !!il,
-    staleTime: 10 * 60_000,
-    queryFn: () =>
-      apiPost<RiskYaniti>('/api/risk/predict', { city: il!.il, manualLatitude: il!.lat, manualLongitude: il!.lon }),
-  })
-}
 
 /** Seçili il (mağazada `il:<ad>`); sol ve sağ panel ile harita paylaşır. */
 export function useSeciliRiskIli(siralama: RiskSirasi[] | undefined): RiskSirasi | null {
@@ -101,33 +65,60 @@ export function useSeciliRiskIli(siralama: RiskSirasi[] | undefined): RiskSirasi
   }, [secim, siralama])
 }
 
+/** İl seçimi: harita ilin 200 km'lik hesap alanına sığar. */
+export function useIlSec() {
+  const sec = useCozumleme((d) => d.riskBolgeSec)
+  const depremSec = useRiskSecimi((d) => d.depremSec)
+  const { kutuyaUc } = useHarita()
+  return (il: RiskSirasi) => {
+    sec(`il:${il.il}`)
+    depremSec(null)
+    kutuyaUc(alanKutusu(il.lon, il.lat, 210))
+  }
+}
+
 export function RiskSol() {
   const siralama = useRiskSiralamasi()
   const secili = useSeciliRiskIli(siralama.data?.iller)
-  const sec = useCozumleme((d) => d.riskBolgeSec)
-  const { ucus } = useHarita()
+  const ilSec = useIlSec()
+  const { duzey, duzeySec } = useRiskSecimi()
   const [ara, setAra] = useState('')
+  const { kutuyaUc, hazir } = useHarita()
 
-  const ilSec = (il: RiskSirasi) => {
-    sec(`il:${il.il}`)
-    ucus(il.lon, il.lat, 6.4) // 200 km'lik hesap alanı ekrana sığsın
-  }
-  // Haritadan ya da düğmeden seçilen il listede görünür olsun.
+  // Moda girince harita sorunun ölçeğine gelir: il seçili değilse Türkiye,
+  // seçiliyse ilin hesap alanı. Yalnız açılışta, harita hazır olunca (sonra
+  // kullanıcı gezer).
+  const ilkSecili = useState(secili)[0]
+  const uculdu = useRef(false)
+  useEffect(() => {
+    if (!hazir || uculdu.current) return
+    uculdu.current = true
+    kutuyaUc(ilkSecili ? alanKutusu(ilkSecili.lon, ilkSecili.lat, 210) : TURKIYE)
+  }, [hazir, ilkSecili, kutuyaUc])
+
   useEffect(() => {
     if (secili) document.getElementById(`risk-il-${secili.il}`)?.scrollIntoView({ block: 'nearest' })
   }, [secili])
+
+  const sayilar = useMemo(() => {
+    const s: Record<RiskDuzeyi, number> = { crit: 0, high: 0, mid: 0, ok: 0 }
+    for (const x of siralama.data?.iller ?? []) s[RISK_TONU(x.skor)] += 1
+    return s
+  }, [siralama.data])
+
   const liste = useMemo(() => {
     const a = ara.trim().toLocaleLowerCase('tr')
     return (siralama.data?.iller ?? [])
       .map((x, i) => ({ ...x, sira: i + 1 }))
+      .filter((x) => !duzey || RISK_TONU(x.skor) === duzey)
       .filter((x) => !a || x.il.toLocaleLowerCase('tr').includes(a))
-  }, [siralama.data, ara])
+  }, [siralama.data, ara, duzey])
 
   return (
     <Bolum baslik="Deprem riski" ek={<Micro>81 il</Micro>}>
       <Amac>
-        Hangi ilde deprem riski daha yüksek, neden? Geçmiş depremler, fay uzaklığı ve son
-        hareketlilik birlikte; her il merkezi için.
+        Hangi ilde büyük deprem tehlikesi yüksek, neden? Bir il seç: skoru belirleyen geçmiş
+        depremler haritada, olasılıklar ve dayanakları sağda.
       </Amac>
 
       <HazirSecenekler
@@ -139,6 +130,20 @@ export function RiskSol() {
           if (il) ilSec(il)
         }}
       />
+
+      <div className="mt-3">
+        <Micro>Düzeye göre</Micro>
+        <div role="group" aria-label="Düzeye göre süz" className="mt-1.5 flex flex-wrap gap-1.5">
+          {DUZEYLER.map((d) => (
+            <Chip key={d} secili={duzey === d} onClick={() => duzeySec(duzey === d ? null : d)}>
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden className={sn('h-2 w-2 rounded-full', TON_ZEMIN[d])} />
+                {`${DUZEY_ADI[d]} · ${sayilar[d]}`}
+              </span>
+            </Chip>
+          ))}
+        </div>
+      </div>
 
       <label className="mt-3 block" htmlFor="risk-ara">
         <Micro>İl ara</Micro>
@@ -159,6 +164,9 @@ export function RiskSol() {
       ) : (
         <ol aria-label="İller, riske göre" className="mt-2 max-h-form overflow-auto rounded-control border border-line">
           {siralama.isPending && <li className="px-2.5 py-2 text-small text-ink-3">81 il hesaplanıyor…</li>}
+          {!siralama.isPending && liste.length === 0 && (
+            <li className="px-2.5 py-2 text-small text-ink-3">Bu süzgeçte il yok.</li>
+          )}
           {liste.map((il) => (
             <li key={il.il}>
               <button
@@ -188,32 +196,25 @@ export function RiskSol() {
 
       <SuAn>
         {secili
-          ? `${secili.il}: skor ${Math.round(secili.skor)}, ${secili.seviye.toLocaleLowerCase('tr')}; ayrıntı sağda.`
-          : 'Bir ile tıkla; skorun bileşenleri ve dayanağı sağda, hesap alanı haritada.'}
+          ? `${secili.il}: skor ${Math.round(secili.skor)}, ${secili.seviye.toLocaleLowerCase('tr')}. Haritada yalnız bu ilin hesabına giren depremler var.`
+          : 'Listeden ya da haritadan bir il seç. Haritadaki halkalar Türkiye’nin geçmişteki M≥6 depremleri.'}
       </SuAn>
 
       <Teknik>
-        Skor her il için il merkezinde hesaplanır, ilin tamamı için değil. Model istek yolunda
-        eğitilmez; sonuç veri değişmedikçe sunucuda saklanır (ilk sıralama ~2 sn, sonra anında).
+        Skor il merkezinde hesaplanır, ilin tamamı için değil. Model istek yolunda eğitilmez; sonuç
+        veri değişmedikçe sunucuda saklanır (ilk sıralama ~2 sn, sonra anında).
       </Teknik>
     </Bolum>
   )
 }
 
+/* ---- sağ panel -------------------------------------------------------------- */
+
 export function RiskSag() {
   const siralama = useRiskSiralamasi()
   const secili = useSeciliRiskIli(siralama.data?.iller)
   const risk = useRisk(secili)
-  if (!secili) {
-    return (
-      <Bolum baslik="Risk">
-        <Amac>Seçilen ilin risk skoru, üç bileşeni ve her birinin dayanağı burada görünür.</Amac>
-        <div className="mt-2">
-          <VeriYok ne="Risk" neden="henüz il seçilmedi" />
-        </div>
-      </Bolum>
-    )
-  }
+  if (!secili) return <UlkeGorunumu />
   if (!risk.data) {
     return (
       <Bolum baslik={secili.il}>
@@ -224,33 +225,137 @@ export function RiskSag() {
   return <RiskSonucu veri={risk.data} />
 }
 
-function Bilesen({
-  ad,
+/** Harita lejantı: neyi nasıl okuyacağız. */
+function Okuma({ ilSecili }: { ilSecili: boolean }) {
+  return (
+    <ul className="space-y-1.5 text-small text-ink-2">
+      <li className="flex items-center gap-2">
+        <span aria-hidden className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-high" />
+        İl merkezi; içindeki sayı risk skoru, renk düzeyi
+      </li>
+      <li className="flex items-center gap-2">
+        <span aria-hidden className="h-4 w-4 shrink-0 rounded-full border-2 border-deprem" />
+        {ilSecili ? '200 km içindeki M≥6 ana şok; çap büyüklük' : 'M≥6 ana şok (1933’ten beri); çap büyüklük'}
+      </li>
+      {ilSecili && (
+        <li className="flex items-center gap-2">
+          <span aria-hidden className="mx-1 h-2 w-2 shrink-0 rounded-full bg-deprem" />
+          Son bir yılın depremi (150 km içinde)
+        </li>
+      )}
+      {ilSecili && (
+        <li className="flex items-center gap-2">
+          <span aria-hidden className="w-4 shrink-0 border-t-2 border-dashed border-ink-3" />
+          İlin hesap alanı (200 km)
+        </li>
+      )}
+      <li className="flex items-center gap-2">
+        <span aria-hidden className="w-4 shrink-0 border-t-2 border-dashed border-fay" />
+        Etkin fay (GEM)
+      </li>
+    </ul>
+  )
+}
+
+function DepremSatiri({ d, uzaklik }: { d: RiskDeprem; uzaklik: boolean }) {
+  const { deprem, depremSec } = useRiskSecimi()
+  const { ucus } = useHarita()
+  const id = depremKimligi(d)
+  const secili = deprem === id
+  return (
+    <li>
+      <button
+        type="button"
+        aria-pressed={secili}
+        onClick={() => {
+          depremSec(secili ? null : id)
+          if (!secili) ucus(d.longitude, d.latitude, 8)
+        }}
+        className={sn(
+          'flex w-full items-baseline gap-2 border-b border-line px-1 py-1.5 text-left last:border-b-0',
+          secili ? 'bg-raised' : 'hover:bg-hover',
+        )}
+      >
+        <span className="w-10 shrink-0 font-mono text-small text-ink-3">{depremYili(d)}</span>
+        <span className="w-12 shrink-0 font-mono text-small text-ink">{`M ${buyukluk(d.magnitude)}`}</span>
+        <span className="min-w-0 flex-1 truncate text-small text-ink-2" title={d.place}>
+          {d.place}
+        </span>
+        {uzaklik && d.distanceKm != null && (
+          <span className="shrink-0 font-mono text-small text-ink-3">{`${Math.round(d.distanceKm)} km`}</span>
+        )}
+      </button>
+    </li>
+  )
+}
+
+function UlkeGorunumu() {
+  const ana = useUlkeAnaSoklari(true)
+  const [hepsi, setHepsi] = useState(false)
+  const liste = ana.data?.depremler ?? []
+  return (
+    <>
+      <Bolum baslik="Türkiye’nin büyük depremleri">
+        <Amac>
+          Haritadaki halkalar 1933’ten bu yana M≥6 ana şoklar; artçılar ayıklandı, çap büyüklüğü
+          gösterir. Uzun vadeli tehlike bunlardan hesaplanır. Bir il seçince yalnız o ilin hesabına
+          giren depremler kalır.
+        </Amac>
+        {ana.isError ? (
+          <div className="mt-2">
+            <VeriYok ne="Deprem kataloğu" neden="sunucu kataloğu yükleyemedi" />
+          </div>
+        ) : ana.isPending ? (
+          <p className="mt-2 text-small text-ink-3">Yükleniyor…</p>
+        ) : (
+          <>
+            <p className="mt-2 text-small text-ink-2">
+              {`${liste.length} ana şok · katalog ${ana.data.katalogBasi.slice(0, 4)}–${ana.data.katalogSonu.slice(0, 4)} (Kandilli, USGS)`}
+            </p>
+            <ul className="mt-1.5 border-t border-line">
+              {(hepsi ? liste : liste.slice(0, 10)).map((d) => (
+                <DepremSatiri key={depremKimligi(d)} d={d} uzaklik={false} />
+              ))}
+            </ul>
+            {liste.length > 10 && (
+              <button
+                type="button"
+                onClick={() => setHepsi(!hepsi)}
+                className="mt-1.5 text-small text-ink-3 hover:text-ink"
+              >
+                {hepsi ? 'En büyük 10' : `Hepsini göster (${liste.length})`}
+              </button>
+            )}
+          </>
+        )}
+      </Bolum>
+      <Bolum baslik="Haritayı okuma">
+        <Okuma ilSecili={false} />
+      </Bolum>
+    </>
+  )
+}
+
+function Olasilik({
   soru,
   deger,
-  agirlik,
   dayanak,
   uyari,
+  agirlik,
 }: {
-  ad: string
   soru: string
-  deger: number
-  agirlik: number
+  deger: string
   dayanak: string
   uyari?: string | null
+  agirlik: number
 }) {
-  const ton = RISK_TONU(deger * 100)
   return (
     <div className="border-t border-line py-2.5 first:border-t-0">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-body text-ink">{ad}</span>
-        <span className="font-mono text-body text-ink">{yuzde(deger)}</span>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-body text-ink">{soru}</span>
+        <span className="shrink-0 font-mono text-subtitle text-ink">{deger}</span>
       </div>
-      <p className="text-small text-ink-3">{soru}</p>
-      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line">
-        <span className={sn('block h-full', TON_ZEMIN[ton])} style={{ width: `${Math.max(2, deger * 100)}%` }} />
-      </div>
-      <p className="mt-1 text-small text-ink-2">
+      <p className="mt-0.5 text-small text-ink-2">
         {dayanak} <span className="text-ink-3">· skordaki payı {yuzde(agirlik)}</span>
       </p>
       {uyari && (
@@ -266,25 +371,38 @@ function Bilesen({
 export function RiskSonucu({ veri }: { veri: RiskYaniti }) {
   const d = veri.dayanak
   const ag = d?.agirlik ?? { kisa: 0.4, uzun: 0.3, fay: 0.3 }
+  const yaricap = d?.yaricapKm ?? { kisa: 150, uzun: 200, yakinDeprem: 150 }
   const katalogYil = d ? `${d.katalogBasi.slice(0, 4)}–${d.katalogSonu.slice(0, 4)}` : null
+  const yilSayisi = d ? Number(d.katalogSonu.slice(0, 4)) - Number(d.katalogBasi.slice(0, 4)) : null
+  const ana = veri.anaSoklar ?? []
+  const sonYil = veri.sonYilDepremler ?? []
+  const [anaHepsi, setAnaHepsi] = useState(false)
   return (
     <>
-      <Bolum baslik="Risk skoru" ek={<Micro>{veri.city}</Micro>}>
-        <div className="flex items-end justify-between gap-2">
+      <Bolum baslik={veri.city} ek={<Rozet ton={RISK_TONU(veri.riskScore)}>{veri.riskLevel}</Rozet>}>
+        <div className="flex items-baseline gap-2">
           <p className="font-cond text-metric text-ink">{Math.round(veri.riskScore)}</p>
-          <Rozet ton={RISK_TONU(veri.riskScore)}>{veri.riskLevel}</Rozet>
+          <p className="text-small text-ink-3">/ 100 · üç bileşenin ağırlıklı toplamı</p>
         </div>
-        <p className="mt-1 text-small text-ink-3">100 üzerinden; üç bileşenin ağırlıklı toplamı.</p>
 
         <div className="mt-2">
-          <Bilesen
-            ad="Kısa vadeli"
-            soru={`30 gün içinde ${d?.yaricapKm.kisa ?? 150} km'de M ≥ 4 olasılığı (model)`}
-            deger={veri.metrics.shortRisk}
+          <Olasilik
+            soru={`10 yılda, ${yaricap.uzun} km içinde M≥6 deprem`}
+            deger={yuzde(veri.metrics.longHazard)}
+            agirlik={ag.uzun}
+            dayanak={
+              d
+                ? `${katalogYil} arasında (${yilSayisi} yıl) bu alanda ${d.uzunVadeAnaSok} ana şok oldu; olasılık bu sıklıktan (Poisson).`
+                : 'Katalogdaki sıklıktan.'
+            }
+          />
+          <Olasilik
+            soru={`30 günde, ${yaricap.kisa} km içinde M≥4 deprem`}
+            deger={yuzde(veri.metrics.shortRisk)}
             agirlik={ag.kisa}
             dayanak={
               d?.kisaVadeKaynagi === 'yerel'
-                ? `Son bir yılda yakında ${d.kisaVadeYerelDeprem} deprem.`
+                ? `Model, son bir yılın ${d.kisaVadeYerelDeprem} depreminden tahmin ediyor.`
                 : 'Yakında son bir yılda yeterli deprem yok.'
             }
             uyari={
@@ -293,23 +411,59 @@ export function RiskSonucu({ veri }: { veri: RiskYaniti }) {
                 : 'Zayıf model: ROC-AUC 0,61 (yedi model kıyası). Tek başına karar verdirmez.'
             }
           />
-          <Bilesen
-            ad="Uzun vadeli"
-            soru={`10 yılda ${d?.yaricapKm.uzun ?? 200} km'de en az bir M ≥ 6 olasılığı`}
-            deger={veri.metrics.longHazard}
-            agirlik={ag.uzun}
-            dayanak={
-              d ? `${katalogYil} kataloğunda ${d.uzunVadeAnaSok} ana şok (artçılar sayılmadı).` : 'Katalogdan.'
-            }
-          />
-          <Bilesen
-            ad="Fay etkisi"
-            soru="En yakın etkin faya uzaklık"
-            deger={veri.metrics.faultScore}
+          <Olasilik
+            soru="En yakın etkin fay"
+            deger={`${ondalik(veri.metrics.faultDistanceKm)} km`}
             agirlik={ag.fay}
-            dayanak={`En yakın fay ${ondalik(veri.metrics.faultDistanceKm)} km (30 km altı tam puan, 150 km üstü %10).`}
+            dayanak={`Fay puanı ${yuzde(veri.metrics.faultScore)}: 30 km altı tam puan, 150 km üstü %10.`}
           />
         </div>
+      </Bolum>
+
+      <Bolum
+        baslik="Geçmişteki büyük depremler"
+        ek={<Micro>{`${yaricap.uzun} km · M≥6 · ${ana.length}`}</Micro>}
+      >
+        {ana.length === 0 ? (
+          <p className="text-small text-ink-3">
+            {`${katalogYil ?? 'Katalogda'} bu alanda M≥6 ana şok yok; uzun vadeli olasılık en düşük değerde.`}
+          </p>
+        ) : (
+          <>
+            <p className="text-small text-ink-2">Uzun vadeli olasılığın dayanağı. Satıra tıkla: haritada göster.</p>
+            <ul className="mt-1.5 border-t border-line">
+              {(anaHepsi ? ana : ana.slice(0, 8)).map((x) => (
+                <DepremSatiri key={depremKimligi(x)} d={x} uzaklik />
+              ))}
+            </ul>
+            {ana.length > 8 && (
+              <button
+                type="button"
+                onClick={() => setAnaHepsi(!anaHepsi)}
+                className="mt-1.5 text-small text-ink-3 hover:text-ink"
+              >
+                {anaHepsi ? 'En büyük 8' : `Hepsini göster (${ana.length})`}
+              </button>
+            )}
+          </>
+        )}
+      </Bolum>
+
+      <Bolum baslik="Son bir yıl" ek={<Micro>{`${yaricap.kisa} km`}</Micro>}>
+        {sonYil.length === 0 ? (
+          <p className="text-small text-ink-3">Son bir yılda bu alanda kayıtlı deprem yok.</p>
+        ) : (
+          <>
+            <p className="text-small text-ink-2">
+              {`${d?.kisaVadeYerelDeprem ?? sonYil.length} deprem; en büyüğü M ${buyukluk(sonYil[0].magnitude)}. Kısa vadeli tahminin girdisi.`}
+            </p>
+            <ul className="mt-1.5 border-t border-line">
+              {sonYil.slice(0, 5).map((x) => (
+                <DepremSatiri key={depremKimligi(x)} d={x} uzaklik />
+              ))}
+            </ul>
+          </>
+        )}
       </Bolum>
 
       {!!veri.yakinFaylar?.length && (
@@ -326,24 +480,9 @@ export function RiskSonucu({ veri }: { veri: RiskYaniti }) {
         </Bolum>
       )}
 
-      {!!veri.sonDepremler?.length && (
-        <Bolum
-          baslik="Yakındaki son depremler"
-          ek={<Micro>{`${d?.yaricapKm.yakinDeprem ?? 150} km içinde`}</Micro>}
-        >
-          <ul>
-            {veri.sonDepremler.map((o, i) => (
-              <li key={`${o.time}-${i}`} className="flex items-baseline justify-between gap-2 border-b border-line py-1.5 last:border-b-0">
-                <span className="font-mono text-small text-ink">{`M ${ondalik(o.magnitude)}`}</span>
-                <span className="min-w-0 flex-1 truncate text-small text-ink-2">{o.place}</span>
-                <span className="shrink-0 font-mono text-small text-ink-3">
-                  {`${Math.round(o.distanceKm)} km · ${o.time.slice(0, 10)}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Bolum>
-      )}
+      <Bolum baslik="Haritayı okuma">
+        <Okuma ilSecili />
+      </Bolum>
 
       <Bolum baslik="Yöntem">
         <Teknik>

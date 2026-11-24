@@ -78,6 +78,9 @@ export function HaritaKabugu({ children, className, ipucu, baslangic }: KabukSec
     const o = new MapboxOverlay({
       interleaved: false,
       layers: [],
+      // İnce çizgiler (10 m'lik kapanma parçası birkaç piksel) ve dokunmatik
+      // ekran için tıklama payı.
+      pickingRadius: 6,
       onHover: (bilgi) => {
         // Isı dokusunun nesnesi yok, pikseli var (J-175): onun kartı da üretilir.
         const icerik = bilgi.object || bilgi.layer?.id === 'isi' ? ipucuUret(bilgi) : null
@@ -121,22 +124,37 @@ export function HaritaKabugu({ children, className, ipucu, baslangic }: KabukSec
         const px = (ad: string) => parseFloat(kok.getPropertyValue(ad)) || 0
         const genis = window.matchMedia(`(min-width: ${px('--breakpoint-genis')}px)`).matches
         const pay = px('--spacing-gutter') * 3
-        harita.current?.fitBounds(
+        const m = harita.current
+        if (!m) return
+        let dolgu = genis
+          ? {
+              top: pay * 2,
+              bottom: px('--spacing-timeline') + pay * 2,
+              left: px('--spacing-panel-l') + pay,
+              right: px('--spacing-panel-r') + pay,
+            }
+          : { top: pay, bottom: pay, left: pay, right: pay }
+        // Alçak ya da dar pencerede dolgu tuvali aşarsa maplibre hiç uçmuyordu
+        // ("Map cannot fit", J-191): dolgu tuvalin en çok %70'ine küçültülür.
+        const tuval = m.getCanvas()
+        const g = tuval.clientWidth
+        const y = tuval.clientHeight
+        const kx = Math.min(1, (g * 0.7) / Math.max(1, dolgu.left + dolgu.right))
+        const ky = Math.min(1, (y * 0.7) / Math.max(1, dolgu.top + dolgu.bottom))
+        if (kx < 1 || ky < 1) {
+          dolgu = {
+            top: dolgu.top * ky,
+            bottom: dolgu.bottom * ky,
+            left: dolgu.left * kx,
+            right: dolgu.right * kx,
+          }
+        }
+        m.fitBounds(
           [
             [k[0], k[1]],
             [k[2], k[3]],
           ],
-          {
-            padding: genis
-              ? {
-                  top: pay * 2,
-                  bottom: px('--spacing-timeline') + pay * 2,
-                  left: px('--spacing-panel-l') + pay,
-                  right: px('--spacing-panel-r') + pay,
-                }
-              : pay,
-            duration: azalt ? 0 : 1000,
-          },
+          { padding: dolgu, duration: azalt ? 0 : 1000 },
         )
       },
       ucus: (lon, lat, zoom = 15) => {

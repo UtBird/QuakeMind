@@ -91,6 +91,8 @@ def _diziler(motor) -> dict:
     sure_yil = (df["time"].max() - df["time"].min()).days / 365.25
     d = {
         "motor": motor,
+        # J-191: ana şokların df_full içindeki sırası (haritada gösterilir).
+        "ana_idx": np.asarray(ana, dtype=np.int64),
         "lat": df["latitude"].to_numpy(),
         "lon": df["longitude"].to_numpy(),
         "buyuk_lat": df["latitude"].to_numpy()[buyuk],
@@ -184,6 +186,20 @@ def hesapla(ad: str, lat: float, lon: float) -> dict:
                 "distanceKm": round(float(r.distance_km), 1), "latitude": float(r.latitude),
                 "longitude": float(r.longitude)}
 
+    # J-191: skoru belirleyen depremler haritada gösterilsin. Uzun vadeli
+    # bileşenin saydığı ana şoklar (200 km, M>=6, artçısız) ve kısa vadeli
+    # bileşenin baktığı son bir yıl (150 km, motorun ayıklanmış çerçevesi).
+    ana_idx = d["ana_idx"]
+    uz_ana = uz[ana_idx]
+    ic = ana_idx[uz_ana <= UZUN_YARICAP_KM]
+    ana_soklar = (df.iloc[ic].assign(distance_km=uz[ic])
+                  .sort_values(["mag", "time"], ascending=[False, False]))
+    dm = motor.df_main
+    son_yil = dm[dm["time"] >= dm["time"].max() - pd.Timedelta(days=365)]
+    uz_son = mod.haversine(lat, lon, son_yil["latitude"].to_numpy(), son_yil["longitude"].to_numpy())
+    son_yil = (son_yil[uz_son <= KISA_YARICAP_KM].assign(distance_km=uz_son[uz_son <= KISA_YARICAP_KM])
+               .sort_values(["mag", "time"], ascending=[False, False]))
+
     yakin_faylar = [
         {"tur": f["tur"], "kimlik": f["kimlik"], "km": round(float(f["km"]), 1)}
         for f in mod.yakin_faylar(lat, lon, 3)
@@ -221,6 +237,9 @@ def hesapla(ad: str, lat: float, lon: float) -> dict:
                          for r in son5.itertuples()],
         "sonDepremler": [olay(r) for r in son5.itertuples()],
         "technicalQuakes": [olay(r) for r in buyukler.head(20).itertuples()],
+        "anaSoklar": [olay(r) for r in ana_soklar.itertuples()],
+        # En büyük 60'ı yeter (harita ve liste); sayı ayrıca kisaVadeYerelDeprem'de.
+        "sonYilDepremler": [olay(r) for r in son_yil.head(60).itertuples()],
         "usedManualCoordinates": True,
         "source": "backend_exact",
     }
@@ -229,6 +248,29 @@ def hesapla(ad: str, lat: float, lon: float) -> dict:
         while len(_onbellek) > ONBELLEK_BOYU:
             _onbellek.popitem(last=False)
     return sonuc
+
+
+def ulke_ana_soklari() -> dict:
+    """Türkiye kataloğundaki M>=6 ana şoklar (artçısız), büyükten küçüğe (J-191).
+    Risk ekranı il seçilmemişken bunları gösterir: uzun vadeli bileşenin
+    dayandığı geçmiş."""
+    motor = ck.risk_engine
+    if motor is None:
+        raise RiskHazirDegil("Risk motoru yüklenemedi.")
+    _hazirla(motor)
+    d = _diziler(motor)
+    df = motor.df_full.iloc[d["ana_idx"]].sort_values(["mag", "time"], ascending=[False, False])
+    return {
+        "depremler": [
+            {"time": str(r.time), "place": r.place if isinstance(r.place, str) else "Bilinmeyen konum",
+             "magnitude": float(r.mag), "depth": None if r.depth != r.depth else float(r.depth),
+             "latitude": float(r.latitude), "longitude": float(r.longitude)}
+            for r in df.itertuples()
+        ],
+        "esikM": UZUN_ESIK_M,
+        "katalogBasi": d["veri_basi"],
+        "katalogSonu": d["veri_sonu"],
+    }
 
 
 def veriyi_tazele() -> str:

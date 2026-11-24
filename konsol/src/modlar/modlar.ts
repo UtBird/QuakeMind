@@ -87,7 +87,8 @@ export const MODLAR = [
     grup: 'analiz',
     ad: 'Deprem riski',
     ozet: 'Bölge bazlı risk skoru: sismik geçmiş, fay uzaklığı, son hareketlilik.',
-    katmanlar: ['yollar', 'depremler', 'faylar'],
+    // J-191: ülke kataloğunun binlerce dairesi kapalı; risk katmanı skora giren depremleri çizer.
+    katmanlar: ['yollar', 'faylar'],
   },
   {
     id: 'simulasyon',

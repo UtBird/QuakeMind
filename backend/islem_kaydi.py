@@ -37,6 +37,8 @@ TURLER = (
     "ekip_uyeleri",
     "bildirim_yayinlandi",
     "bildirim_geri_cekildi",
+    # Yol kapanmasi durumu (kapali / acildi / yanlis alarm) (J-190).
+    "kapanma_durumu",
     # J-166: giris gecmisi, konum paylasimi, kisisel veri goruntuleme.
     "giris_basarili",
     "giris_basarisiz",

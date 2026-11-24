@@ -23,7 +23,6 @@ import {
   useToplanmaAlanlari,
 } from '@/veri/katman'
 import { TOPLANMA_EN_AZ_ZOOM, YAPI_EN_AZ_ZOOM, useGorunenAltlik } from '@/harita/altlikGorunumu'
-import { SAGLIK_EN_AZ_ZOOM } from '@/harita/katmanlar'
 import { simgeAdresi, type SimgeTuru } from '@/harita/simgeler'
 import { sayi } from '@/lib/bicim'
 import { sn } from '@/lib/sinif'
@@ -48,8 +47,9 @@ const MODA_OZEL: Partial<Record<KatmanId, string>> = {
 }
 
 const ESIK: Partial<Record<KatmanId, number>> = {
+  // Sağlık ve toplanma uzakta küme olarak görünür (J-191); toplanma verisi
+  // bölge altlığı görününce iner.
   toplanma: TOPLANMA_EN_AZ_ZOOM,
-  saglik: SAGLIK_EN_AZ_ZOOM,
   yapilar: YAPI_EN_AZ_ZOOM,
 }
 

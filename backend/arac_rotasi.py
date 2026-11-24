@@ -95,6 +95,7 @@ ROTA_SADELESTIRME_DERECE = 0.00015
 BAGLANTI_HIZI_MS = 15 / 3.6
 ONBELLEK_BOYU = 32
 HASAR_TAZELIK_SN = 10.0
+ARAC_KAPANMA_CARPANI = 1e6
 
 
 @lru_cache(maxsize=1)
@@ -496,7 +497,11 @@ def _maliyet_verisi(ag: yol_agi.Ag, b: dict, kacin: bool):
     """(imza, carpan, kapali, agirlik, hasar ozeti)."""
     imza, kapanmalar, hasarlar = _hasar_verisi(b)
     if kacin:
-        carpan, kapali = ag.carpanlar(imza, kapanmalar, hasarlar)
+        # Arac kapali yoldan gecmez: carpan cok buyuk, yalniz baska yol yoksa
+        # (hedef kapali sokakta, ya da cevresi tumden kapali) gecer ve bunu
+        # 'kapanmadanGecer' ile soyler. 20 kat yetmiyordu: kisa kapali parca
+        # dolasmaktan ucuz kaliyordu (Elektrik, 40 rotanin 1'i 3 kapanmadan gecti).
+        carpan, kapali = ag.carpanlar(imza, kapanmalar, hasarlar, kapanma_carpani=ARAC_KAPANMA_CARPANI)
         anahtar = imza
     else:
         carpan, kapali = np.ones(len(ag.u)), np.zeros(len(ag.u), dtype=bool)
@@ -522,6 +527,10 @@ def _rota_ozeti(ag, kenarlar, t_bas, t_son, bedeller, carpan, kapali, bas_mesafe
         "mesafeM": round(yol_m + baglanti),
         "sureDk": max(1, round((yol_sn + baglanti / BAGLANTI_HIZI_MS) / 60)),
         "kapanmadanGecer": int(kapali[kenarlar].sum()) if len(kenarlar) else 0,
+        # Baslangic ya da hedef kapali sokagin ustundeyse gecmek kacinilmaz;
+        # ekran bunu "baska yol yok"tan ayri soyler.
+        "baslangicKapanmada": bool(kapali[kenarlar[0]]) if len(kenarlar) else False,
+        "hedefKapanmada": bool(kapali[kenarlar[-1]]) if len(kenarlar) else False,
         "riskliM": round(float((ag.uzunluk[kenarlar] * pay)[carpan[kenarlar] > 1.0].sum())) if len(kenarlar) else 0,
         "baglantiM": round(bas_mesafe),
     }

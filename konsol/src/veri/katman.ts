@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { apiGet } from './istemci'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { apiGet, apiPatch, apiPost } from './istemci'
 import type { AltlikBolgesi } from './altlik'
 
 /* ---------------------------------------------------------------------------
@@ -46,6 +46,19 @@ export type Kapanma = {
   zaman: number
   kaynak: string
   analizId: string | null
+  /** Kapalı (modelin tahmini) · açıldı · yanlış alarm. Rota ve harita yalnız
+      "kapali"ya bakar; öbürleri yalnız kapanma yönetiminde görünür. */
+  durum: KapanmaDurumu
+  durumZaman: number | null
+  durumNotu: string | null
+}
+
+export type KapanmaDurumu = 'kapali' | 'acildi' | 'yanlis'
+
+export const KAPANMA_DURUM_ADI: Record<KapanmaDurumu, string> = {
+  kapali: 'Kapalı',
+  acildi: 'Açıldı',
+  yanlis: 'Yanlış alarm',
 }
 
 export type Deprem = {
@@ -100,6 +113,38 @@ export function useKapanmalar(acik: boolean) {
     queryKey: ['katman', 'kapanmalar'],
     enabled: acik,
     queryFn: () => apiGet<KatmanYaniti<Kapanma>>('/api/katman/kapanmalar'),
+  })
+}
+
+/** Kapanma yönetimi: açılan ve yanlış alarm olanlar da gelir. Anahtar
+    ['katman','kapanmalar', …] önekli: canlı akıştaki "kapanma" ve
+    "yeni-analiz" mesajları bunu da tazeler. */
+export function useKapanmaListesi(acik: boolean) {
+  return useQuery({
+    queryKey: ['katman', 'kapanmalar', 'tumu'],
+    enabled: acik,
+    queryFn: () => apiGet<KatmanYaniti<Kapanma>>('/api/katman/kapanmalar', { tumu: 'true' }),
+  })
+}
+
+/** Tek kapanmanın durumu (saha ekibi ve üstü). Aynı parçanın öbür analizlerdeki
+    kayıtları da birlikte değişir (sunucu). */
+export function useKapanmaDurumu() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (g: { id: string; durum: KapanmaDurumu; not?: string }) =>
+      apiPatch<{ degisenKayit: number }>(`/api/kapanmalar/${g.id}`, { durum: g.durum, not: g.not || undefined }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['katman', 'kapanmalar'] }),
+  })
+}
+
+/** Bir analizin bütün kapanmaları (yalnız koordinasyon). */
+export function useAnalizKapanmaDurumu() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (g: { analizId: string; durum: KapanmaDurumu }) =>
+      apiPost<{ degisenKayit: number }>(`/api/kapanmalar/analiz/${g.analizId}/durum`, { durum: g.durum }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['katman', 'kapanmalar'] }),
   })
 }
 

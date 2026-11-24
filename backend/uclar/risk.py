@@ -105,6 +105,15 @@ def risk_siralamasi(_kul: dict = Depends(kimlik.kullanici)):
     return {"iller": satirlar, "agirlik": risk_hizmeti.AGIRLIK}
 
 
+@yonlendirici.get("/api/risk/ana-soklar")
+def risk_ana_soklar(_kul: dict = Depends(kimlik.kullanici)):
+    """Ulke geneli M>=6 ana soklar (J-191): risk ekraninin il secilmemis gorunumu."""
+    try:
+        return risk_hizmeti.ulke_ana_soklari()
+    except risk_hizmeti.RiskHazirDegil as e:
+        raise HTTPException(status_code=503, detail="Deprem kataloğu yüklenemedi.") from e
+
+
 @yonlendirici.get("/api/risk/fault_lines")
 def risk_fault_lines(_kul: dict = Depends(kimlik.kullanici)):
     """Eski web ve mobil icin elle yazilmis yaklasik fay cizgileri. J-173: giris

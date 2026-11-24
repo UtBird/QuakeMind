@@ -90,3 +90,27 @@ def test_siralama(ortam):
     assert y.status_code == 200
     iller = y.json()["iller"]
     assert len(iller) == 81 and [x["skor"] for x in iller] == sorted((x["skor"] for x in iller), reverse=True)
+
+
+def test_skoru_belirleyen_depremler(ortam):
+    """J-191: yanit skora giren depremleri konumlariyla tasir; sayilar dayanakla tutar."""
+    c, j = ortam
+    g = c.post("/api/risk/predict", json={"city": "Manisa", "manualLatitude": 38.6191, "manualLongitude": 27.4289},
+               headers=j).json()
+    d = g["dayanak"]
+    ana = g["anaSoklar"]
+    assert len(ana) == d["uzunVadeAnaSok"]
+    assert all(x["magnitude"] >= 6.0 and x["distanceKm"] <= d["yaricapKm"]["uzun"] for x in ana)
+    assert [x["magnitude"] for x in ana] == sorted((x["magnitude"] for x in ana), reverse=True)
+    son = g["sonYilDepremler"]
+    assert len(son) == min(60, d["kisaVadeYerelDeprem"])
+    assert all(x["distanceKm"] <= d["yaricapKm"]["kisa"] and "latitude" in x and "longitude" in x for x in son)
+
+
+def test_ulke_ana_soklari(ortam):
+    c, j = ortam
+    assert c.get("/api/risk/ana-soklar").status_code == 401
+    y = c.get("/api/risk/ana-soklar", headers=j)
+    assert y.status_code == 200
+    v = y.json()
+    assert v["depremler"] and all(x["magnitude"] >= v["esikM"] for x in v["depremler"])

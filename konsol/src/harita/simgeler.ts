@@ -95,3 +95,32 @@ export function simgeAdresi(tur: SimgeTuru, secili = false): string {
 export function ikon(tur: SimgeTuru, secili = false) {
   return { id: `${tur}${secili ? '-secili' : ''}`, url: simgeAdresi(tur, secili), width: BOY, height: BOY, mask: false }
 }
+
+/* Küme simgesi (J-191): türün şekli ve rengi, glifsiz; ortasına sayı yazılır.
+   Şekil türü söyler (olay daire, yer ve ekip kare), renk tek başına değil. */
+const kumeOnbellek = new Map<SimgeTuru, string>()
+
+function kumeSvg(t: SimgeTanimi): string {
+  const zemin = hex(t.zemin)
+  const kenar = hex('--color-ground')
+  const govde =
+    t.sekil === 'daire'
+      ? `<circle cx="32" cy="32" r="28" fill="${zemin}" stroke="${kenar}" stroke-width="4"/>`
+      : `<rect x="4" y="4" width="56" height="56" rx="14" fill="${zemin}" stroke="${kenar}" stroke-width="4"/>`
+  // İkinci, sönük halka: tek simgeden ayrılsın, "birden çok" okunsun.
+  const halka =
+    t.sekil === 'daire'
+      ? `<circle cx="32" cy="32" r="22" fill="none" stroke="${kenar}" stroke-opacity=".35" stroke-width="2"/>`
+      : `<rect x="10" y="10" width="44" height="44" rx="10" fill="none" stroke="${kenar}" stroke-opacity=".35" stroke-width="2"/>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${BOY}" height="${BOY}" viewBox="0 0 ${BOY} ${BOY}">${govde}${halka}</svg>`
+}
+
+/** deck.gl IconLayer `getIcon` için küme simgesi. */
+export function kumeIkonu(tur: SimgeTuru) {
+  let adres = kumeOnbellek.get(tur)
+  if (!adres) {
+    adres = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(kumeSvg(SIMGE[tur]))}`
+    kumeOnbellek.set(tur, adres)
+  }
+  return { id: `kume-${tur}`, url: adres, width: BOY, height: BOY, mask: false }
+}

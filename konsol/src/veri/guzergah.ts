@@ -35,6 +35,22 @@ export type Guzergah = {
   aramaMs?: number
   kusUcusuM?: number
   kacin?: boolean
+  /** Başlangıç ya da hedef kapalı sokağın üstünde: geçmek kaçınılmaz. */
+  baslangicKapanmada?: boolean
+  hedefKapanmada?: boolean
+  /** Çok duraklı rotada bacaklar (1 → 2, 2 → 3, …). */
+  bacaklar?: RotaBacagi[]
+}
+
+export type RotaBacagi = {
+  mesafeM: number
+  sureDk: number
+  kapanmadanGecer: number
+  riskliM: number
+  kusUcusuM?: number
+  adimlar?: RotaAdimi[]
+  baslangicKapanmada?: boolean
+  hedefKapanmada?: boolean
 }
 
 export type EnYakinYer = Guzergah & {

@@ -55,22 +55,76 @@ def _ag(dizin: Path):
     return yol_agi.Ag({"id": "t", "kutu": [LON0 - 0.01, LAT0 - 0.01, LON0 + 0.02, LAT0 + 0.01]}, dizin)
 
 
-def test_kapanma_cizgisiyle_eslesir_orta_noktayla_degil(tmp_path):
+def _ag_kur(dizin: Path, dugumler, kenarlar):
+    """Yapay yonsuz ag: dugumler [(x, y) metre], kenarlar [(u, v)]."""
+    import yol_agi
+
+    xy = np.array(dugumler, dtype=float)
+    komsu = {i: [] for i in range(len(xy))}
+    for k, (a, b) in enumerate(kenarlar):
+        komsu[a].append((b, k))
+        komsu[b].append((a, k))
+    indptr, indices, kenar = [0], [], []
+    for n in range(len(xy)):
+        for m, k in sorted(komsu[n]):
+            indices.append(m)
+            kenar.append(k)
+        indptr.append(len(indices))
+    uz = [float(np.hypot(*(xy[b] - xy[a]))) for a, b in kenarlar]
+    np.savez(
+        dizin / "j.npz",
+        dugum_lon=LON0 + xy[:, 0] / KX, dugum_lat=LAT0 + xy[:, 1] / KY,
+        indptr=np.array(indptr), indices=np.array(indices), kenar=np.array(kenar),
+        kenar_u=np.array([a for a, _ in kenarlar]), kenar_v=np.array([b for _, b in kenarlar]),
+        kenar_uzunluk=np.array(uz), kenar_yol=np.arange(len(kenarlar)),
+        yol_adi=np.array([f"Y{i}" for i in range(len(kenarlar))]),
+        yol_tipi=np.array(["residential"] * len(kenarlar)),
+    )
+    return yol_agi.Ag({"id": "j", "kutu": [LON0 - 0.01, LAT0 - 0.01, LON0 + 0.02, LAT0 + 0.01]}, dizin)
+
+
+def test_kapanma_uzerinde_yattigi_kenari_kapatir(tmp_path):
     ag = _ag(tmp_path)
-    # Cizgi (50,-60) -> (50,-10): orta noktasi (50,-35) kenar 0'a 35 m (25 m
-    # disinda), ama ucu 10 m icinde. Eskiden kaciyordu.
-    cizgi = (ll(50, -60), ll(50, -10))
-    _carpan, kapali = ag.carpanlar(("a",), [cizgi], [])
+    # Cizgi (-80,0) -> (20,0): orta noktasi kenar 0'a 30 m uzak, ama cizginin
+    # 20 m'si kenarin ustunde. Kenar kapanir (J-181: orta nokta yetmiyordu).
+    _c, kapali = ag.carpanlar(("a",), [(ll(-80, 0), ll(20, 0))], [])
     assert kapali.tolist() == [True, False]
 
-    # Tek noktali (cizgisiz) kapanma orta noktayla calismaya devam eder.
-    _carpan, kapali = ag.carpanlar(("b",), [(ll(650, 5),)], [])
+    # Tek noktali (cizgisiz) kapanma en yakin kenara oturur.
+    _c, kapali = ag.carpanlar(("b",), [(ll(650, 5),)], [])
     assert kapali.tolist() == [False, True]
 
     # Uzak cizgi hicbir kenari kapatmaz.
-    _carpan, kapali = ag.carpanlar(("c",), [(ll(300, -200), ll(320, -200))], [])
+    _c, kapali = ag.carpanlar(("c",), [(ll(300, -200), ll(320, -200))], [])
     assert not kapali.any()
 
+
+def test_dik_kapanma_kestigi_yolu_kapatmaz(tmp_path):
+    """Baska bir sokaktaki kapanmanin ucu bu yola 1 m yaklasir: yalniz iki ornek
+    nokta yakin; yol kapanmaz. Eski 25 m kurali kapatiyordu."""
+    ag = _ag(tmp_path)
+    _c, kapali = ag.carpanlar(("d",), [(ll(50, -60), ll(50, -1))], [])
+    assert not kapali.any()
+
+
+def test_kavsaktaki_kapanma_yan_sokaklari_kapatmaz(tmp_path):
+    """Kavsak (100,0): bati (kenar 0), dogu (kenar 1), kuzey (kenar 2). Kuzey
+    sokaktaki kapanma kavsaga kadar uzanir; yalniz kuzey sokak kapanir.
+    Eskiden 25 m cevresindeki butun kenarlar kapaniyor, kavsak tumden
+    tikaniyor ve rota "baska yol yok" diye kapanmadan geciyordu."""
+    ag = _ag_kur(tmp_path, [(0, 0), (100, 0), (200, 0), (100, 100)], [(0, 1), (1, 2), (1, 3)])
+    _c, kapali = ag.carpanlar(("e",), [(ll(100, 2), ll(100, 60))], [])
+    assert kapali.tolist() == [False, False, True]
+
+
+def test_kapanma_carpani_arac_icin_buyutulebilir(tmp_path):
+    ag = _ag(tmp_path)
+    cizgi = (ll(20, 0), ll(80, 0))
+    c, kapali = ag.carpanlar(("f",), [cizgi], [], kapanma_carpani=1e6)
+    assert kapali.tolist() == [True, False] and c[0] == 1e6 and c[1] == 1.0
+    # Yaya varsayilani degismedi.
+    c, _k = ag.carpanlar(("g",), [cizgi], [])
+    assert c[0] == 20.0
 
 @pytest.fixture()
 def depo(tmp_path):
