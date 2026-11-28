@@ -44,3 +44,6 @@ veri/yol_agi/
 veri/il_merkezleri.json
 # Indirilen acik lisansli goruntu karolari (J-172); yeniden indirilebilir.
 veri/goruntu_onbellek/
+
+# Karo vekilinin disk onbellegi (karo_onbellegi.py); yeniden indirilebilir.
+veri/karo_onbellek/

@@ -742,6 +742,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:  # noqa: BLE001
         print(f"Tatbikat noktalari temizlenemedi: {e}", flush=True)
 
+    # Merkez/saha esitlemesi (esitleme.py). Tatbikat temizliginden SONRA:
+    # silinen tatbikat noktalari gunluge zaten girmez, sira onemsiz ama acik.
+    # Ayar hatasi acilisi durdurur.
+    import esitleme
+
+    esitleme.baslat(depo)
+
     # PostGIS yoklamasi 2 sn zaman asimina dusebiliyor; ilk kullanici bunu
     # beklemesin diye acilista ayri bir is parcaciginda yapilir ve sonuc
     # onbellege girer (postgis_manager.check_connection).
@@ -778,20 +785,31 @@ async def lifespan(app: FastAPI):
     )
     road_damage_sweeper_thread.start()
 
-    road_damage_pool = ProcessPoolExecutor(
-        max_workers=pool_size,
-        initializer=road_damage_worker._init_worker,
-        initargs=(uydu_kunyesi, road_damage_progress_queue),
-    )
-    # Pay the one-time "cold worker spawn" cost (Windows process creation +
-    # module import, measured ~10-15s on this machine) now, during startup,
-    # instead of during the first real user's analysis request.
-    warm_up = road_damage_pool.submit(road_damage_worker._warm_up)
-    try:
-        warm_up.result(timeout=120)
-        print(f"Road Damage pool warmed up ({pool_size} worker(s)).", flush=True)
-    except Exception as e:
-        print(f"Road Damage pool warm-up failed (will still lazy-init on first job): {e}", flush=True)
+    # Internetsiz kipte uydu analizi zaten yapilamaz (goruntu internetten,
+    # internetsiz.py); isci sureci yine de torch ve SegFormer ice aktarip
+    # ~1,2 GB tutuyordu (olculdu 28 Kasim, 6,9 GB'lik dizustu: arka uc 3,1 GB'a
+    # cikip bellek tavanina dayandi). Bu kipte acilmaz; tatbikat da kapanir.
+    # QUAKEMIND_UYDU_ISCISI=1 yine acar (onbellekteki goruntuyle tatbikat icin).
+    import internetsiz
+
+    if internetsiz.uydu_iscisi_gerekli():
+        road_damage_pool = ProcessPoolExecutor(
+            max_workers=pool_size,
+            initializer=road_damage_worker._init_worker,
+            initargs=(uydu_kunyesi, road_damage_progress_queue),
+        )
+        # Pay the one-time "cold worker spawn" cost (Windows process creation +
+        # module import, measured ~10-15s on this machine) now, during startup,
+        # instead of during the first real user's analysis request.
+        warm_up = road_damage_pool.submit(road_damage_worker._warm_up)
+        try:
+            warm_up.result(timeout=120)
+            print(f"Road Damage pool warmed up ({pool_size} worker(s)).", flush=True)
+        except Exception as e:
+            print(f"Road Damage pool warm-up failed (will still lazy-init on first job): {e}", flush=True)
+    else:
+        road_damage_pool = None
+        print("Internetsiz kip: uydu analizi iscisi acilmadi (QUAKEMIND_UYDU_ISCISI=1 acar)", flush=True)
 
     # Metin modeli kendi isci surecinde (J-170, CLAUDE.md 3). Isinma acilisi
     # BEKLETMEZ: ilk istek isinma surerken gelirse kuyrukta bekler.
@@ -801,10 +819,12 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    esitleme.durdur()
     metin_iscisi.durdur()
     if road_damage_sweeper_stop is not None:
         road_damage_sweeper_stop.set()
-    road_damage_pool.shutdown(wait=False, cancel_futures=True)
+    if road_damage_pool is not None:
+        road_damage_pool.shutdown(wait=False, cancel_futures=True)
     try:
         road_damage_progress_queue.put_nowait(None)
     except Exception:
@@ -1184,6 +1204,11 @@ class SafeRouteRequest(BaseModel):
 
 def _fetch_osrm_street_route(u_lat: float, u_lon: float, d_lat: float, d_lon: float):
     import requests
+
+    import internetsiz
+
+    if internetsiz.etkin():
+        return None, None, "Internetsiz kip: OSRM rota servisi kullanilmiyor"
     url = f"http://router.project-osrm.org/route/v1/foot/{u_lon},{u_lat};{d_lon},{d_lat}?overview=full&geometries=geojson"
     r = requests.get(url, timeout=6)
     if r.status_code == 200:

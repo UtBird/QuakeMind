@@ -4475,3 +4475,50 @@ okuma yolu var (`load_local_graph_from_cache`) ama yalnız önceden ısıtılmı
 - `pytest`: risk testleri 6/6 (yeni: skoru belirleyen depremlerin sayısı dayanakla tutar, hepsi yarıçap ve eşik içinde; ülke ana şokları giriş ister). `tsc -b`, `kontrol:token` temiz.
 - Yerel konsolda: genel durumda toplanma kümeleri (28 → tıklayınca 17, 7, 3…), üzerine gelince "28 toplanma alanı"; risk modunda Türkiye görünümü, Manisa seçilince hesap alanı, 14 ana şok etiketli, öteki iller sönük; listeden 1953 Gönen M7,3 seçilince harita uçtu ve vurguladı; logo genel duruma götürdü.
 - Ölçülmedi: SOS ve ihbar kümeleri (yerel veride açık SOS ya da ihbar yoktu); canlıda.
+
+---
+
+## J-193 🟠 Saha sunucusu internetsizken dış servisleri zaman aşımına kadar bekliyordu; hangi özelliğin internetsiz çalıştığı yazılı değildi
+**Durum:** KAPALI (28 Kasım 2026) · **Bulundu:** 28 Kasım 2026 (internetsiz çalışma işine dönülünce kod taraması) · **İlgili:** OPTIMIZASYON madde 3, 33, 35; J-170, J-172, J-187, J-198
+
+**Bulgu (kodda tarandı `[K]`).**
+- Dış serviste çalışan uçlar internet yokken zaman aşımını bekliyordu: OSRM yedek rotası 10 sn, karo vekili 20 sn, Wayback ve OAM araması, deprem kataloğu tazeleme. Sonra genel bir hata dönüyordu.
+- Hugging Face istemcisi diskte duran altlık için bile ağa soruyordu; eksik altlıkta internet yokken ayıklanmamış hata çıkıyordu.
+- Hangi özelliğin internetsiz çalıştığı yalnız OPTIMIZASYON madde 33'te elle yazılmış, eskimiş bir tabloda vardı.
+- İnternetsiz kipte uydu analizi yapılamadığı hâlde uydu işçisi açılıp bellek tutuyordu.
+
+**Yapılan.**
+- `backend/internetsiz.py`: `QUAKEMIND_INTERNETSIZ=1` kipi. `fastapi_app` ilk satırlarında uygulanır (HF_HUB_OFFLINE, TRANSFORMERS_OFFLINE, yerel yol maskesi). Dış servis uçları beklemeden 503 ve neden döner (`hasar_analiz`, `risk/refresh_live_data`, `afetzede/sokak-rotasi`, eski OSRM yolu). Eksik altlık indirilmez.
+- `GET /api/internetsiz`: özellik matrisi. Her çağrıda yerel dosyalar ölçülür, yol dönmez. Tablo `MIMARI.md` §14'te.
+- `backend/karo_onbellegi.py`: karo vekilinin disk önbelleği. OAM ve Esri Wayback saklanır (J-172 kuralı), Google saklanmaz. Sınır `QUAKEMIND_KARO_ONBELLEK_MB`. İnternetsiz kipte yalnız önbellekten.
+- İnternetsiz kipte uydu analizi işçisi açılmaz (`internetsiz.uydu_iscisi_gerekli`, `QUAKEMIND_UYDU_ISCISI=1` açar). `/api/hazir` bunu "hazır değil" saymaz. Bedeli: bu kipte tatbikat kapalı, ekran nedenini yazar.
+
+**Ölçüm `[Ö]`** (28 Kasım 2026, i5-12450H, 6,9 GB RAM, arka uç cgroup'u, `memory.stat` anon):
+- Uydu işçisiyle: 3 130 MB (ana süreç 1 288, uydu işçisi 1 198, metin işçisi 1 364 MB RSS; paylaşılan sayfalar nedeniyle toplam RSS anon'u geçer). 2,5 GB tavanda metin modeli yüklenirken çekirdek süreci öldürdü; 3,2 GB tavana dayandı.
+- Uydu işçisi kapalı (internetsiz kip): 2 645 MB.
+
+**Doğrulama.**
+- `tests/test_internetsiz.py` (9): karo önbelleği (Esri bir kez iner, Google her seferinde), internetsiz kipte önbellekten verme ve yoksa 503, OSRM'e gitmeden 1 sn içinde 503, matris ucu giriş ister ve yol vermez, eksik dosya özelliği "hayır" yapar, kip kitaplıkları kapatır, altlık indirme denenmez, önbellek sınırı en eskiyi siler, uydu işçisi anahtarı.
+- Bütün test dosyaları dosya dosya 1,5 GB tavanla: 189 geçti, 1 atlandı (uydu işçisi değişikliğinden önce). Değişiklikten sonra `test_internetsiz.py` + `test_tatbikat_bitir.py` 12/12.
+- Tam uygulama internetsiz kipte açıldı (`/api/hazir` 200, `internetsiz: true`, metin modeli 7,5 sn'de hazır).
+- Ölçülmedi: telefonla saha denemesi. Telefon aynı Wi-Fi'dan konsola bağlanamadı (güvenlik duvarı ya da modem yalıtımı, inceleniyor).
+
+---
+
+## J-194 🔴 Sahada açılan SOS, ihbar ve kapanma yalnız o makinede kalıyordu: merkezle eşitleme yoktu
+**Durum:** KAPALI (28 Kasım 2026) — kalanlar J-195 · **Bulundu:** OPTIMIZASYON madde 31 · **İlgili:** J-193, J-195, J-158, kural 1, 3, 4
+
+**Bulgu.** Hedef mimaride (OPTIMIZASYON Bölüm 0) saha sunucusu internetsiz çalışıp bağlantı gelince merkezle kayıt alışverişi yapmalı. Kodda böyle bir yol yoktu; uydu analizi de (internet ister) sahaya hiç inemiyordu.
+
+**Yapılan.**
+- `depo/esitleme_tablolari.py`: `degisim_gunlugu` (satır başına son değişiklik, tekil; budanmadan satır sayısını geçmez), `gelen_kayitlar`, `esitleme_durumu`. Günlüğü SQLite tetikleyicileri yazar. Rol sonradan açılınca eski kayıtlar bir kez günlüğe girer.
+- `esitleme.py`: düğüm iş parçacığı. Gönder (hasar, kapanma, SOS, ihbar) sonra çek (hasar, kapanma), 30 sn aralık, hatada ikiye katlanır (en çok 10 dk). Ayarlar ortam değişkeninden; iki rol birden ya da kısa anahtar açılışı durdurur.
+- `uclar/esitleme.py`: `POST /al`, `GET /ver` (düğüm anahtarı, sabit zamanlı karşılaştırma); `GET /durum`, `POST /simdi`, `GET /gelen` (koordinatör, yönetici).
+- Kimlik: başka sunucudan gelen satır `<köken>~<kimlik>`. Düğümün kendi gönderdiği satır geri gelmez; gelen satır günlüğe girmez.
+- Merkezde SOS ve ihbar yalnız ham kayıt (iş akışına karışmaz); hasar ve kapanma merkezin tablosuna da yazılır, öteki düğümlere iner.
+- Gönderilmeyenler: tatbikat verisi, ihbar fotoğrafları, ihbarın tekrar-istek anahtarı ve istek özeti.
+
+**Ölçüm `[Ö]`** (`benchmark/esitleme_yazma_olcumu.py`, `benchmark/reports/esitleme_yazma_olcumu.json`; i5-12450H, disk, SQLite 3.54.1, 3×2000 SOS yazması): ortanca 0,043–0,050 ms → düğüm rolünde 0,074–0,081 ms; %95 0,10–0,13 → 0,17–0,21 ms. J-158'in 20 ms yazma bütçesinin çok altında.
+
+**Doğrulama.** `tests/test_esitleme.py` (8): yukarı giden kayıtlar ve tatbikatın gitmemesi, değişen satırın yeniden gitmesi ve eski sürümün yenisini ezmemesi, merkez kapanmasının düğüme inmesi ve geri gönderilmemesi, ikinci düğümün birincinin hasarını alması, merkezde durum değişikliğinin inmesi, geriye dönük doldurma, anahtar ve rol denetimi, bozuk kayıt reddi, bağlantı yokken bekleme ve kaybolmama, ayar hataları.
+- Ölçülmedi: iki gerçek sunucu arasında uçtan uca (bu makinenin RAM'i iki arka uca yetmiyor); test istemcisiyle iki ayrı veritabanı arasında sınandı.

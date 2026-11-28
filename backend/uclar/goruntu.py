@@ -13,6 +13,8 @@ reddedilir (SSRF). Yol ve sorgu dizisi de karo deseninin dışına çıkamaz.
 import re
 
 import httpx
+import internetsiz
+import karo_onbellegi
 import kimlik
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
@@ -97,6 +99,21 @@ def karo(
         )
     _adres_dogrula(hedef)
 
+    # Disk onbellegi (karo_onbellegi.py): OAM ve Esri Wayback; Google saklanmaz.
+    # Internetsiz kipte yalniz onbellekten verilir.
+    sakli = karo_onbellegi.oku(kaynak, hedef)
+    if sakli is not None:
+        return Response(
+            content=sakli[0], media_type=sakli[1],
+            headers={"Cache-Control": ONBELLEK, "X-Karo-Onbellek": "evet"},
+        )
+    if internetsiz.etkin():
+        raise HTTPException(
+            status_code=503,
+            detail="İnternetsiz kip: bu karo önbellekte yok."
+            + (" Google karoları lisansı gereği saklanmaz." if kaynak == "google" else ""),
+        )
+
     try:
         yanit = _http().get(hedef)
     except httpx.HTTPError as e:
@@ -110,8 +127,10 @@ def karo(
     if yanit.status_code >= 400:
         raise HTTPException(status_code=502, detail=f"Karo sunucusu {yanit.status_code} döndü.")
 
+    tur = yanit.headers.get("content-type", "image/png")
+    karo_onbellegi.yaz(kaynak, hedef, yanit.content, tur)
     return Response(
         content=yanit.content,
-        media_type=yanit.headers.get("content-type", "image/png"),
+        media_type=tur,
         headers={"Cache-Control": ONBELLEK},
     )

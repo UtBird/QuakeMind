@@ -11,7 +11,12 @@ Yerel mobil istemci icin: python fastapi_app.py
 
 import os
 
-from fastapi import FastAPI
+# Internetsiz kip, model ve veri kitapliklari ice aktarilmadan ONCE (internetsiz.py).
+import internetsiz
+
+internetsiz.kipi_uygula()
+
+from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -24,6 +29,7 @@ from uclar import (
     bildirim,
     canli,
     ekip,
+    esitleme,
     eski_kimlik,
     eski_sos,
     genel,
@@ -90,6 +96,7 @@ for modul in (
     islem,
     guzergah,
     zaman,
+    esitleme,
 ):
     app.include_router(modul.yonlendirici)
 

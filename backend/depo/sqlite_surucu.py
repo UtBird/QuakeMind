@@ -22,6 +22,8 @@ import threading
 from threading import Lock
 from typing import Any, Iterable, Optional
 
+from .esitleme_tablolari import EsitlemeKarisimi
+
 SEMA = """
 CREATE TABLE IF NOT EXISTS kullanicilar (
     id            TEXT PRIMARY KEY,
@@ -387,7 +389,7 @@ def _satirlar(rows: Iterable[sqlite3.Row]) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-class SqliteDepo:
+class SqliteDepo(EsitlemeKarisimi):
     """Tek YAZMA baglantisi + is parcacigi basina OKUMA baglantisi (J-158).
 
     Eskiden okuma da yazma da tek baglantida, tek kilitle siraya giriyordu:
@@ -413,6 +415,8 @@ class SqliteDepo:
         with self._yazma():
             self._baglanti.executescript(SEMA)
             self._sutunlari_tamamla()
+            # Esitleme gunlugu ve merkez tablolari (depo/esitleme_tablolari.py).
+            self._esitleme_semasi()
             # Eski SQLite dosyalarinda yeni sutunlar _sutunlari_tamamla'dan
             # sonra var olur. Her kullanicinin tekrar-istek anahtari benzersizdir.
             self._baglanti.execute(

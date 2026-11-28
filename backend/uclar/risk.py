@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 import cekirdek as ck
+import internetsiz
 import kimlik
 import risk_hizmeti
 
@@ -190,6 +191,7 @@ def _tazele() -> str:
 def risk_refresh_live_data(_kul: dict = Depends(kimlik.rol_gerektir(*_KOORDINASYON))):
     """Kandilli (+ USGS) verisini ceker; yeni motor hazirlanip tek atamayla
     devreye girer (koşan istekler eski veriyle biter)."""
+    internetsiz.dis_servis_gerekli("deprem_verisi")
     return {"message": _tazele()}
 
 

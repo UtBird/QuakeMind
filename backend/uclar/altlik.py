@@ -28,7 +28,12 @@ ALTLIK_HF_DEPOSU = "Utbird/quakemind-altlik"
 
 
 def _indir(ad: str) -> Path | None:
-    """`ad` HF veri kumesinde varsa indirir ve yerel yolunu doner; yoksa None."""
+    """`ad` HF veri kumesinde varsa indirir ve yerel yolunu doner; yoksa None.
+    Internetsiz kipte denenmez: eksik bolge "uretilmedi" gibi bos doner."""
+    import internetsiz
+
+    if internetsiz.etkin():
+        return None
     try:
         indirilen = hf_hub_download(
             repo_id=ALTLIK_HF_DEPOSU,

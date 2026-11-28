@@ -121,7 +121,7 @@ ve Bölüm 12'deki karara doğrudan bağlı — orada nihai olarak hangi arayüz
 hangisinin sadece PC'ye ait kalacağı netleştiriliyor.
 
 ### 3. 🔴 `QUAKEMIND_OFFLINE_ONLY` process-genelinde global env var — çoklu kullanıcıda birbirini eziyor
-**Durum:** Bekliyor
+**Durum:** Kısmen (28 Kasım 2026, J-193) — ürün yolunda sunucu genelinde `QUAKEMIND_INTERNETSIZ=1` kipi var ve açılışta bir kez uygulanıyor (istek başına değişmiyor). Eski Streamlit ekranları (`main.py`, `apps/road_damage/app.py`) hâlâ istek başına global değişken yazıyor; onlar kullanılmıyor.
 **📡 Pi/Offline Notu:** Bu madde artımızda kritik seviyeye çıktı. Pi senaryosunda
 "offline mi online mu" **her istekte otomatik algılanması gereken bir sistem durumu**
 olmalı — kullanıcının elle işaretlediği bir checkbox değil. Bir telefon hotspot'a
@@ -410,7 +410,7 @@ motoru, model eğitimi) internet olduğunu varsayıyor ya da internet yokken ses
 bozuluyor. Sıfırdan tasarlanması gereken parçalar:
 
 ### 31. 🔴 (yeni) "Outbox" desenli senkronizasyon katmanı yok
-**Durum:** Bekliyor
+**Durum:** Yapıldı (28 Kasım 2026, J-194) — `esitleme.py`, `depo/esitleme_tablolari.py`, `uclar/esitleme.py`. Yukarı: hasar, kapanma, SOS, ihbar; aşağı: hasar ve kapanma. Merkezde düğümler arası tekilleştirme yapılmadı (J-195).
 Bir telefon, Pi'nin hotspot'una bağlıyken bir afet ihbarı/NLP analizi gönderdiğinde,
 bu kayıt **sadece o Pi'nin yerel diskinde** kalıyor. Pi internete çıktığında bu
 kayıtların merkezi sunucuya iletilmesi gerekiyor ama böyle bir mekanizma yok.
@@ -426,7 +426,7 @@ kayıtların merkezi sunucuya iletilmesi gerekiyor ama böyle bir mekanizma yok.
   sadece "gördüğünü ilet", karar merkezi sunucuda).
 
 ### 32. 🟠 (yeni) "Cloud'da eğit, Pi'ye dağıt" modeli resmileştirilmeli
-**Durum:** Bekliyor
+**Durum:** Kısmen — model ve OSM kesiti sabit sürümle Hugging Face'ten iniyor (J-187). Sahada "yeni sürüm var mı" denetimi ve atomik değişim yok.
 Model eğitimi (CatBoost risk modeli, gelecekte fine-tune edilecek BERT/Segformer/YOLO
 modelleri) **Pi üzerinde değil, cloud/geliştirici makinesinde** yapılmalı; Pi sadece
 **eğitilmiş, dondurulmuş model dosyalarını** çalıştırmalı. Bunun için:
@@ -440,7 +440,7 @@ modelleri) **Pi üzerinde değil, cloud/geliştirici makinesinde** yapılmalı; 
   dosya değişimi: yeni dosyayı `.tmp` olarak indir, tamamlanınca `rename` ile değiştir).
 
 ### 33. 🟡 (yeni) "Özellik matrisi" — hangi özellik offline'da çalışır, hangisi çalışmaz?
-**Durum:** Bekliyor
+**Durum:** Yapıldı (28 Kasım 2026, J-193) — `internetsiz.py`, `GET /api/internetsiz`. Tablo elle yazılmıyor, her çağrıda diskten ölçülüyor. Bugünkü hali `MIMARI.md` §14'te.
 Şu an kodda hangi özelliğin internete bağımlı olduğu **örtük** (bazı fonksiyonlar
 `try/except` ile sessizce boş dönüyor, kullanıcı neden bir şey görmediğini anlamıyor).
 Açıkça tanımlanmış bir tablo faydalı olur, örnek:
@@ -474,7 +474,7 @@ uyarısı göstermek için kullanılabilir.
 > Pi ulaştığında bocalamadan doğrudan ölçüme geçebilmek.
 
 ### 34. 🔴 (yeni) Gerçek Pi donanımında erken benchmark yapılmadı (varsayım: yapılmadı)
-**Durum:** Bekliyor — **⚠️ şu an bloklu, Pi donanımı yok**
+**Durum:** Bekliyor — **⚠️ şu an bloklu, Pi donanımı yok** (J-198)
 Şu ana kadarki tüm performans varsayımları muhtemelen x86_64 geliştirici makinesinde
 ölçüldü/varsayıldı. Pi temin edildiğinde **öncelik #1 olmalı:** Hedef Pi modelini
 (Pi 4 4GB/8GB mi, Pi 5 mi?) netleştirip üzerinde şu ölçümleri erken yap:
@@ -498,7 +498,7 @@ netleştirmek** (Pi 4 4GB mi, 8GB mi, Pi 5 mi olacak — satın alma kararı) bu
 zaten cevaplanamaz.
 
 ### 35. 🟠 (yeni) RAM bütçesi planlaması yok
-**Durum:** Bekliyor — **⚠️ kesin sayılar Pi'de doğrulanmalı**
+**Durum:** Bekliyor — **⚠️ kesin sayılar Pi'de doğrulanmalı** (J-198)
 Pi 4 (4GB varsayımıyla, işletim sistemi + diğer servisler ~500MB-1GB alır) kullanılabilir
 RAM ~3-3.5GB civarı. Yüklenmesi düşünülen modeller: BERTurk sınıflandırma (~500MB-1GB
 fp32), BERTurk/harici NER modeli (~500MB-1GB), Segformer mit_b4 (encoder büyük, muhtemelen
@@ -518,7 +518,7 @@ edilebilir; sadece "tetiklenme eşiği" (kaç MB'ta tahliye başlasın) Pi'nin g
 bütçesi netleşince ayarlanacak bir parametre olarak bırakılmalı.
 
 ### 36. 🟡 (yeni) SD kart aşınması ve I/O yavaşlığı
-**Durum:** Bekliyor
+**Durum:** Bekliyor (J-198)
 Şu an kodda SD kart'a sık/gereksiz yazan noktalar var: `catboost_info/` (proje kökünde
 zaten oluşmuş, her eğitimde ayrıntılı log/event dosyaları yazıyor — `verbose=False`
 olsa da CatBoost bazı meta dosyaları hâlâ yazabilir, kontrol edilmeli), sürekli büyüyen
@@ -540,7 +540,7 @@ Pi'de faydası çok daha somut ortaya çıkacak.
 ## Bölüm 11 — (YENİ) Ağ/Erişim Mimarisi (WiFi AP + Keşif)
 
 ### 37. 🟡 (yeni) Mobil uygulama Pi'yi IP tahmin ederek buluyor — kırılgan
-**Durum:** Bekliyor
+**Durum:** Bekliyor (J-196) — Kotlin uygulamasında adres derleme anında sabit (`BuildConfig.API_BASE_URL`); sahadaki yerel sunucuyu bulamıyor.
 `mobile/lib/services/api_config.dart`, sabit bir IP listesi deniyor
 (`10.42.0.1:8000`, `192.168.137.1:8000` vb.) — bu, "hangi işletim sistemi hotspot
 açtıysa o IP" varsayımına dayanıyor, kırılgan.
@@ -550,7 +550,7 @@ yerine (ya da ona ek olarak) mDNS keşfi kullan. Bu, Pi'nin hangi ağ yapıland�
 hotspot açtığından bağımsız, çok daha sağlam bir çözüm.
 
 ### 38. 🟡 (yeni) Uygulamayı yüklememiş kullanıcılar için tarayıcı erişimi / captive portal
-**Durum:** Bekliyor
+**Durum:** Bekliyor (J-198)
 Amaç "afet öncesi/sonrası herkese hizmet" ise, Flutter uygulamasını **yüklememiş**
 biri de Pi'nin hotspot'una bağlanıp bir şeyler görebilmeli. **Öneri (bkz. Bölüm 12):**
 Pi, FastAPI üzerinden statik olarak **Flutter Web build'ini** serve etsin; isteğe
@@ -650,7 +650,7 @@ kullanılıyor olacağı için, Faz 2'ye geçiş fiilen sadece "kök requirement
 > varsayıma dayalı değil.
 
 ### 39. 🔴 (yeni) P2P / BLE Mesh / Raspberry Pi Broadcast (IP5) — kodda hiçbir karşılığı yok
-**Durum:** Bekliyor
+**Durum:** Bekliyor (J-198)
 Başvurunun 2.5 bölümü (IP5), projenin belirtilen hedeflerinden biri olarak resmi
 öneride önemli bir yer kaplıyor: Raspberry Pi üzerinde hotspot + broadcast mesajlaşma,
 **Bluetooth Low Energy (BLE) ile peer discovery ve köprüleme** (hotspot menzili dışında

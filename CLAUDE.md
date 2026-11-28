@@ -110,8 +110,10 @@ yeni konsol devralır. Eski web'de yalnız kritik düzeltme yapılır.
 
 ## 10. Kapsam notları (20 Eylül 2026)
 
-- Raspberry Pi ve internetsiz çalışma **ertelendi**, ayrı bir iş olarak ele alınacak.
-  `backend/OPTIMIZASYON_ANALIZI.md`'nin Pi/offline bölümleri şu an geçerli değil.
+- Raspberry Pi **donanımı** hâlâ yok; Pi'ye bağlı ölçüm ve ağ işleri (OPTIMIZASYON madde
+  34–36, 38–39) bekliyor (J-198). İnternetsiz çalışmanın yazılım tarafı 28 Kasım 2026'da
+  başladı: `QUAKEMIND_INTERNETSIZ` kipi, `/api/internetsiz` özellik matrisi, karo önbelleği,
+  merkez–saha eşitlemesi (`MIMARI.md` §14, J-193, J-194).
 - 7 Kasım 2026 itibarıyla eski Flutter klasörü yerini `mobile/` altındaki Kotlin/Compose Android uygulamasına bıraktı; Android-backend entegrasyonu geliştirme kapsamındadır.
 - `OPTIMIZASYON_ANALIZI.md` içindeki durum alanları bayat (hepsi "Bekliyor" görünüyor ama
   bazıları yapılmış). Oradan madde kullanmadan önce koda bak.

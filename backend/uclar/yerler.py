@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 import cekirdek as ck
+import internetsiz
 import kimlik
 import yol_agi
 
@@ -331,6 +332,7 @@ def sokak_rotasi(istek: SokakRotasiIstegi, _kul: dict = Depends(kimlik.kullanici
     secilir; secilen rota kapanmadan geciyorsa yanit bunu acikca yazar. Hasar
     noktalarini ve bilinmeyen yikik yolu BILMEZ. Servis yanit vermezse duz
     cizgi uydurulmaz, hata doner."""
+    internetsiz.dis_servis_gerekli("osrm")
     from depo import aktif_depo
 
     bas = (istek.baslangicLon, istek.baslangicLat)

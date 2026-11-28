@@ -3,7 +3,7 @@
 Bu dosya, makale ve proje üzerinde tespit edilen her eksik, hata ve açık konuyu
 tek yerde tutar. Amaç hiçbir sorunun gözden kaçmaması ve sonradan geri dönülebilmesidir.
 
-**Son güncelleme:** 18 Kasım 2026 (temizlik: kapanan maddeler arşive taşındı — bkz. değişiklik günlüğü)
+**Son güncelleme:** 28 Kasım 2026 (internetsiz çalışma: J-193…J-198)
 **Nasıl kullanılır:** Her maddenin bir kimliği var (örn. `J-38`). Bu dosyada yalnız açık, kısmen
 kapalı ve karar bekleyen maddeler durur. Bir madde kapanınca durumunu `KAPALI` yapıp kapanış
 tarihini ve kanıtını yazın, sonra maddeyi değiştirmeden `EKSIKLER_ARSIV.md`'ye taşıyın ve sondaki
@@ -22,17 +22,17 @@ dizine bir satır ekleyin. Hiçbir madde silinmez; kimlikler değişmez.
 
 `AÇIK` · `DEVAM EDİYOR` · `KAPALI` · `KARAR BEKLİYOR` (kullanıcı kararı gerekiyor)
 
-## Özet (güncellendi 24 Kasım 2026)
+## Özet (güncellendi 28 Kasım 2026)
 
-192 maddenin **110'u kapandı** ve `EKSIKLER_ARSIV.md`'ye taşındı (dizini bu dosyanın sonunda).
-Burada kalan **82 madde** şöyle dağılıyor:
+198 maddenin **112'si kapandı** ve `EKSIKLER_ARSIV.md`'ye taşındı (dizini bu dosyanın sonunda).
+Burada kalan **86 madde** şöyle dağılıyor:
 
 | Neye ait | Madde | Ne zaman |
 |---|---|---|
 | Ürün — teslimden önce bakılmalı | 4 | Bu hafta (aşağıdaki liste) |
-| Ürün — iyileştirme | 10 | Teslimden sonra olabilir |
+| Ürün — iyileştirme | 13 | Teslimden sonra olabilir |
 | Makale ve model sonuçları | 63 | Makale aşamasında (`MAKALE_DUZELTME_LISTESI.md` ile birlikte) |
-| Kapsam dışı (C grubu) | 5 | Makalede "yapılmadı" diye yazılır |
+| Kapsam dışı (C grubu ve J-198) | 6 | Makalede "yapılmadı" diye yazılır |
 
 **Ürün — teslimden önce bakılmalı.**
 
@@ -53,6 +53,9 @@ Burada kalan **82 madde** şöyle dağılıyor:
 - J-151: 81 il altlığı (Utku).
 - J-155, J-158: büyük ölçüde kapandı, kalanları maddelerinde yazılı.
 - J-192: deprem kataloğunda yer adlarında "?" (kaynak veride).
+- J-195: eşitlemenin kalanları (merkez ekranı, tekilleştirme).
+- J-196: Android uygulaması yerel sunucuyu bulamıyor (Deha).
+- J-197: yürüme/araç ağı yalnız 5 bölgede (OSM kopyası indirilmeli).
 
 **Makale ve model sonuçları (62):** A grubundan 21, B 12, D 8 (D-08 hariç), G 3, E 4 ve şu J maddeleri:
 - Model ve kapanma: J-20, J-21, J-22, J-25, J-26, J-34, J-36, J-65, J-69, J-70.
@@ -2050,6 +2053,38 @@ Temel ölçüm de yeniden koşuldu (`benchmark/reports/sqlite_yuk_2026-11-13_son
 
 **Yapılacak.** Uydurma düzeltme yapılmaz. Seçenekler: (a) aynı USGS kimliğini (`id` sütunu) USGS'ten yeniden çekip yer adını oradan almak, (b) yer adı yerine koordinattan en yakın il/ilçe adını (yerel OSM kopyası) yazmak ve kaynağını belirtmek.
 
+---
+
+## J-195 🟡 Eşitlemenin kalan parçaları: merkez ekranı, düğümler arası tekilleştirme, sahadan durum geri bildirimi
+**Durum:** AÇIK · **Bulundu:** 28 Kasım 2026 (J-194 sırasında) · **İlgili:** J-194, OPTIMIZASYON madde 31
+
+- Merkez konsolunda düğümlerden gelen SOS ve ihbarın ekranı yok; yalnız `GET /api/esitleme/gelen` ve `/durum` var.
+- Aynı olayı iki düğüm bildirirse merkezde iki kayıt olur; birleştirme yapılmıyor (OPTIMIZASYON madde 31, üçüncü madde).
+- Sahada merkezden gelen bir kapanma "açıldı" işaretlenirse bu merkeze geri gitmez (gelen satır günlüğe girmez).
+- İhbar fotoğrafları gönderilmiyor (bilerek); merkezin fotoğrafa ihtiyacı olursa ayrı, sınırlı bir yol gerekir.
+- İki gerçek sunucu arasında uçtan uca deneme yapılmadı (bkz. J-194).
+
+---
+
+## J-196 🟠 Android uygulaması sahadaki yerel sunucuyu bulamıyor: adres derleme anında sabit
+**Durum:** AÇIK · **Bulundu:** 28 Kasım 2026 · **Kimde:** Deha (mobil) · **İlgili:** OPTIMIZASYON madde 37
+
+`mobile/core/network/build.gradle.kts` sunucu adresini `BuildConfig.API_BASE_URL` olarak derlemeye gömüyor (varsayılan bulut adresi). Sahada (hotspot, `10.42.0.1`) çalışmak için ayrı derleme gerekiyor. Öneri: uygulama içinde sunucu adresi seçimi ya da mDNS/NSD ile keşif (`_quakemind._tcp`). Debug derlemesi `-PquakemindDebugApiBaseUrl=http://10.42.0.1:8000/` ile yapılabiliyor (http'ye izin veriyor). Bu makinede Gradle'ın 3 GB bellek ayarı arka uçla birlikte RAM'i aşıyor; derlenmedi.
+
+---
+
+## J-197 🟡 Kendi yürüme ve araç ağımız yalnız 5 bölgede; diğer yerlerde rota internet ister
+**Durum:** AÇIK · **Bulundu:** 28 Kasım 2026 · **İlgili:** J-44, J-55, J-181, J-193
+
+`veri/yol_agi/` yalnız Antakya, Maraş, Antep, Malatya, Adıyaman (yürüme ve araç). Bu bölgelerin dışında afetzede rotası yedek OSRM'e düşer, internetsiz kipte 503 döner (J-193). Ağ `araclar_yol_agi_uret.py` ile `turkey-latest.osm.pbf`'den üretiliyor; bu dosya makinede yok (~600 MB indirme, kullanıcı onayı gerekli).
+
+---
+
+## J-198 ⚪ Pi donanımına bağlı işler: ölçüm, RAM bütçesi, SD kart, erişim noktası, BLE ağı
+**Durum:** AÇIK (donanım bekliyor) · **Bulundu:** OPTIMIZASYON madde 34–36, 38–39 · **İlgili:** J-193
+
+Pi elde yok. Bekleyenler: Pi'de model süreleri ve bellek (34, 35), SD kart yazma yükü (36), hotspot/erişim noktası ve tarayıcı için yakalayıcı sayfa (38), BLE ağı (39, kodda karşılığı yok). Bilinen bir sayı: x86 dizüstünde internetsiz kipteki arka uç 2,6 GB (J-193); 4 GB'lık Pi için metin işçisi ve ana sürecin torch yükü ayrıca küçültülmeli.
+
 # KAPANAN MADDELER DİZİNİ
 
 Kapanan maddelerin tam metni `EKSIKLER_ARSIV.md`'de, aynı bölüm başlıkları altında ve aynı
@@ -2073,6 +2108,8 @@ kimlikle. Başka belgelerdeki "EKSIKLER J-xxx" atıfları için kimliği burada 
 | J-24 | ⚪ (bilgi) Model tabanlı kapanma için gereken EMSR648 değil, Maxar kapsaması | 16 Eylül 2026 |
 | J-62 | 🟠 Simülasyon (tatbikat) modu konsolda kuruldu; sözleşmeyle üç uyuşmazlık çıktı | 25 Eylül 2026 |
 | J-61 | 🟠 Yanıtlar sıkıştırılmıyordu: konsol açılışında 660 KB ham JSON iniyordu | 25 Eylül 2026 |
+| J-193 | 🟠 Saha sunucusu internetsizken dış servisleri zaman aşımına kadar bekliyordu; özellik matrisi yoktu | 28 Kasım 2026 |
+| J-194 | 🔴 Sahada açılan SOS, ihbar ve kapanma yalnız o makinede kalıyordu: merkezle eşitleme yoktu | 28 Kasım 2026 |
 | J-60 | 🔴 CORS herkese açıktı: her site kimlik bilgisiyle API'ye istek atabiliyordu | 25 Eylül 2026 |
 | J-59 | 🟠 Uçların üçte biri hâlâ kimlik istemiyor (kural 5) | 18 Kasım 2026 |
 | J-57 | 🟠 `npm run kontrol` konsol kaynaklarının yanına `.js` yazıyor; Vite bu kopyaları `.tsx`'ten önce yükler | 24 Eylül 2026 |
@@ -2411,3 +2448,4 @@ kimlikle. Başka belgelerdeki "EKSIKLER J-xxx" atıfları için kimliği burada 
 | 24 Kasım 2026 | **J-38** kapatıldı: yol ağı kurulamazsa sonuç ve konsol "hesaplanamadı" der, "0 kapalı yol" / "kapanma yok" demez (`roadNetworkMissing`, `oneri_metni`). **J-168** kapatıldı: eski web kamera sayfası API'ye ulaşamayınca uydurma sonuç yerine "Analiz yapılamadı" gösterir. `pytest -q` 177/177. Maddeler arşivde. |
 | 24 Kasım 2026 | **J-190** kapatıldı: Yol ve rota baştan; iki nokta (A/B) ve sıralı çok duraklı rota; hasar ekranının yarım çokgeni artık taşınmıyor; araç kapalı yoldan yalnız başka yol yoksa geçer ve söyler; kapanma eşleşmesi en yakın kenar + en az 3 nokta; kapanma durumu (kapalı / açıldı / yanlış alarm) konsoldan değişir, işlem kaydına ve canlı akışa gider. 186 test geçti. Madde arşivde. |
 | 24 Kasım 2026 | **J-191** kapatıldı: deprem riski ekranı baştan (il seçilince yalnız skora giren depremler ve hesap alanı; olasılıklar soru cümlesiyle; deprem listesi haritayla bağlı); harita noktaları uzakta sayılı kümeler (toplanma, sağlık, ekip, ihbar, SOS); logo genel duruma götürür. **J-192** açık madde: katalogda yer adlarında "?" (kaynak veride). |
+| 28 Kasım 2026 | **J-193** kapatıldı: `QUAKEMIND_INTERNETSIZ` kipi (dış servis uçları beklemeden 503, kitaplıklar ağa çıkmaz), ölçülen özellik matrisi `/api/internetsiz`, karo disk önbelleği (OAM, Esri; Google değil), internetsiz kipte uydu işçisi açılmıyor (arka uç 3 130 → 2 645 MB). **J-194** kapatıldı: merkez–saha eşitlemesi (tetikleyicili değişim günlüğü, yukarı hasar/kapanma/SOS/ihbar, aşağı hasar/kapanma, tatbikat gitmez); SOS yazması 0,045 → 0,078 ms. Bütün testler 189 geçti (dosya dosya, bellek tavanıyla). Açık maddeler: **J-195** (eşitleme kalanları), **J-196** (Android yerel sunucu), **J-197** (yol ağı 5 bölge), **J-198** (Pi donanımı). Telefonla saha denemesi yapılamadı: aynı Wi-Fi'dan bağlanılamıyor. |

@@ -4,7 +4,7 @@ Bu belge sistemin nasıl kurulacağını anlatır: katmanlar, veri sözleşmesi,
 yapıldığı, ölçek eşikleri ve ölçüm bütçeleri. Kurallar `CLAUDE.md`'de, tasarım sistemi
 `ARAYUZ_KARARLARI.md`'de.
 
-Son güncelleme: 13 Kasım 2026 (depo: bugün SQLite, PostGIS hedef — §1, §3, §4, §6) · Kapsam: web + backend (Pi/offline ve mobil ertelendi)
+Son güncelleme: 28 Kasım 2026 (internetsiz kip ve merkez–saha eşitlemesi — §14) · Kapsam: web + backend; Pi donanımı ve mobil ayrı
 
 ---
 
@@ -357,3 +357,73 @@ Taban çizgi alınmadan iyileştirme yapılmaz. Ölçülecekler:
 | 20 Eyl 2026 | Yeni konsol ayrı klasörde geliştirilir, onaydan sonra devralır |
 | 22 Eyl 2026 | Ekip-olay uzaklığı araç yolundan (J-55): kendi araç ağımız, tek yöne uyar; süre yol türü hız varsayımıyla, trafik verisi yok. Konum 10 dakikadan eskiyse afetzedeye süre gösterilmez |
 | 22 Eyl 2026 | Sevk bir görev kaydıdır (J-54). Ekip durumu görevden okunur. Durumu hem ekip telefonundan hem koordinasyon işaretler. Afetzede kendi olayına gelen ekibin adını, kişi sayısını ve konumunu görür |
+| 28 Kas 2026 | İnternetsiz çalışmanın yazılım tarafı başladı (Pi donanımı hâlâ yok): `QUAKEMIND_INTERNETSIZ` kipi, ölçülen özellik matrisi, karo önbelleği, merkez–saha eşitlemesi (§14) |
+| 28 Kas 2026 | Eşitleme tek yönlü iş akışı: SOS ve ihbar sahadan merkeze yalnız ham kayıt olarak gider, merkezde atanmaz; hasar ve kapanma iki yönlü (gözlem, iş akışı değil) |
+| 28 Kas 2026 | Karo önbelleği analiz görüntüsünün kuralıyla (J-172): OpenAerialMap ve Esri Wayback saklanır, Google saklanmaz |
+
+---
+
+## 14. İnternetsiz çalışma ve eşitleme
+
+Hedef (OPTIMIZASYON_ANALIZI Bölüm 0): afet bölgesindeki saha sunucusu (Pi ya da dizüstü,
+hotspot) internet olmadan bölgesine hizmet verir, bağlantı gelince merkezle kayıt alışverişi
+yapar. Pi donanımı yok; aşağıdakiler aynı kodun herhangi bir makinede çalışan kısmıdır.
+
+**Kip.** `QUAKEMIND_INTERNETSIZ=1` (`backend/internetsiz.py`). `fastapi_app` ilk satırlarında
+uygulanır: Hugging Face istemcisi ve analiz işçileri ağa çıkmaz, yol maskesi yalnız yerel OSM
+kopyasından, eksik altlık indirilmez. Yalnız dış serviste çalışan uçlar (uydu analizi, Wayback,
+OAM araması, OSRM yedek rotası, deprem kataloğu tazeleme) beklemeden 503 ve nedenini döner;
+eskiden internet yokken 10–20 sn zaman aşımını bekliyorlardı. Kip merkezle eşitlemeyi kapatmaz.
+
+**Özellik matrisi.** `GET /api/internetsiz` (giriş yapmış her kullanıcı). Elle yazılmış tablo
+değil: her çağrıda hangi yerel dosyanın bu sunucuda olduğu ölçülür, yol dönmez. Bu makinede
+(28 Kasım 2026) çıkan hal:
+
+| Özellik | İnternetsiz | Dayanak |
+|---|---|---|
+| Giriş, hesaplar, roller; SOS, ihbar, görev, ekip, bildirim, canlı akış | evet | yerel SQLite, aynı sunucunun SSE akışı |
+| Metin analizi (sınıflandırma + adres) | evet | model diskte, adres yerel dizinden (J-170) |
+| Fotoğraf / kamera tespiti | evet | YOLO ağırlıkları diskte |
+| Deprem riski; deprem, fay, toplanma katmanları | evet | model, katalog, AFAD listesi diskte |
+| Deprem kataloğunu tazeleme | hayır | Kandilli/USGS |
+| Harita altlığı | evet (81/81 bölge diskte) | eksik bölge internetsiz açılmaz |
+| Yürüme ve araç rotası | kısmen | kendi yol ağımız yalnız 5 bölgede (J-197); diğer yerlerde yedek OSRM internet ister |
+| Uydu hasar analizi | hayır | görüntü internetten; sonuç merkezden eşitlemeyle gelir |
+| Görüntü karoları | kısmen | daha önce açılmış OAM ve Esri karoları önbellekten; Google saklanmaz |
+| Yol maskesi (analiz içinde) | evet | yerel `roads.gpkg` |
+| Tatbikat | hayır (kipte) | uydu işçisi internetsiz kipte bellek için açılmaz; `QUAKEMIND_UYDU_ISCISI=1` açar |
+
+**Bellek** `[Ö]` (6,9 GB'lik dizüstü, arka uç cgroup'u): uydu işçisiyle 3 130 MB, internetsiz kipte
+(uydu işçisi kapalı) 2 645 MB. Ayrıntı J-193.
+
+**Karo önbelleği** (`backend/karo_onbellegi.py`). `veri/karo_onbellek/`, sınır
+`QUAKEMIND_KARO_ONBELLEK_MB` (varsayılan 2048); 200 yazmada bir ölçülür, aşılınca en eski
+erişilen silinir. Anahtar karonun tam adresi: aynı yerin farklı görüntüsü ayrı dosyadır.
+
+**Eşitleme** (`backend/esitleme.py`, `depo/esitleme_tablolari.py`, `uclar/esitleme.py`).
+
+```
+saha sunucusu (düğüm)                              merkez
+  hasar, kapanma, SOS, ihbar ── POST /api/esitleme/al ──►  gelen_kayitlar (ham, son hali)
+     (tetikleyici → degisim_gunlugu)                       hasar, kapanma → kendi tablosu
+                                                            "<düğüm>~<kimlik>"
+  hasar, kapanma ◄── GET /api/esitleme/ver?sonra=N ───────  degisim_gunlugu (sira > N)
+     "merkez~<kimlik>", gunluge girmez
+```
+
+- İstek hep düğümden çıkar (düğüm hotspot/NAT arkasında). 30 sn'de bir dener, hata olursa
+  aralık ikiye katlanır (en çok 10 dk); koordinatör `POST /api/esitleme/simdi` ile hemen
+  yeniden deneyebilir. Bu sunucudan sunucuya bir döngüdür; arayüzün yoklama yasağı (kural 4) sürer.
+- Değişim günlüğünü SQLite tetikleyicileri yazar; günlük her satırın yalnız son değişikliğini
+  tutar (tablo + kimlik tekil), yani budanmadan satır sayısını geçmez. Aynı kayıt iki kez
+  gelirse bir kez sayılır, eski sürüm yenisini ezmez.
+- Gönderilmeyenler: tatbikat verisi (kural 1), ihbar fotoğrafları, ihbarın tekrar-istek anahtarı.
+- Kimlik doğrulama: merkezde `QUAKEMIND_ESITLEME_DUGUMLERI="ad:anahtar,..."`, düğümde
+  `QUAKEMIND_MERKEZ_URL`, `QUAKEMIND_DUGUM_ADI`, `QUAKEMIND_ESITLEME_ANAHTARI` (en az 24
+  karakter, sabit zamanlı karşılaştırma). Kullanıcı jetonu eşitleme uçlarından geçmez.
+- Ölçüm `[Ö]` (`benchmark/esitleme_yazma_olcumu.py`, i5-12450H, disk, 3×2000 yazma): SOS yazması
+  ortanca 0,04–0,05 ms → düğüm rolünde 0,07–0,08 ms; %95 0,10–0,13 → 0,17–0,21 ms. J-158'in
+  20 ms yazma bütçesinin çok altında.
+- Yapılmadı: merkezde düğümler arası tekilleştirme, merkez konsolunda gelen kayıtların ekranı,
+  sahada değiştirilen merkez kapanmasının geri bildirimi (J-195).
+

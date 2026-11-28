@@ -1,0 +1,45 @@
+{
+  "yazma": 2000,
+  "tekrar": 3,
+  "makine": "12th Gen Intel(R) Core(TM) i5-12450H",
+  "isletimSistemi": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43",
+  "sqlite": "3.54.1",
+  "tarih": "2026-11-28",
+  "python": "3.12.16",
+  "kosular": {
+    "None": [
+      {
+        "ortancaMs": 0.0429,
+        "p95Ms": 0.1037,
+        "gunlukSatiri": 0
+      },
+      {
+        "ortancaMs": 0.044,
+        "p95Ms": 0.1017,
+        "gunlukSatiri": 0
+      },
+      {
+        "ortancaMs": 0.0498,
+        "p95Ms": 0.1302,
+        "gunlukSatiri": 0
+      }
+    ],
+    "dugum": [
+      {
+        "ortancaMs": 0.0806,
+        "p95Ms": 0.2148,
+        "gunlukSatiri": 2000
+      },
+      {
+        "ortancaMs": 0.0735,
+        "p95Ms": 0.1721,
+        "gunlukSatiri": 2000
+      },
+      {
+        "ortancaMs": 0.0773,
+        "p95Ms": 0.1676,
+        "gunlukSatiri": 2000
+      }
+    ]
+  }
+}

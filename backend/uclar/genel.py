@@ -33,7 +33,8 @@ from utils.postgis_manager import postgis_engine
 from apps.road_damage.utils.serialization import compact_segment_coords as _compact_segment_coords, serialize_segments as _serialize_segments, haversine_m as _haversine_m
 from apps.road_damage.utils.imaging import image_array_to_b64 as _image_array_to_b64, build_damage_overlay as _build_damage_overlay, build_segmentation_overlay as _build_segmentation_overlay
 from apps.road_damage.utils.tiling import zoom_for_radius as _zoom_for_radius
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+import kimlik
 
 yonlendirici = APIRouter()
 
@@ -60,10 +61,13 @@ def hazir():
         veritabani = False
     isci = ck.road_damage_pool is not None
     from metin_analizi import isci as metin_iscisi
+    import internetsiz
 
     # None: metin iscisi kurulmadi (testler); False: isiniyor ya da yuklenemedi.
     metin = metin_iscisi.hazir_mi()
-    hazir_mi = veritabani and isci
+    # Internetsiz kipte uydu iscisi bilerek acilmaz; yoklugu "hazir degil" sayilmaz.
+    uydu_gerekli = internetsiz.uydu_iscisi_gerekli()
+    hazir_mi = veritabani and (isci or not uydu_gerekli)
     # Analizin dosya bagimliliklari (J-184): eksikse sunucu ayakta ama sonuc
     # eksik ("yol katmani alinamadi", model listesi kisa). Yalniz evet/hayir
     # ve sayi; dosya yolu donmez.
@@ -79,10 +83,22 @@ def hazir():
         status_code=200 if hazir_mi else 503,
         content={
             "hazir": hazir_mi, "veritabani": veritabani, "analizIscisi": isci, "metinModeli": metin,
+            "internetsiz": internetsiz.etkin(),
             "yerelYolVerisi": yerel_yol.veri_var(),
             "uyduModeli": {"hazir": sum(modeller), "tanimli": len(modeller)},
         },
     )
+
+
+@yonlendirici.get("/api/internetsiz")
+def internetsiz_durumu(_kul: dict = Depends(kimlik.kullanici)):
+    """Ozellik matrisi (OPTIMIZASYON madde 33): hangi ozellik internet olmadan
+    calisir ve dayandigi yerel dosya bu sunucuda var mi. Elle yazilmis tablo
+    degil, her cagrida diskten olculur. Dosya yolu donmez, yalniz var/yok ve
+    sayi. Esitleme durumu ayri: /api/esitleme/durum."""
+    import internetsiz
+
+    return internetsiz.durum()
 
 
 @yonlendirici.get("/api/postgis/status")

@@ -35,6 +35,7 @@ from apps.road_damage.utils.serialization import compact_segment_coords as _comp
 from apps.road_damage.utils.imaging import image_array_to_b64 as _image_array_to_b64, build_damage_overlay as _build_damage_overlay, build_segmentation_overlay as _build_segmentation_overlay
 from apps.road_damage.utils.tiling import zoom_for_radius as _zoom_for_radius
 from fastapi import APIRouter, Depends, Query
+import internetsiz
 import kimlik
 
 yonlendirici = APIRouter()
@@ -42,6 +43,7 @@ yonlendirici = APIRouter()
 
 @yonlendirici.get("/api/road_damage/wayback_versions")
 def road_damage_wayback_versions(_kul: dict = Depends(kimlik.rol_gerektir("saha", "koordinator", "yonetici"))):
+    internetsiz.dis_servis_gerekli("wayback")
     try:
         runtime = ck._get_road_runtime()
     except Exception:
@@ -69,6 +71,7 @@ def road_damage_wayback_goruntuler(
     ayni kuraldan (`zoom_for_radius`) secilir; cunku ayni surum farkli
     yakinlastirmada farkli goruntu gosterebilir. Soguk ilk cagri Esri'ye birkac
     istek atar (olculdu 1,4-5,7 sn), sonra onbellekten doner."""
+    internetsiz.dis_servis_gerekli("wayback")
     from apps.road_damage.utils import wayback
 
     try:
@@ -136,6 +139,7 @@ def road_damage_oam_search(
     bboxNorth: Optional[float] = None,
     _kul: dict = Depends(kimlik.rol_gerektir("saha", "koordinator", "yonetici")),
 ):
+    internetsiz.dis_servis_gerekli("oam_arama")
     try:
         runtime = ck._get_road_runtime()
     except Exception:
@@ -167,6 +171,9 @@ def analyze_road_damage(req: ck.RoadDamageRequest, kul: dict = Depends(kimlik.ro
     other endpoint on this single-process server for its whole duration.
     Poll GET /api/road_damage/status/{analysisId} for the result.
     """
+    # Goruntu her kaynakta (google, esri, oam) internetten iner; is kuyruga
+    # girip dakikalarca sonra "goruntu alinamadi" demesin.
+    internetsiz.dis_servis_gerekli("uydu_goruntusu")
     if ck.road_damage_pool is None:
         raise HTTPException(status_code=503, detail="Road Damage worker havuzu henuz hazir degil.")
     if ck._count_queued_road_damage_jobs() >= ck.ROAD_DAMAGE_MAX_QUEUED_JOBS:

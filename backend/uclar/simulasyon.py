@@ -295,6 +295,14 @@ def simulasyon_kos(
             return {"isId": onceki, "parmakIzi": izi, "onbellekten": True}
 
     if ck.road_damage_pool is None:
+        import internetsiz
+
+        if not internetsiz.uydu_iscisi_gerekli():
+            raise HTTPException(
+                status_code=503,
+                detail="İnternetsiz kip: uydu analizi işçisi açılmadı, tatbikat kapalı "
+                       "(QUAKEMIND_UYDU_ISCISI=1 ile açılır).",
+            )
         raise HTTPException(status_code=503, detail="Çıkarım işçi havuzu henüz hazır değil.")
     if ck._count_queued_road_damage_jobs() >= ck.ROAD_DAMAGE_MAX_QUEUED_JOBS:
         raise HTTPException(status_code=503, detail="Kuyruk dolu; birkaç saniye sonra tekrar deneyin.")
